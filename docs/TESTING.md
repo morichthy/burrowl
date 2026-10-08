@@ -84,7 +84,7 @@
 **依赖、模型、打包、启动器**
 
 - 构建安装包，在含中文和空格的路径做一次离线安装。
-- 验证 `burrowl` 可用、`burrowl connect` 写入的配置能被 MCP 客户端拉起、版本切换与回滚。
+- 验证 `burrowl` 可用、`burrowl mcp-config` 输出的配置能被 MCP 客户端拉起；版本切换与回滚后 `burrowl upgrade` 刷新 Skill。
 
 **检索、表示或语义变化**
 

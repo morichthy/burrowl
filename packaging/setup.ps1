@@ -5,14 +5,18 @@
 #   <Root>\bin\burrowl.cmd          指向当前版本的启动器（加入用户 PATH）
 #   <Root>\models\              共享模型（安装包带模型且这里没有时复制）
 #
-# Root 默认 %LOCALAPPDATA%\burrowl；可用 -Root 指定（路径可含中文与空格）。
+# Root（安装根目录）：-Root 指定 → 上次安装记下的用户环境变量 BURROWL_ROOT → %LOCALAPPDATA%\burrowl。
+# 路径可含中文与空格。升级时不必再写 -Root，会装到上次的位置。
 param(
-    [string]$Root = (Join-Path $env:LOCALAPPDATA "burrowl"),
+    [string]$Root,
     [string]$Use,
     [switch]$List,
     [switch]$NoPath
 )
 $ErrorActionPreference = "Stop"
+if (-not $Root) { $Root = [Environment]::GetEnvironmentVariable("BURROWL_ROOT", "User") }
+if (-not $Root) { $Root = Join-Path $env:LOCALAPPDATA "burrowl" }
+$Root = [System.IO.Path]::GetFullPath($Root)
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $versions = Join-Path $Root "versions"
 New-Item -ItemType Directory -Force -Path $versions | Out-Null
@@ -26,6 +30,11 @@ function Write-Shim([string]$version) {
     $link = Join-Path $Root "current"
     if (Test-Path -LiteralPath $link) { cmd /c rmdir "$link" | Out-Null }  # rmdir 只删联接本身，不动目标内容
     New-Item -ItemType Junction -Path $link -Target (Join-Path $versions $version) | Out-Null
+    # 从商店/MSIX 打包应用（如 Claude 桌面版）里启动时，写入 AppData 的文件会被重定向到该应用的私有目录，
+    # 联接指向的真实路径并不存在；这样装出来的程序其他软件也看不到。及早失败并给出办法。
+    if (-not (Test-Path -LiteralPath (Join-Path $link "burrowl.cmd"))) {
+        throw "安装目录 $Root 被系统重定向（常见于从商店版应用中运行安装）。请改用 -Root 指定 AppData 以外的目录，如 setup.cmd -Root D:\software\burrowl"
+    }
     # 只用相对的 ASCII 路径：cmd 按控制台代码页读取 .cmd，中文绝对路径会被读坏。
     $shim = "@echo off`r`ncall `"%~dp0..\current\burrowl.cmd`" %*`r`nexit /b %ERRORLEVEL%`r`n"
     [System.IO.File]::WriteAllText((Join-Path $bin "burrowl.cmd"), $shim, (New-Object System.Text.ASCIIEncoding))
@@ -37,7 +46,11 @@ function Write-Shim([string]$version) {
             Write-Host "已把 $bin 加入用户 PATH（新开的终端生效）"
         }
     }
+    if (-not $NoPath) { [Environment]::SetEnvironmentVariable("BURROWL_ROOT", $Root, "User") }  # 下次升级的默认位置
     Write-Host "当前版本：$version"
+    # 切换版本后刷新所有登记过的 Skill 目录（只替换用户没改过的文件）；MCP 配置经 current 联接自动生效
+    & (Join-Path $link "burrowl.cmd") upgrade
+    if ($LASTEXITCODE -ne 0) { throw "刷新 Skill 失败" }
 }
 
 if ($List) {
@@ -57,14 +70,13 @@ if ($Use) {
 $version = (Get-Content -LiteralPath (Join-Path $here "VERSION") -Raw).Trim()
 $dest = Join-Path $versions $version
 if ((Resolve-Path -LiteralPath $here).Path -ne $dest) {
-    if (Test-Path -LiteralPath $dest) {
-        Write-Host "版本 $version 已存在，覆盖安装"
-        Remove-Item -LiteralPath $dest -Recurse -Force
+    # 同版本重装时就地同步，不先删除：正在运行的 MCP 服务会锁住 python 的 DLL，先删会删到一半失败。
+    # robocopy /MIR 跳过未变化的文件（锁住的运行时文件内容相同，不需要复制），删除包里已没有的文件。
+    if (Test-Path -LiteralPath $dest) { Write-Host "版本 $version 已存在，同步更新文件" } else { Write-Host "安装到 $dest" }
+    robocopy $here $dest /MIR /XD (Join-Path $here "models") /R:0 /W:0 /NFL /NDL /NJH /NJS /NP | Out-Null
+    if ($LASTEXITCODE -ge 8) {
+        throw "复制到 $dest 失败：有文件正被占用。关闭正在使用 burrowl 的 AI 客户端（其 MCP 服务）后重试"
     }
-    Write-Host "安装到 $dest"
-    New-Item -ItemType Directory -Force -Path $dest | Out-Null
-    Get-ChildItem -LiteralPath $here -Force | Where-Object { $_.Name -ne "models" } |
-        Copy-Item -Destination $dest -Recurse -Force
 }
 
 $bundledModels = Join-Path $here "models"

@@ -37,19 +37,26 @@ def test_default_models_dir_respects_env(tmp_path, monkeypatch):
     assert model_store.default_models_dir() == tmp_path / "m"
 
 
-def test_connect_project_merges_existing_servers(tmp_path, monkeypatch):
+def test_mcp_config_prints_standard_entry(tmp_path, monkeypatch):
     monkeypatch.delenv("BURROWL_HOME", raising=False)
     monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
     data = tmp_path / "数据 目录"
-    data.mkdir()
-    host = tmp_path / "host"
-    host.mkdir()
-    (host / ".mcp.json").write_text(json.dumps({"mcpServers": {"other": {"command": "x"}}}), encoding="utf-8")
-    result = CliRunner().invoke(cli, ["connect", "--data-dir", str(data), "-c", "claude-code", "--scope", "project",
-                                      "-p", str(host), "--mode", "manual"])
+    result = CliRunner().invoke(cli, ["mcp-config", "--data-dir", str(data), "--mode", "manual"])
     assert result.exit_code == 0, result.output
-    servers = json.loads((host / ".mcp.json").read_text(encoding="utf-8"))["mcpServers"]
-    assert servers["other"] == {"command": "x"}
-    assert servers["burrowl"]["args"][-7:] == ["mcp", "--data-dir", str(data.resolve()), "--work-dir", str(host.resolve()),
-                                              "--mode", "manual"]
-    assert servers["burrowl"]["env"]["PYTHONUTF8"] == "1"
+    entry = json.loads(result.stdout)["mcpServers"]["burrowl"]          # 标准输出只有 JSON，可直接解析
+    assert entry["args"][-5:] == ["mcp", "--data-dir", str(data.resolve()), "--mode", "manual"]
+    assert entry["env"]["PYTHONUTF8"] == "1" and (data / ".burrowl").is_dir()
+
+
+def test_models_dir_follows_install_root_through_current_junction(tmp_path, monkeypatch):
+    """经 bin -> current 联接启动时，模型目录仍是 <根>/models，而不是联接位置往上数两级。"""
+    import _winapi
+
+    root = tmp_path / "安装 根"
+    version = root / "versions" / "0.1.0"
+    version.mkdir(parents=True)
+    _winapi.CreateJunction(str(version), str(root / "current"))
+    monkeypatch.delenv("BURROWL_MODELS_DIR", raising=False)
+    for home in (version, root / "current"):
+        monkeypatch.setenv("BURROWL_HOME", str(home) + "\\")
+        assert model_store.default_models_dir() == (root / "models").resolve()

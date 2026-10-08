@@ -1,5 +1,4 @@
 """接入各类客户端：运行模式与项目启用、system_guide、各客户端配置格式。"""
-import json
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -40,25 +39,40 @@ def test_system_guide_serves_skill_text(tmp_path):
     assert call(ctx, "system.guide", {"name": "burrowl-work"})["text"] == (SKILLS / "burrowl-work" / "SKILL.md").read_text(encoding="utf-8")
 
 
-def test_connect_user_scope_for_several_clients(tmp_path, monkeypatch):
+def test_skills_install_upgrade_keeps_user_edits(tmp_path, monkeypatch):
     monkeypatch.delenv("BURROWL_HOME", raising=False)
-    home = tmp_path / "home"
-    monkeypatch.setenv("USERPROFILE", str(home))
-    monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("APPDATA", str(tmp_path / "appdata"))
-    codex = home / ".codex" / "config.toml"
-    codex.parent.mkdir(parents=True)
-    codex.write_text('model = "x"\n\n[mcp_servers.burrowl]\ncommand = "old"\n\n[mcp_servers.other]\ncommand = "y"\n',
-                     encoding="utf-8")
-    result = CliRunner().invoke(cli, ["connect", "-d", str(tmp_path / "数据"), "-c", "codex", "-c", "cursor",
-                                      "-c", "vscode", "--mode", "manual"])
+    target = tmp_path / "客户端 skills"
+    result = CliRunner().invoke(cli, ["skills", "install", str(target), "--dev"])
     assert result.exit_code == 0, result.output
-    text = codex.read_text(encoding="utf-8")
-    assert 'model = "x"' in text and "[mcp_servers.other]" in text and '"old"' not in text   # 只替换自己的表
-    assert text.count("[mcp_servers.burrowl]") == 1 and '"--mode", "manual"' in text
-    assert (home / ".codex" / "skills" / "burrowl-work" / "SKILL.md").exists()
-    cursor = json.loads((home / ".cursor" / "mcp.json").read_text(encoding="utf-8"))
-    assert "--work-dir" not in cursor["mcpServers"]["burrowl"]["args"]                      # 全局：工作目录取启动时目录
-    vscode = json.loads((tmp_path / "appdata" / "Code" / "User" / "mcp.json").read_text(encoding="utf-8"))
-    assert vscode["servers"]["burrowl"]["type"] == "stdio"
-    assert "burrowl enable" in result.output
+    assert (target / "RULES.md").exists() and (target / "burrowl-dev-check" / "SKILL.md").exists()
+    state = agents.load_state()
+    assert str(target.resolve()) in state["skill_dirs"]                     # 登记了目录，升级时会刷新
+
+    # 模拟"上一版本"装过的文件：旧内容（用户没改，指纹与记录一致）、用户改过的文件、新版本已删除的旧 Skill
+    work = target / "burrowl-work" / "SKILL.md"
+    read = target / "burrowl-read" / "SKILL.md"
+    old = target / "burrowl-old" / "SKILL.md"
+    for path, text in ((work, "旧版本内容"), (old, "已改名的旧 Skill")):
+        path.parent.mkdir(exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+        state["skill_files"][agents._key(path)] = agents._sha(path.read_bytes())
+    read.write_text("用户自己改过", encoding="utf-8")
+    agents.save_state(state)
+
+    assert agents.upgrade(lambda _: None) == 1
+    assert work.read_text(encoding="utf-8") == (SKILLS / "burrowl-work" / "SKILL.md").read_text(encoding="utf-8")
+    assert read.read_text(encoding="utf-8") == "用户自己改过"                 # 用户修改保留
+    assert not old.exists() and not old.parent.exists()                      # 旧 Skill 被移除
+    assert (target / "burrowl-dev-check" / "SKILL.md").exists()              # 沿用当时的 --dev 选项
+
+
+def test_skills_pack_for_upload(tmp_path):
+    import zipfile
+
+    made = agents.pack_skills(tmp_path / "zips", dev=False)
+    assert [p.name for p in made] == ["burrowl-work.zip", "burrowl-read.zip", "burrowl-consolidate.zip"]
+    with zipfile.ZipFile(made[0]) as archive:
+        names = set(archive.namelist())
+        assert names == {"burrowl-work/SKILL.md", "burrowl-work/RULES.md", "burrowl-work/RECORDING.md"}
+        assert "../RULES.md" not in archive.read("burrowl-work/SKILL.md").decode("utf-8")

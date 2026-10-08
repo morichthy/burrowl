@@ -122,6 +122,8 @@
 - **修订（2026-10-08）**：用户要求接入面向通用 agent，而不是优先 Claude；manual 要能按项目开启。改为：
   - `burrowl connect -c <客户端>` 按客户端写配置（generic、claude-code、codex、cursor、vscode、gemini、claude-desktop），默认用户级；
   - Skill 只装进原生支持 SKILL.md 的客户端；其余客户端由 MCP 工具 `system.guide` 提供同样的全文。MCP prompts 通常只能由用户触发，agent 读不到，所以不能作为唯一通道；
+  - **再修订（同日）**：用户要求不要替各 agent 决定 MCP 和 Skill 的安装细节。删除按客户端写配置的 `connect`，改为 `burrowl mcp-config` 输出标准 MCP 配置、`burrowl skills install <目录>` / `skills pack`，由客户端里的 agent 按自己客户端的规范登记（各客户端的配置位置变化快，写死在程序里易过时，例如 Codex 的用户级 Skill 目录已从 `~/.codex/skills` 改为 `~/.agents/skills`）。Skill 安装目录与文件指纹记入安装根目录下的 `burrowl-install.json`，setup 切换版本后自动执行 `burrowl upgrade`，只替换和删除用户没改过的文件；setup 记住安装根目录（用户环境变量 `BURROWL_ROOT`）。
+  - 安装根目录不放在 AppData：从 MSIX 打包的客户端（Claude 桌面版）中运行时 AppData 写入会被重定向到该应用私有目录，`current` 联接失效、其他程序也看不到；setup 检测到时报错。
   - 项目开关 `burrowl enable / disable`：写 `.burrowl.json`（MCP 服务启动时按工作目录读取，manual 下启用、auto 下关闭），并在 AGENTS.md（及已存在的 CLAUDE.md / GEMINI.md）中维护标记块，让不读 MCP 服务说明的客户端也知道。
 
 ## 三、删除或暂缓的功能

@@ -70,16 +70,21 @@ Skill 里反引号中的工具名（如 `memory_owners`）都由 burrowl MCP 服
 
 ## 安装
 
-安装分两步：先把程序装到本机，再用 `burrowl connect` 把它接入你使用的 AI 客户端。
+分两步：先把程序装到本机（每台电脑一次）；再把它接入你使用的 AI 客户端（每个客户端一次）。接入由客户端里的 AI 按它自己客户端的规范完成，burrowl 只提供标准的 MCP 配置和 Skill 文件。
 
 ### 让 AI 助手替你安装（推荐）
 
-在任意 AI 助手（Claude Code、Codex、Cursor、Gemini CLI 等）中，把下面这段话发给它，尖括号换成你的实际内容：
+1. 先手动解压安装包 `burrowl-<版本>-win64.zip`，放到一个长期保留的位置（如 `D:\software\burrowl`）。解压后得到 `burrowl-<版本>\` 文件夹，本文件 `README.md` 和安装脚本 `setup.cmd` 都在里面。
+2. 在任意 AI 助手（Claude Code、Codex、Cursor、Gemini CLI 等）中，把下面这段话发给它，尖括号换成你的实际内容：
 
-> 请按 `<burrowl 仓库或解压目录>/README.md` 中"安装步骤（AI 助手照此执行）"一节为我安装 burrowl。
-> 安装包：`<…/burrowl-0.1.0-win64.zip>`；数据目录：`<D:/BurrowlData/main>`；运行模式：`<auto 或 manual>`；接入的客户端：你自己（以及 `<其他客户端>`）。
+> 请按 `<解压后的 burrowl-<版本> 文件夹>\README.md` 中"安装步骤（AI 助手照此执行）"一节为我安装 burrowl，并接入你自己。
+> 安装根目录：`<D:\software\burrowl，可省略>`；数据目录：`<D:\BurrowlData\main>`；运行模式：`<auto 或 manual>`。
 
-AI 会执行下面的步骤，最后报告结果，并告诉你还需要做什么（通常只有"重启客户端或新开对话"）。
+**已经装过，只想再接入另一个客户端**（例如已在 Claude 中装好，还要在 Codex 中用）：在那个客户端里发：
+
+> 请按 `<安装根目录>\current\README.md` 中"接入客户端"一节，把 burrowl 接入你自己。数据目录：`<同一个数据目录>`；运行模式：`<auto 或 manual>`。
+
+多个客户端可以共用同一个数据目录，记忆是同一份。
 
 ### 安装步骤（AI 助手照此执行）
 
@@ -91,34 +96,31 @@ AI 会执行下面的步骤，最后报告结果，并告诉你还需要做什�
 
 需要用户提供（缺哪项就问哪项）：
 
-| 参数     | 含义                                                                 | 默认     |
-| -------- | -------------------------------------------------------------------- | -------- |
-| 安装来源 | 离线包`burrowl-<版本>-win64.zip`，或 burrowl 源码仓库              | —       |
-| 数据目录 | burrowl 存放记忆的文件夹，不存在会新建。不要放在项目目录或安装目录里 | —       |
-| 运行模式 | `auto`（全局启用）或 `manual`（按项目启用）                      | `auto` |
-| 客户端   | 你自己是哪个客户端，以及用户还要接入哪些，见第 3 步的表              | 你自己   |
-| 接入范围 | `user`（本机所有项目）或 `project`（只对一个项目）               | `user` |
+| 参数 | 含义 | 默认 |
+|---|---|---|
+| 安装来源 | 已解压的安装包文件夹（本 README 所在的 `burrowl-<版本>\`），或 burrowl 源码仓库 | 本 README 所在文件夹 |
+| 安装根目录 | 程序装到哪里，其下会有 `versions\`、`current\`、`bin\`、`models\` | 本 README 所在文件夹的上一级 |
+| 数据目录 | burrowl 存放记忆的文件夹，不存在会新建。不要放在项目目录或安装目录里 | — |
+| 运行模式 | `auto`（全局启用）或 `manual`（按项目启用） | `auto` |
 
 **方式 A：离线安装包**
 
-1. 解压到一个新的空目录，再运行安装脚本。脚本没有交互：把程序装到 `%LOCALAPPDATA%\burrowl\versions\<版本>`，并把 `burrowl` 加入用户 PATH。
+1. 运行解压目录中的安装脚本。安装包已由用户解压，不要再解压一次。
 
    ```powershell
-   $unpack = Join-Path $env:TEMP ("burrowl-setup-" + [guid]::NewGuid().ToString("N").Substring(0, 8))
-   Expand-Archive -LiteralPath "<安装包.zip>" -DestinationPath $unpack
+   & "<解压目录>\setup.cmd" -Root "<安装根目录>"
    ```
 
-   包内有一层 `burrowl-<版本>\` 目录，安装脚本在其中：
+   - 脚本没有交互：把程序复制到 `<安装根目录>\versions\<版本>`，建立 `current` 联接指向当前版本，把 `<安装根目录>\bin` 加入用户 PATH，并记住安装根目录（以后升级不用再写 `-Root`）。
+   - 成功标志：输出"当前版本：<版本>"，随后打印模型状态 JSON。
+   - 安装根目录不要放在 `%LOCALAPPDATA%` 等 AppData 目录下：从商店版或 MSIX 打包的 AI 客户端（如 Claude 桌面版）里运行时，写进 AppData 的文件会被系统重定向到该客户端的私有目录，其他软件看不到。脚本发现这种情况会报"安装目录被系统重定向"，换一个目录重试。
+
+   当前终端的 PATH 还没刷新，本次安装的后续命令都用完整路径调用：
 
    ```powershell
-   & (Get-ChildItem $unpack -Recurse -Filter setup.cmd | Select-Object -First 1).FullName
+   $burrowl = "<安装根目录>\bin\burrowl.cmd"
    ```
 
-   成功标志：输出"当前版本：<版本>"，随后打印模型状态 JSON。当前终端的 PATH 还没刷新，本次安装的后续命令都用完整路径调用：
-
-   ```powershell
-   $burrowl = "$env:LOCALAPPDATA\burrowl\bin\burrowl.cmd"
-   ```
 2. 安装模型。只需一次，需要联网下载约 220 MB；安装包名带 `-models` 时已经包含，跳过这一步。
 
    ```powershell
@@ -126,36 +128,8 @@ AI 会执行下面的步骤，最后报告结果，并告诉你还需要做什�
    ```
 
    下载失败不影响使用，只是检索退化为只用关键词。告诉用户稍后重试即可。
-3. 接入客户端。数据目录不存在会新建；重复运行是安全的；`-c` 可以写多次。
 
-   ```powershell
-   & $burrowl connect --data-dir "<数据目录>" --mode auto -c <客户端>
-   ```
-
-   | `-c` 取值        | MCP 配置写到（user 级 / project 级）                           | Skill 装到                                       |
-   | ------------------ | -------------------------------------------------------------- | ------------------------------------------------ |
-   | `claude-code`    | `claude mcp add-json --scope user` / `<项目>\.mcp.json`    | `~\.claude\skills` / `<项目>\.claude\skills` |
-   | `codex`          | `~\.codex\config.toml` / `<项目>\.codex\config.toml`       | `~\.codex\skills` / `<项目>\.codex\skills`   |
-   | `cursor`         | `~\.cursor\mcp.json` / `<项目>\.cursor\mcp.json`           | 不装（用`system_guide`）                       |
-   | `vscode`         | `%APPDATA%\Code\User\mcp.json` / `<项目>\.vscode\mcp.json` | 不装（用`system_guide`）                       |
-   | `gemini`         | `~\.gemini\settings.json` / `<项目>\.gemini\settings.json` | 不装（用`system_guide`）                       |
-   | `claude-desktop` | `%APPDATA%\Claude\claude_desktop_config.json`                | 不装（用`system_guide`）                       |
-   | `generic`        | 不写文件，打印通用配置（JSON 与 TOML），由你填进客户端         | 不装；需要时加`--skills-dir <目录>`            |
-
-
-   - 已有配置中的其他服务原样保留，只替换名为 burrowl 的一项。
-   - 只对一个项目接入时，加 `--scope project --project "<项目目录>"`。此时工作目录固定为该项目；user 级的工作目录取客户端启动 MCP 时的当前目录。
-   - 客户端支持 SKILL.md 但不在表中时，用 `--skills-dir <它的技能目录>` 安装 Skill。
-   - 运行模式为 manual 时，告诉用户：在需要的项目里运行 `burrowl enable <项目目录>`。
-4. 验证：
-
-   ```powershell
-   & $burrowl doctor --data-dir "<数据目录>"
-   ```
-
-   - 输出 JSON 中 `data_dir` 是用户指定的数据目录。`vector.ready` 为 false 只表示模型没装好。
-   - 第 3 步输出中列出的配置文件里有 `burrowl` 一项，`args` 含 `--data-dir` 和 `--mode`。
-5. 向用户报告：安装版本、数据目录、运行模式、接入了哪些客户端（及写入的文件）、模型是否就绪。然后请用户**重启客户端或新开对话**，客户端提示时同意启用 burrowl。之后在客户端的 MCP 列表中应能看到 burrowl。
+3. 按下面"接入客户端"一节，把 burrowl 接入你自己。
 
 **方式 B：从源码仓库安装（开发者）**
 
@@ -169,39 +143,70 @@ uv sync --all-packages --all-extras
 npm --prefix frontend ci; npm --prefix frontend run build
 ```
 
-之后把方式 A 中的 `& $burrowl` 换成 `uv run burrowl`，从第 2 步继续，同样在仓库目录下执行。
+之后把下文的 `& $burrowl` 换成 `uv run burrowl`，从"接入客户端"继续，同样在仓库目录下执行。
 
-- 这样登记的 MCP 用的是仓库虚拟环境里的 Python，所以仓库不能再移动。
+- 这样生成的 MCP 配置用的是仓库虚拟环境里的 Python，所以仓库不能再移动。
 - 生成离线安装包：`uv run python packaging/build.py`，加 `--with-models` 把模型一起打包，产物在 `dist/`。
 
-### 通用 MCP 配置
+### 接入客户端（AI 助手照此执行）
 
-不在上表中的客户端，照抄 `burrowl connect -c generic` 打印的配置即可，格式如下：
+程序已安装时，`$burrowl` 是 `<安装根目录>\bin\burrowl.cmd`。具体写到哪个配置文件、用什么命令登记，由你按自己客户端的规范决定。
 
-```json
-{
-  "mcpServers": {
-    "burrowl": {
-      "command": "C:\\Users\\<你>\\AppData\\Local\\burrowl\\current\\python\\python.exe",
-      "args": ["-m", "burrowl.interfaces.cli", "mcp", "--data-dir", "D:\\BurrowlData\\main", "--mode", "auto"],
-      "env": {"PYTHONUTF8": "1", "PYTHONNOUSERSITE": "1"}
-    }
-  }
-}
-```
+1. **登记 MCP 服务**。先生成标准配置（数据目录不存在会新建）：
 
-- `command` 指向 `current` 联接，以后升级或回滚版本不用改配置。
-- `--work-dir <目录>` 可选：固定工作目录；不写时用客户端启动服务时的当前目录。
-- 客户端不支持 Skill 时不需要做别的：AI 会按 MCP 服务说明调用 `system_guide` 读取工作流说明。
+   ```powershell
+   & $burrowl mcp-config --data-dir "<数据目录>" --mode auto
+   ```
+
+   它在标准输出打印 `{"mcpServers": {"burrowl": {command, args, env}}}`。把其中 `burrowl` 这一项**原样**登记为你所在客户端的**用户级（全局）** MCP 服务：
+   - 服务名用 `burrowl`；已有同名项就替换，其他服务不要动。
+   - 客户端用 TOML 等其他格式时，按它的格式转写 command、args、env 三项。
+   - 不要加 `--work-dir`：全局接入时，工作目录取客户端启动 MCP 时的当前目录，也就是用户打开的项目。只为单个项目接入时才写 `--work-dir <项目目录>`。
+   - `command` 指向 `<安装根目录>\current`，以后升级不用改这项配置。
+
+2. **安装 Skill**（三个工作流 burrowl-work、burrowl-read、burrowl-consolidate 与公共规则）：
+   - 客户端会从某个目录读取 SKILL.md 格式的 Skill：确定它的**用户级** Skill 目录，然后运行下面的命令。命令会登记这个目录，升级时自动更新。
+
+     ```powershell
+     & $burrowl skills install "<你的客户端的用户级 Skill 目录>"
+     ```
+
+   - 客户端只能通过界面上传 Skill 压缩包（如 Claude 桌面版的聊天）：运行下面的命令生成压缩包，并告诉用户在客户端的设置中逐个上传。
+
+     ```powershell
+     & $burrowl skills pack "<输出目录>"
+     ```
+
+   - 客户端不支持 Skill：跳过。burrowl 的 MCP 服务说明会让你用工具 `system_guide` 读取同样的内容。
+
+3. **验证**：
+
+   ```powershell
+   & $burrowl doctor --data-dir "<数据目录>"
+   ```
+
+   - 输出 JSON 中 `data_dir` 是用户指定的数据目录。`vector.ready` 为 false 只表示模型没装好。
+   - 客户端的 MCP 配置里有 `burrowl` 一项，`args` 含 `--data-dir` 和 `--mode`。客户端提供检查命令或界面的，用它确认 burrowl 能连接。
+
+4. **向用户报告**：安装根目录与版本、数据目录、运行模式、写入了哪些配置文件和 Skill 目录、模型是否就绪。然后请用户**重启客户端或新开对话**；客户端提示时同意启用 burrowl。运行模式为 manual 时，告诉用户在需要的项目里运行 `burrowl enable <项目目录>`。
+
+## 升级
+
+1. 解压新版本的安装包，运行其中的 `setup.cmd`。不用写 `-Root`：会装到上次记下的安装根目录。
+2. 脚本切换 `current` 到新版本，并自动执行 `burrowl upgrade`，刷新所有用 `burrowl skills install` 装过的 Skill 目录：
+   - 你没改过的文件直接替换为新版本；
+   - 你改过的文件保留不动，并提示；要覆盖，运行 `burrowl skills install <目录> --force`；
+   - 新版本里已不存在的旧 Skill 文件，只要没被改过就删除。
+3. 各客户端的 MCP 配置指向 `current`，不用改。重启客户端或新开对话即可。
+4. 用压缩包上传的 Skill（如 Claude 桌面版的聊天）不会自动更新：重新运行 `burrowl skills pack` 并重新上传。
+
+旧版本保留在 `versions\` 下：`setup.cmd -List` 列出已安装版本，`setup.cmd -Use <版本>` 切换或回滚（同样会刷新 Skill）。数据目录不受升级影响。
 
 ## 接入后怎样使用
 
 ### 改数据目录、工作目录或运行模式
 
-这三项都是客户端 MCP 配置里的启动参数，改完后**重启客户端或新开对话**生效。改法任选其一：
-
-- 用新参数重新运行 `burrowl connect`，会覆盖原来的 burrowl 配置项；
-- 直接编辑客户端配置中 burrowl 一项的 `--data-dir`、`--work-dir`、`--mode`。
+这三项都是客户端 MCP 配置里 burrowl 一项的启动参数（`--data-dir`、`--work-dir`、`--mode`）。直接改配置，或请 AI 按"接入客户端"一节重新登记，然后**重启客户端或新开对话**生效。
 
 另外两个开关：
 
@@ -301,9 +306,7 @@ burrowl restore D:/备份/research-2026-10.zip D:/BurrowlData/main --map ROOT-PR
   burrowl call index.reconcile --data-dir D:/BurrowlData/main
   ```
 
-  ```bash
-  burrowl connect --data-dir D:/BurrowlData/main -c <客户端>
-  ```
+  然后在新电脑的各个 AI 客户端里，请 AI 按"接入客户端"一节重新接入（数据目录填恢复后的目录）。
 
 **只是工作目录搬家**（数据目录不变）：把整个目录移到新位置后，在工作台"维护与监测 → 工作目录"填新位置，或让 AI 调用 `sources_relocate_root`。程序会逐个核对文件指纹，全部一致才改指向。
 
@@ -328,13 +331,15 @@ burrowl validate
 
 - 不要手工修改 `memory/` 和 `.burrowl/` 中的文件。
 - 原件保持只读；内容更新时用新的来源 ID 登记。
-- 模型放在 `%LOCALAPPDATA%\burrowl\models`，所有数据目录共用；可用环境变量 `BURROWL_MODELS_DIR` 改位置。
+- 模型放在安装根目录下的 `models`（直接双击 setup.cmd 安装时为 `%LOCALAPPDATA%\burrowl\models`），所有数据目录共用；可用环境变量 `BURROWL_MODELS_DIR` 改位置。
 
 ## 命令速查
 
 | 命令                                                                                                      | 作用                                                |
 | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| `burrowl connect -d <数据目录> -c <客户端> [--mode auto 或 manual] [--scope project -p <项目>] [--dev]` | 一步接入：数据目录 + 客户端 MCP 配置 + Skill        |
+| `burrowl mcp-config -d <数据目录> [--mode auto 或 manual]` | 准备数据目录并输出标准 MCP 配置（由 AI 登记到自己的客户端） |
+| `burrowl skills install <Skill 目录> [--dev]` / `burrowl skills pack <输出目录>` | 安装并登记 Skill / 生成供上传的 Skill 压缩包 |
+| `burrowl upgrade` | 刷新已登记的 Skill 目录（setup.cmd 自动调用） |
 | `burrowl enable [<项目>]` / `burrowl disable [<项目>]`                                                | 在项目中启用 / 关闭 burrowl 工作流                  |
 | `burrowl init <数据目录>`                                                                               | 新建数据目录并设为默认                              |
 | `burrowl serve`                                                                                         | 启动工作台                                          |
@@ -344,15 +349,14 @@ burrowl validate
 | `burrowl verify-backup <包.zip>`                                                                        | 只校验备份，列出工作根与原件                        |
 | `burrowl restore <包.zip> <新目录> [--map 键=新位置] [--default]`                                       | 恢复并重定向原件                                    |
 | `burrowl secret set keyring:burrowl/<连接器>`                                                           | 把密钥写入本机凭据管理器                            |
-| `burrowl skills install <目录> [--only work]`                                                           | 单独安装 Skill                                      |
 | `burrowl call <操作> key=value` / `burrowl ops`                                                       | 直接调用任意操作 / 列出全部操作                     |
 | `setup.cmd -List` / `setup.cmd -Use <版本>`                                                           | 列出已安装版本 / 切换或回滚版本（数据目录不受影响） |
 
-**升级**：解压新版本，运行它的 `setup.cmd`，旧版本保留。已登记的 MCP 配置经 `current` 联接自动指向新版本。之后重新运行 `burrowl connect`（或 `burrowl skills install <目录> --force`）更新 Skill。
+升级见上文"升级"一节。
 
 ## 开发与已知边界
 
-- 修改本框架时先读 [AGENTS.md](AGENTS.md) 与 [burrowl-dev-check](skills/burrowl-dev-check/SKILL.md)（`burrowl connect --dev` 会安装它）。六份必读文档的分工见 [docs/README](docs/README.md)，架构见 [ARCHITECTURE](ARCHITECTURE.md)，选择理由见 [DEVELOPMENT_HISTORY](docs/DEVELOPMENT_HISTORY.md)。
+- 修改本框架时先读 [AGENTS.md](AGENTS.md) 与 [burrowl-dev-check](skills/burrowl-dev-check/SKILL.md)（`burrowl skills install <目录> --dev` 会安装它）。六份必读文档的分工见 [docs/README](docs/README.md)，架构见 [ARCHITECTURE](ARCHITECTURE.md)，选择理由见 [DEVELOPMENT_HISTORY](docs/DEVELOPMENT_HISTORY.md)。
 - 源项目功能的迁移对照见 [MIGRATION_AUDIT](docs/MIGRATION_AUDIT.md)。
 - **已知边界**：
   - 只支持 memory-v4 数据格式，不迁移源项目的旧数据；

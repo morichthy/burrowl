@@ -24,6 +24,9 @@ RERANKER_REPO = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
 def default_models_dir() -> Path:
     if value := os.environ.get("BURROWL_MODELS_DIR"):
         return Path(value)
+    if home := os.environ.get("BURROWL_HOME"):
+        # 安装包内：BURROWL_HOME 是版本目录，或经 current 联接到达；resolve() 穿过联接，取 <根>/models
+        return Path(home).resolve().parent.parent / "models"
     base = os.environ.get("LOCALAPPDATA")
     return Path(base) / "burrowl" / "models" if base else Path.home() / ".local" / "share" / "burrowl" / "models"
 

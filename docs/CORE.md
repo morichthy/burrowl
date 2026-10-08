@@ -230,4 +230,4 @@ wiki：外部被人修改（漂移）时不覆盖，除非显式 force
     写数据文件和原件 → 改写新数据目录的来源登记（relocated_from 留痕）
 ```
 
-实现：`storage/sources.py`、`portable/bundle.py`、`interfaces/cli.py`（`connect`、`mcp`、`backup`、`restore`）。
+实现：`storage/sources.py`、`portable/bundle.py`、`interfaces/cli.py`（`mcp-config`、`mcp`、`backup`、`restore`）与 `interfaces/agents.py`（Skill 安装与升级）。

@@ -1,29 +1,30 @@
-"""把 burrowl 接入各类 AI 客户端（agent）：MCP 配置的位置与格式、Skill 目录、项目启用标记。
+"""把 burrowl 接入 AI 客户端（agent）：标准 MCP 配置、Skill 安装与升级、项目启用标记。
 
-MCP 配置是通用的 stdio 服务描述（command + args + env），各客户端只是存放位置和外层格式不同：
+burrowl 不替各客户端决定配置写到哪里：`burrowl mcp-config` 给出标准的 MCP stdio 服务描述
+（command + args + env），由客户端里的 agent 按自己客户端的规范登记；Skill 由 agent 选好自己客户端的
+Skill 目录后用 `burrowl skills install <目录>` 安装，只能上传压缩包的客户端用 `burrowl skills pack`。
 
-    客户端          用户级（全局）                                   项目级
-    generic         只打印配置，由用户或 agent 填进自己的客户端
-    claude-code     claude mcp add-json --scope user                 <项目>/.mcp.json
-    codex           ~/.codex/config.toml  [mcp_servers.<名>]         <项目>/.codex/config.toml
-    cursor          ~/.cursor/mcp.json                               <项目>/.cursor/mcp.json
-    vscode          %APPDATA%/Code/User/mcp.json（键 servers）       <项目>/.vscode/mcp.json
-    gemini          ~/.gemini/settings.json                          <项目>/.gemini/settings.json
-    claude-desktop  %APPDATA%/Claude/claude_desktop_config.json      —
-
-Skill（SKILL.md 目录格式）只有原生支持的客户端才装到它们的技能目录；其他客户端由 MCP 工具
-system_guide 提供同样的说明全文，所以不装 Skill 也能按工作流工作。
+安装记录（安装根目录下的 burrowl-install.json；开发环境在 %APPDATA%/burrowl/ 下）：
+    skill_dirs   装过 Skill 的目录及当时的选项。升级（setup 自动调用 `burrowl upgrade`）时逐个刷新；
+    skill_files  本程序写出的每个文件 → sha256。只替换或删除仍与记录一致（用户没改过）的文件。
+MCP 配置指向 <安装根目录>/current，升级只切换 current，配置不用改。
 
 项目启用：<项目>/.burrowl.json 写 {"enabled": true}，并在项目说明文件（AGENTS.md，及已存在的
 CLAUDE.md / GEMINI.md）中维护一段标记块。MCP 服务启动时读取工作目录下的标记；项目说明文件则让
 不经 MCP 说明的客户端同样知道本项目启用了 burrowl。
 """
+import hashlib
 import json
 import os
 import re
-import shutil
-import subprocess
+import sys
+import zipfile
+from collections.abc import Callable
 from pathlib import Path
+
+SKILL_NAMES = ("burrowl-work", "burrowl-read", "burrowl-consolidate", "burrowl-dev-check")
+SHARED_DOCS = ("RULES.md", "RECORDING.md")
+STATE_FILE = "burrowl-install.json"
 
 MARKER = ".burrowl.json"
 BLOCK_BEGIN = "<!-- burrowl:begin -->"
@@ -42,92 +43,179 @@ BLOCK = f"""{BLOCK_BEGIN}
 """
 NOTE_FILES = ["AGENTS.md", "CLAUDE.md", "GEMINI.md"]   # AGENTS.md 总是写；其余只在已存在时写
 
-
-def _appdata() -> Path:
-    return Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming")
+Echo = Callable[[str], None]
 
 
-def clients() -> dict[str, dict]:
-    """客户端 → {user, project, format, skills_user, skills_project}。路径在调用时计算（便于测试改环境变量）。"""
-    home = Path.home()
-    return {
-        "generic": {"format": "print"},
-        "claude-code": {"user": "claude-cli", "project": ".mcp.json", "format": "json",
-                        "skills_user": home / ".claude" / "skills", "skills_project": ".claude/skills"},
-        "codex": {"user": home / ".codex" / "config.toml", "project": ".codex/config.toml", "format": "toml",
-                  "skills_user": home / ".codex" / "skills", "skills_project": ".codex/skills"},
-        "cursor": {"user": home / ".cursor" / "mcp.json", "project": ".cursor/mcp.json", "format": "json"},
-        "vscode": {"user": _appdata() / "Code" / "User" / "mcp.json", "project": ".vscode/mcp.json",
-                   "format": "vscode"},
-        "gemini": {"user": home / ".gemini" / "settings.json", "project": ".gemini/settings.json",
-                   "format": "json"},
-        "claude-desktop": {"user": _appdata() / "Claude" / "claude_desktop_config.json", "format": "json"},
-    }
+# ---------- 安装位置与 MCP 配置 ----------
+def skills_source() -> Path:
+    """仓库内 skills/ 目录（开发时）或安装包内的 skills/。"""
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        if (parent / "skills" / "RULES.md").exists():
+            return parent / "skills"
+    return here.parents[3] / "skills"
 
 
-def _merge_json(path: Path, key: str, name: str, entry: dict) -> None:
-    config = json.loads(path.read_text(encoding="utf-8")) if path.exists() and path.read_text(encoding="utf-8").strip() else {}
-    config.setdefault(key, {})[name] = entry
+def install_root() -> Path | None:
+    """安装包内运行时的安装根目录（BURROWL_HOME 是版本目录或经 current 联接到达，resolve() 穿过联接）。"""
+    home = os.environ.get("BURROWL_HOME")
+    return Path(home).resolve().parent.parent if home else None
+
+
+def launcher() -> tuple[list[str], dict[str, str]]:
+    """客户端拉起本程序的命令与环境。
+
+    安装包内：直接用 <根>/current/python/python.exe，不经 .cmd（客户端经 cmd.exe 启动带空格路径的 .cmd 容易出错），
+    切换版本后配置仍然有效。开发环境：当前解释器。
+    """
+    env = {"PYTHONUTF8": "1"}
+    root = install_root()
+    if root is not None:
+        current = root / "current"
+        base = current if (current / "python").is_dir() else Path(os.environ["BURROWL_HOME"]).resolve()
+        env["BURROWL_MODELS_DIR"] = str(root / "models")   # 与 model_store.default_models_dir 一致
+        return [str(base / "python" / "python.exe"), "-m", "burrowl.interfaces.cli"], env | {"PYTHONNOUSERSITE": "1"}
+    return [sys.executable, "-m", "burrowl.interfaces.cli"], env
+
+
+def server_entry(data: Path, work: Path | None, mode: str | None) -> dict:
+    """标准 MCP stdio 服务描述：数据目录、工作目录与运行模式都写成启动参数，改位置只需改这里。"""
+    (command, *args), env = launcher()
+    args = [*args, "mcp", "--data-dir", str(data)]
+    if work:
+        args += ["--work-dir", str(work)]
+    if mode:
+        args += ["--mode", mode]
+    return {"command": command, "args": args, "env": env}
+
+
+# ---------- 安装记录 ----------
+def state_path() -> Path:
+    root = install_root()
+    if root is not None:
+        return root / STATE_FILE
+    return Path(os.environ.get("APPDATA") or Path.home() / ".config") / "burrowl" / STATE_FILE
+
+
+def load_state() -> dict:
+    path = state_path()
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        value = {}
+    value.setdefault("skill_dirs", {})
+    value.setdefault("skill_files", {})
+    return value
+
+
+def save_state(state: dict) -> None:
+    path = state_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    path.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def toml_block(name: str, entry: dict) -> str:
-    """Codex 的 [mcp_servers.<名>] 表。json.dumps 生成的字符串同时是合法的 TOML 基本字符串。"""
-    lines = [f"[mcp_servers.{name}]", f"command = {json.dumps(entry['command'], ensure_ascii=False)}",
-             f"args = {json.dumps(entry['args'], ensure_ascii=False)}", "", f"[mcp_servers.{name}.env]"]
-    lines += [f"{k} = {json.dumps(v, ensure_ascii=False)}" for k, v in entry["env"].items()]
-    return "\n".join(lines) + "\n"
+def _sha(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
 
 
-def _merge_toml(path: Path, name: str, entry: dict) -> None:
-    """替换（或追加）本服务的两个表，文件其余内容原样保留。"""
-    text = path.read_text(encoding="utf-8") if path.exists() else ""
-    own = re.compile(rf"^\[mcp_servers\.{re.escape(name)}(\.env)?\]\s*$")
-    kept, skipping = [], False
-    for line in text.splitlines():
-        if line.lstrip().startswith("["):
-            skipping = bool(own.match(line.strip()))
-        if not skipping:
-            kept.append(line)
-    body = "\n".join(kept).rstrip()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text((body + "\n\n" if body else "") + toml_block(name, entry), encoding="utf-8")
+def _key(path: Path) -> str:
+    return os.path.normcase(str(path.resolve()))
 
 
-def write_mcp(client: str, scope: str, project: Path | None, name: str, entry: dict) -> str:
-    """按客户端写入 MCP 配置，返回给用户看的一句说明。不认识或无法写入时返回手动配置文本。"""
-    spec = clients()[client]
-    if spec["format"] == "print":
-        return ("通用 MCP 配置（填进你的客户端的 MCP 设置）：\n"
-                + json.dumps({"mcpServers": {name: entry}}, ensure_ascii=False, indent=2)
-                + "\nTOML 形式（如 Codex）：\n" + toml_block(name, entry))
-    target = spec.get(scope)
-    if target is None:
-        return f"{client} 不支持 {scope} 级配置"
-    if target == "claude-cli":
-        command = [shutil.which("claude") or "claude", "mcp", "add-json", "--scope", "user", name,
-                   json.dumps(entry, ensure_ascii=False)]
-        if shutil.which("claude") and subprocess.run(command, check=False).returncode == 0:
-            return "Claude Code：已登记为用户级 MCP 服务"
-        return "Claude Code：未找到 claude 命令或登记失败，请手动运行：\n  " + subprocess.list2cmdline(command)
-    path = target if isinstance(target, Path) else project / target
-    if spec["format"] == "toml":
-        _merge_toml(path, name, entry)
-    elif spec["format"] == "vscode":
-        _merge_json(path, "servers", name, {"type": "stdio", **entry})
-    else:
-        _merge_json(path, "mcpServers", name, entry)
-    return f"{client}：已写入 {path}"
+# ---------- Skill ----------
+def skill_names(dev: bool) -> list[str]:
+    return [n for n in SKILL_NAMES if dev or n != "burrowl-dev-check"]
 
 
-def skills_dir(client: str, scope: str, project: Path | None) -> Path | None:
-    """客户端原生的 Skill 目录；不支持 Skill 的客户端返回 None（改用 system_guide 工具）。"""
-    spec = clients()[client]
-    if scope == "user":
-        return spec.get("skills_user")
-    relative = spec.get("skills_project")
-    return project / relative if relative and project else None
+def _skill_payload(names: list[str]) -> dict[str, bytes]:
+    """目标目录下的相对路径 → 内容。布局与仓库一致：<目录>/RULES.md 与 <目录>/<skill>/SKILL.md。"""
+    source = skills_source()
+    files = {doc: (source / doc).read_bytes() for doc in SHARED_DOCS}
+    for name in names:
+        files[f"{name}/SKILL.md"] = (source / name / "SKILL.md").read_bytes()
+    return files
+
+
+def install_skills(target: Path, *, dev: bool, force: bool, state: dict, echo: Echo) -> dict:
+    """把 Skill 装进 target 并登记，供升级时刷新。
+
+    已存在的文件：内容相同跳过；与上次本程序写出的一致（用户没改过）就替换；被用户改过则保留并提示（force 时覆盖）。
+    上次装过、这次不再需要的文件（如改名或去掉的 Skill），未被修改时删除。
+    """
+    target = target.resolve()
+    recorded = state["skill_files"]
+    wanted = _skill_payload(skill_names(dev))
+    counts = {"written": 0, "unchanged": 0, "kept_modified": 0, "removed": 0}
+    new_keys = set()
+    for relative, data in wanted.items():
+        destination = target / relative
+        key = _key(destination)
+        new_keys.add(key)
+        if destination.exists():
+            existing = destination.read_bytes()
+            current = _sha(existing)
+            if existing.replace(b"\r\n", b"\n") == data.replace(b"\r\n", b"\n"):   # 只差换行符也算未变
+                recorded[key] = current
+                counts["unchanged"] += 1
+                continue
+            if not force and recorded.get(key) != current:
+                echo(f"保留（已被修改，--force 覆盖）：{destination}")
+                counts["kept_modified"] += 1
+                continue
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(data)
+        recorded[key] = _sha(data)
+        counts["written"] += 1
+    for key, digest in list(recorded.items()):
+        path = Path(key)
+        if key in new_keys or not key.startswith(_key(target) + os.sep):
+            continue
+        if path.is_file() and _sha(path.read_bytes()) == digest:
+            path.unlink()
+            if path.parent != target and not any(path.parent.iterdir()):
+                path.parent.rmdir()
+            counts["removed"] += 1
+        recorded.pop(key, None)
+    state["skill_dirs"][str(target)] = {"dev": dev}
+    echo(f"Skill → {target}：写入 {counts['written']}，未变 {counts['unchanged']}，"
+         f"保留用户修改 {counts['kept_modified']}，移除旧文件 {counts['removed']}")
+    return counts
+
+
+def pack_skills(out_dir: Path, *, dev: bool) -> list[Path]:
+    """为只能上传压缩包的客户端（如 Claude 桌面版的聊天）生成每个 Skill 的 zip。
+
+    每个 zip 顶层是以 Skill 命名的文件夹，内含 SKILL.md 和公共规则；SKILL.md 中的 ../RULES.md 改为同目录引用。
+    """
+    source = skills_source()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    made = []
+    for name in skill_names(dev):
+        text = (source / name / "SKILL.md").read_text(encoding="utf-8")
+        for doc in SHARED_DOCS:
+            text = text.replace(f"../{doc}", doc)
+        path = out_dir / f"{name}.zip"
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr(f"{name}/SKILL.md", text)
+            for doc in SHARED_DOCS:
+                archive.writestr(f"{name}/{doc}", (source / doc).read_bytes())
+        made.append(path)
+    return made
+
+
+def upgrade(echo: Echo) -> int:
+    """新版本切换后由 setup 调用：刷新所有登记过的 Skill 目录。返回刷新的目录数。"""
+    state = load_state()
+    done = 0
+    for directory, options in list(state["skill_dirs"].items()):
+        if not Path(directory).is_dir():
+            echo(f"跳过（目录已不存在，移除登记）：{directory}")
+            state["skill_dirs"].pop(directory)
+            continue
+        install_skills(Path(directory), dev=bool(options.get("dev")), force=False, state=state, echo=echo)
+        done += 1
+    save_state(state)
+    return done
 
 
 # ---------- 项目启用 ----------
@@ -150,7 +238,7 @@ def _strip_block(text: str) -> str:
 def enable(project: Path) -> list[Path]:
     """在项目中启用 burrowl 工作流：写标记文件，并在项目说明文件中加入（或更新）标记块。"""
     written = [project / MARKER]
-    (project / MARKER).write_text(json.dumps({"enabled": True, "workflows": ["burrowl-work", "burrowl-read", "burrowl-consolidate"]},
+    (project / MARKER).write_text(json.dumps({"enabled": True, "workflows": list(skill_names(False))},
                                              ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     for name in NOTE_FILES:
         path = project / name

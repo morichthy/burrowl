@@ -154,7 +154,7 @@ core         记录模型与校验、契约说明、哈希、原子写与锁、�
 
 - 离线安装包按版本安装，用 `current` 联接切换和回滚版本。
 - 整个数据目录的备份、迁移用 burrowl-bundle（逐文件 sha256；不含可重建的索引）。默认连同数据目录外的已登记原件一起打包；恢复时按 `--map` 或默认规则放置原件，并自动改写来源登记。
-- 接入方式（数据目录、工作目录、运行模式 auto/manual）是宿主 MCP 配置里的启动参数，不写进数据目录；`burrowl connect -c <客户端>` 按客户端写好 MCP 配置并在原生支持时安装 Skill（`interfaces/agents.py`）。项目开关 `.burrowl.json` 优先于模式；工作流说明另由 `system.guide` 提供给不支持 Skill 的客户端。
+- 接入方式（数据目录、工作目录、运行模式 auto/manual）是宿主 MCP 配置里的启动参数，不写进数据目录；`burrowl mcp-config` 输出标准 MCP 配置、`burrowl skills install / pack` 提供 Skill，登记到哪里由各客户端里的 agent 按其规范决定（`interfaces/agents.py`）。Skill 安装目录记入安装根目录的 `burrowl-install.json`，升级时 `burrowl upgrade` 只替换未被用户修改的文件。项目开关 `.burrowl.json` 优先于模式；工作流说明另由 `system.guide` 提供给不支持 Skill 的客户端。
 - 不提供源项目旧数据（v1–v3）的迁移。
 
 ### 已知差距

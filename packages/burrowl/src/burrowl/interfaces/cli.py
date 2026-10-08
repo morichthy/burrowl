@@ -1,6 +1,8 @@
-"""命令行 `burrowl`。数据目录：--data-dir → 环境变量 BURROWL_DATA_DIR → %APPDATA%/burrowl/workspaces.json 的默认项。
+"""命令行 `burrowl`。数据目录：--data-dir → 环境变量 BURROWL_DATA_DIR → 已登记的默认数据目录（workspaces.json）。
 
-    burrowl connect -d D:/BurrowlData/main -c codex [--mode auto|manual]   接入 AI 客户端：MCP 配置 + Skill
+    burrowl mcp-config -d D:/BurrowlData/main [--mode auto|manual]   准备数据目录并输出标准 MCP 配置（由 agent 登记）
+    burrowl skills install <客户端的 Skill 目录> / skills pack <目录>   安装 Skill / 生成供上传的 Skill 压缩包
+    burrowl upgrade                                  新版本切换后刷新已安装的 Skill（setup 自动调用）
     burrowl enable / disable <项目目录>             在项目中启用 / 关闭 burrowl 工作流
     burrowl init D:/BurrowlData/main                   新建数据目录并设为默认
     burrowl serve [--port 0] [--no-browser]        启动工作台（同时挂载 MCP HTTP）
@@ -10,7 +12,6 @@
     burrowl call memory.inspect owner_id=RES-X      调用任意操作（也可 --json 文件 / -）
     burrowl ops [--group reading]                   操作目录
     burrowl secret set keyring:burrowl/weknora       把密钥写入本机凭据管理器（交互输入，不回显）
-    burrowl skills install --target .claude/skills  安装工作流 Skill（只增不覆盖用户修改）
 """
 import getpass
 import json
@@ -25,6 +26,8 @@ from ..app import App
 from ..core.errors import BurrowlError
 from ..index import model_store
 from ..storage import secrets
+from . import agents
+from .agents import server_entry, skills_source
 from .ops.registry import Ctx, call, catalog
 
 cli = typer.Typer(add_completion=False, no_args_is_help=True, help="AI 研发工作区（burrowl）")
@@ -41,6 +44,9 @@ Mode = typer.Option(None, "--mode", help="auto：对话默认按工作流进行�
 
 
 def registry_file() -> Path:
+    """已登记的数据目录。安装包内放在安装根目录下：从商店版应用里运行时 AppData 会被重定向，其他程序看不到。"""
+    if (root := agents.install_root()) is not None:
+        return root / "workspaces.json"
     base = Path(os.environ.get("APPDATA") or Path.home() / ".config")
     return base / "burrowl" / "workspaces.json"
 
@@ -56,15 +62,6 @@ def resolve_data_dir(value: Path | None) -> Path:
         if default:
             return Path(default)
     raise typer.BadParameter("未指定数据目录：用 --data-dir、环境变量 BURROWL_DATA_DIR，或先运行 burrowl init")
-
-
-def skills_source() -> Path:
-    """仓库内 skills/ 目录（开发时）或安装包旁的 skills/。"""
-    here = Path(__file__).resolve()
-    for parent in here.parents:
-        if (parent / "skills").is_dir() and (parent / "skills" / "RULES.md").exists():
-            return parent / "skills"
-    return here.parents[3] / "skills"
 
 
 def _fail(exc: BurrowlError) -> None:
@@ -143,36 +140,6 @@ def mcp(data_dir: Path | None = DataDir, work_dir: Path | None = WorkDir, mode: 
     run_stdio(app, skills_dir=skills_source())
 
 
-def launcher() -> tuple[list[str], dict[str, str]]:
-    """宿主拉起本程序的命令与环境。
-
-    安装包内（burrowl.cmd 设置 BURROWL_HOME=版本目录）：直接用 <根>/current/python/python.exe，
-    不经 .cmd（宿主经 cmd.exe 启动带空格路径的 .cmd 容易出错），切换版本后配置仍然有效。
-    开发环境：当前解释器。
-    """
-    env = {"PYTHONUTF8": "1"}
-    if os.environ.get("BURROWL_HOME"):
-        version_dir = Path(os.environ["BURROWL_HOME"]).resolve()
-        root = version_dir.parent.parent
-        current = root / "current"
-        base = current if (current / "python").is_dir() else version_dir
-        if (root / "models" / "multilingual-minilm").is_dir():
-            env["BURROWL_MODELS_DIR"] = str(root / "models")
-        return [str(base / "python" / "python.exe"), "-m", "burrowl.interfaces.cli"], env | {"PYTHONNOUSERSITE": "1"}
-    return [sys.executable, "-m", "burrowl.interfaces.cli"], env
-
-
-def server_entry(data: Path, work: Path | None, mode: str | None) -> dict:
-    """宿主 MCP 配置中的一项：数据目录、工作目录与运行模式都写成启动参数，改位置只需改这里。"""
-    (command, *args), env = launcher()
-    args = [*args, "mcp", "--data-dir", str(data)]
-    if work:
-        args += ["--work-dir", str(work)]
-    if mode:
-        args += ["--mode", mode]
-    return {"command": command, "args": args, "env": env}
-
-
 def _register_default(root: Path, *, force: bool) -> bool:
     path = registry_file()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -185,55 +152,28 @@ def _register_default(root: Path, *, force: bool) -> bool:
     return changed
 
 
-@cli.command()
-def connect(data_dir: Path = typer.Option(..., "--data-dir", "-d", help="数据目录；不存在时新建"),
-            client: list[str] = typer.Option(["generic"], "--client", "-c", help=(
-                "要接入的客户端，可重复：generic（只打印通用配置）、claude-code、codex、cursor、vscode、gemini、"
-                "claude-desktop")),
-            scope: str = typer.Option("user", help="user：本机所有项目（全局）；project：只对 --project 指定的项目"),
-            project: Path | None = typer.Option(None, "--project", "-p", help="项目目录（scope=project 时必填，也是工作目录）"),
-            mode: str = typer.Option("auto", "--mode", help=(
-                "auto：任何项目中的实质工作默认按 burrowl-work / burrowl-read / burrowl-consolidate 进行；"
-                "manual：默认不启用，只在用 burrowl enable 启用的项目中或用户明确要求时使用")),
-            work_dir: Path | None = typer.Option(None, "--work-dir", "-w", help=(
-                "固定的工作目录；默认 project 级为项目目录，user 级为客户端启动 MCP 时的当前目录")),
-            skills_dir: Path | None = typer.Option(None, "--skills-dir", help=(
-                "另把 Skill 装到这个目录（客户端支持 SKILL.md 但不在内置列表中时）")),
-            dev: bool = typer.Option(False, help="同时安装框架开发用的 burrowl-dev-check Skill"),
-            name: str = typer.Option("burrowl", help="MCP 服务名")) -> None:
-    """一步接入 AI 客户端：准备数据目录 → 写入各客户端的 MCP 配置 → 安装 Skill（客户端支持时）。可重复运行。"""
-    from . import agents  # noqa: PLC0415
-
+@cli.command("mcp-config")
+def mcp_config(data_dir: Path = typer.Option(..., "--data-dir", "-d", help="数据目录；不存在时新建"),
+               mode: str = typer.Option("auto", "--mode", help=(
+                   "auto：任何项目中的实质工作默认按 burrowl-work / burrowl-read / burrowl-consolidate 进行；"
+                   "manual：默认不启用，只在用 burrowl enable 启用的项目中或用户明确要求时使用")),
+               work_dir: Path | None = typer.Option(None, "--work-dir", "-w", help=(
+                   "固定的工作目录；不写时为客户端启动 MCP 时的当前目录（全局接入时不要写）")),
+               name: str = typer.Option("burrowl", help="MCP 服务名")) -> None:
+    """准备数据目录，并向标准输出打印标准 MCP 配置（JSON），由客户端里的 agent 按自己客户端的规范登记。"""
     _mode(mode)
-    known = agents.clients()
-    unknown = [c for c in client if c not in known]
-    if unknown:
-        raise typer.BadParameter(f"未知客户端：{'、'.join(unknown)}；可选：{'、'.join(known)}")
-    if scope not in ("project", "user"):
-        raise typer.BadParameter("--scope 只能是 user 或 project")
-    if scope == "project":
-        if project is None or not project.is_dir():
-            raise typer.BadParameter("scope=project 时需要用 --project 指定已存在的项目目录")
-        project = project.resolve()
     app = App.open(data_dir, create=True, fake_vectors=True)
     if _register_default(app.root, force=False):
-        typer.echo(f"已登记为默认数据目录：{app.root}")
-    work = (work_dir or project).resolve() if (work_dir or project) else None
-    entry = server_entry(app.root, work, mode)
-    typer.echo(f"数据目录：{app.root}\n工作目录：{work or '客户端启动 MCP 时的当前目录'}\n运行模式：{mode}")
-    skills = [s for s in ("burrowl-work", "burrowl-read", "burrowl-consolidate", "burrowl-dev-check") if dev or s != "burrowl-dev-check"]
-    for item in client:
-        typer.echo(agents.write_mcp(item, scope, project, name, entry))
-        target = agents.skills_dir(item, scope, project)
-        if target is not None:
-            install_skills(target, skills, force=False)
-        elif item != "generic":
-            typer.echo(f"{item}：没有内置的 Skill 目录；agent 通过 MCP 工具 system_guide 读取同样的工作流说明")
-    if skills_dir:
-        install_skills(skills_dir, skills, force=False)
-    if mode == "manual":
-        typer.echo("manual 模式：在需要的项目中运行 `burrowl enable <项目目录>` 启用，或在对话中明确要求使用 burrowl。")
-    typer.echo("完成。重启客户端（或新开对话）后生效。")
+        typer.echo(f"已登记为默认数据目录：{app.root}", err=True)
+    entry = server_entry(app.root, work_dir.resolve() if work_dir else None, mode)
+    typer.echo(json.dumps({"mcpServers": {name: entry}}, ensure_ascii=False, indent=2))
+
+
+@cli.command()
+def upgrade() -> None:
+    """新版本切换后刷新所有登记过的 Skill 目录（setup.cmd 自动调用）。MCP 配置经 current 联接自动指向新版本。"""
+    count = agents.upgrade(typer.echo)
+    typer.echo(f"已刷新 {count} 个 Skill 目录。" if count else "没有登记过的 Skill 目录，无需刷新。")
 
 
 @cli.command()
@@ -304,29 +244,26 @@ def secret_set(ref: str) -> None:
 
 
 @skills_cli.command("install")
-def skills_install(target: Path, force: bool = typer.Option(False, help="覆盖已存在且内容不同的文件"),
-                   only: list[str] = typer.Option([], help="只安装这些 Skill（可重复）；默认全部")) -> None:
-    """把工作流 Skill 和公共文档（RULES.md、RECORDING.md）复制到宿主的技能目录。
+def skills_install(target: Path = typer.Argument(..., help="客户端的 Skill 目录（由 agent 按自己客户端的规范确定）"),
+                   dev: bool = typer.Option(False, help="同时安装框架开发用的 burrowl-dev-check"),
+                   force: bool = typer.Option(False, help="覆盖被用户改过的文件")) -> None:
+    """把 burrowl Skill 和公共规则（RULES.md、RECORDING.md）装进 target，并登记以便升级时自动刷新。
 
-    布局与仓库一致：<target>/<skill>/SKILL.md 与 <target>/RULES.md，Skill 中的 ../RULES.md 链接可直接打开。
-    已存在且被修改过的文件默认不覆盖。
+    布局：<target>/RULES.md、<target>/<skill>/SKILL.md（Skill 中的 ../RULES.md 链接可直接打开）。
+    被用户改过的文件默认保留；上一版本装过、这一版本不再有的文件（未修改时）会被移除。
     """
-    install_skills(target, only or None, force=force)
+    state = agents.load_state()
+    agents.install_skills(target, dev=dev, force=force, state=state, echo=typer.echo)
+    agents.save_state(state)
 
 
-def install_skills(target: Path, names: list[str] | None, *, force: bool) -> None:
-    source = skills_source()
-    files = [(p, target / p.name) for p in sorted(source.glob("*.md")) if p.name != "README.md"]
-    files += [(p / "SKILL.md", target / p.name / "SKILL.md") for p in sorted(source.iterdir())
-              if (p / "SKILL.md").exists() and (names is None or p.name in names)]
-    for origin, destination in files:
-        text = origin.read_text(encoding="utf-8")
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        if destination.exists() and destination.read_text(encoding="utf-8") != text and not force:
-            typer.echo(f"跳过（已被修改，--force 覆盖）：{destination}")
-            continue
-        destination.write_text(text, encoding="utf-8")
-        typer.echo(f"已安装：{destination}")
+@skills_cli.command("pack")
+def skills_pack(out_dir: Path = typer.Argument(..., help="输出目录"),
+                dev: bool = typer.Option(False, help="同时打包 burrowl-dev-check")) -> None:
+    """为只能上传 Skill 压缩包的客户端（如 Claude 桌面版的聊天）生成每个 Skill 的 zip（内含公共规则）。"""
+    for path in agents.pack_skills(out_dir.resolve(), dev=dev):
+        typer.echo(f"已生成：{path}")
+    typer.echo("这类上传的 Skill 不会随升级自动更新；新版本后重新生成并上传。")
 
 
 @skills_cli.command("check")
