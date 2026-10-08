@@ -1,6 +1,8 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ReadingDetail } from "./reading/ReadingDetail";
+import { ReadingList } from "./reading/ReadingList";
+import { Home } from "./Home";
 import { Review } from "./Review";
 import { Search } from "./Search";
 
@@ -26,7 +28,48 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
+});
+
+const listedSession = {
+  session_id: "RS-NEW",
+  question: "存储与检索演进讨论",
+  status: "active",
+  phase: "screening",
+  strategy: "standard",
+  owner_id: null,
+  updated_at: "2026-10-09T00:00:00Z",
+  revision: 1,
+  pending_requests: 0,
+  notes: 0,
+  relevant: 0,
+};
+
+describe("阅读会话列表刷新", () => {
+  it("首页在会话创建后自动显示当前阅读", async () => {
+    let created = false;
+    handlers["reading.list"] = () => (created ? [listedSession] : []);
+    handlers["review.queue"] = () => ({ counts: {} });
+    handlers["system.capabilities"] = () => ({ data_dir: "data", vector: { backend: "sqlite", embedder: null, ready: false }, reranker: { ready: false }, connectors: [] });
+    vi.useFakeTimers();
+    render(<Home />);
+    await act(async () => Promise.resolve());
+    created = true;
+    await act(async () => vi.advanceTimersByTimeAsync(5_000));
+    expect(screen.getByText("存储与检索演进讨论")).toBeInTheDocument();
+  });
+
+  it("阅读会话页在会话创建后自动更新列表", async () => {
+    let created = false;
+    handlers["reading.list"] = () => (created ? [listedSession] : []);
+    vi.useFakeTimers();
+    render(<ReadingList />);
+    await act(async () => Promise.resolve());
+    created = true;
+    await act(async () => vi.advanceTimersByTimeAsync(5_000));
+    expect(screen.getByText("存储与检索演进讨论")).toBeInTheDocument();
+  });
 });
 
 const claim = {

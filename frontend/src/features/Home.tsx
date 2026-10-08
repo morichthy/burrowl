@@ -1,4 +1,5 @@
 // 首页：当前阅读、待处理事项、复核概况、能力与降级情况。
+import { useEffect } from "react";
 import { useOp } from "../api";
 import { label, SESSION_STATUS } from "../labels";
 import { ErrorBox, href, Panel, Tag, Time } from "../ui";
@@ -6,6 +7,15 @@ import type { SessionSummary } from "./reading/ReadingList";
 
 export function Home() {
   const sessions = useOp<SessionSummary[]>("reading.list", { limit: 20 });
+  // MCP 创建会话时工作台可能一直停留在首页；轮询保证新会话能出现，聚焦时立即补刷。
+  useEffect(() => {
+    const timer = window.setInterval(sessions.reload, 5_000);
+    window.addEventListener("focus", sessions.reload);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", sessions.reload);
+    };
+  }, [sessions.reload]);
   const review = useOp<{ counts: Record<string, number> }>("review.queue", { limit: 1 });
   const caps = useOp<{
     data_dir: string;
@@ -46,10 +56,22 @@ export function Home() {
       <Panel title="复核">
         <ErrorBox error={review.error} />
         {counts ? (
-          <p>
-            未复核 {counts["not-reviewed"]} · 已失效 {counts.stale} · 有争议 {counts.disputed} · 依据受阻 {counts["upstream-blocked"]} · 已确认{" "}
-            {counts.accepted}
-          </p>
+          <div className="stats">
+            {(
+              [
+                ["not-reviewed", "未复核", ""],
+                ["stale", "已失效", "bad"],
+                ["disputed", "有争议", "warn"],
+                ["upstream-blocked", "依据受阻", "bad"],
+                ["accepted", "已确认", "good"],
+              ] as const
+            ).map(([key, text, tone]) => (
+              <div key={key} className={`stat ${counts[key] ? tone : ""}`}>
+                <strong>{counts[key] ?? 0}</strong>
+                <span>{text}</span>
+              </div>
+            ))}
+          </div>
         ) : null}
         <a href={href("review")}>进入知识复核 →</a>
       </Panel>

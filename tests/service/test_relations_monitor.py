@@ -54,3 +54,17 @@ def test_structure(sample_workspace):
     assert research["owners"][0]["counts"]["L1"] >= 1
     page = structure.records(storage, OWNER, limit=5)
     assert page["items"][0]["level"] == "L4" and page["next_offset"] == 5
+
+
+def test_records_filter_by_kind_and_query(sample_workspace):
+    storage = Storage.open(sample_workspace)
+    full = structure.records(storage, OWNER, limit=500)
+    counts = full["kind_counts"]
+    assert sum(counts.values()) == full["total"]
+    details = structure.records(storage, OWNER, kinds=["detail"], limit=500)
+    assert details["total"] == counts["detail"] and {r["kind"] for r in details["items"]} == {"detail"}
+    assert details["kind_counts"] == counts                # 计数在类型筛选之前，筛选项不会随勾选消失
+    first = full["items"][0]
+    found = structure.records(storage, OWNER, query=first["title"][:4].upper(), limit=500)
+    assert first["record_id"] in {r["record_id"] for r in found["items"]}
+    assert all("excerpt" in r and len(r["excerpt"]) <= structure.EXCERPT_CHARS for r in full["items"])

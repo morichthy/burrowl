@@ -27,6 +27,9 @@ from .ops.registry import Ctx, OpSpec, call, load
 COMMON = """工作流说明（burrowl-work / burrowl-read / burrowl-consolidate 及公共规则）：客户端已加载 burrowl 的 Skill 就按 Skill 执行；
 否则调用本服务的工具 system_guide 读取——开始实质工作前读 name=rules，再按任务读 burrowl-work / burrowl-read / burrowl-consolidate，
 写记忆记录前读 recording，并用 memory_contract(kind) 查该类记录的字段与示例。
+用户查询某主题的相关知识、找已有经验，默认先 reading_start 建立可见阅读会话：简查用 strategy=quick，完整阅读用 standard。
+只有用户明确只要片段/候选列表，或直接查看已知源码、配置、开发状态时，才直接使用低层查询或读取工具。
+query_*、memory_owners、memory_resume 不会建立阅读会话，不会出现在工作台的当前阅读或阅读会话中。
 要点：候选不是已读正文；保存≠复核≠索引就绪；引用一律用固定版本（提交回执给出 fixed_ref）；
 AI 自查不能登记为已确认；全文补偿必须先 reading_ask_user 获得用户批准。"""
 

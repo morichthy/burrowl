@@ -1,6 +1,6 @@
 // 系统记忆：对象列表 → 对象（按层级的记录、文稿、时间线） → 单条记录（正文、结论复核徽标、依据）。
 import { useMemo, useState } from "react";
-import { useOp } from "../api";
+import { useAction, useOp } from "../api";
 import { KINDS, label, LEVELS, OWNER_TYPES } from "../labels";
 import { Empty, ErrorBox, href, Loading, Markdown, Panel, ReviewBadge, Tag, Time } from "../ui";
 import type { QueueItem } from "./Review";
@@ -26,20 +26,26 @@ export function Owners() {
       <Loading show={owners.loading && !owners.data} />
       {owners.data?.groups.map((g) => (
         <section key={g.owner_type}>
-          <h3>{label(OWNER_TYPES, g.owner_type)}</h3>
+          <h3>
+            {label(OWNER_TYPES, g.owner_type)} <span className="count">{g.owners.length}</span>
+          </h3>
           <ul className="owners">
             {g.owners.map((o) => (
               <li key={o.owner_id}>
-                <a href={href("memory", o.owner_id)}>{o.title}</a> <code>{o.owner_id}</code>
-                {!o.persisted ? <Tag>尚无记忆</Tag> : null}
-                {o.counts ? (
-                  <span className="hint">
-                    {Object.entries(o.counts)
-                      .filter(([, n]) => n)
-                      .map(([k, n]) => `${k} ${n}`)
-                      .join(" · ")}
-                  </span>
-                ) : null}
+                <a href={href("memory", o.owner_id)}>{o.title}</a>
+                <code>{o.owner_id}</code>
+                <div className="counts">
+                  {!o.persisted ? <Tag>尚无记忆</Tag> : null}
+                  {Object.entries(o.counts ?? {})
+                    .filter(([, n]) => n)
+                    // 层级 L4→L0 在前，其余类型在后
+                    .sort(([a], [b]) => (LEVELS[b] ? 1 : 0) - (LEVELS[a] ? 1 : 0) || (LEVELS[a] ? b.localeCompare(a) : a.localeCompare(b)))
+                    .map(([k, n]) => (
+                      <span key={k} className="badge muted" title={label(LEVELS, k) !== k ? label(LEVELS, k) : label(KINDS, k)}>
+                        {LEVELS[k] ? k : label(KINDS, k)} {n}
+                      </span>
+                    ))}
+                </div>
               </li>
             ))}
           </ul>
@@ -56,7 +62,39 @@ interface RecordRow {
   title: string;
   revision: number;
   updated_at: string;
+  excerpt: string;
   claims: string[];
+}
+
+// 类型筛选项按知识层级从高到低排列，与记录表的排序一致；工作流记录排在后面
+const KIND_ORDER = ["overview", "experience", "narrative", "detail", "source", "document", "document_section"];
+const kindOrder = (kind: string) => (KIND_ORDER.includes(kind) ? KIND_ORDER.indexOf(kind) : KIND_ORDER.length);
+
+/** 导出当前筛选出的记录（只读，不产生新记录）。recordIds 为空时不可用。 */
+function ExportButton({ ownerId, recordIds }: { ownerId: string; recordIds: string[] | undefined }) {
+  const [fmt, setFmt] = useState<"markdown" | "json" | "html">("markdown");
+  const exporter = useAction<{ filename: string; content: string }>("memory.export");
+  const save = async () => {
+    const result = await exporter.run({ owner_id: ownerId, fmt, record_ids: recordIds });
+    if (!result) return;
+    const url = URL.createObjectURL(new Blob([result.content], { type: "text/plain;charset=utf-8" }));
+    const link = Object.assign(document.createElement("a"), { href: url, download: `${ownerId}-${result.filename}` });
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+  return (
+    <span className="actions">
+      <select value={fmt} onChange={(e) => setFmt(e.target.value as "markdown")} aria-label="导出格式">
+        <option value="markdown">Markdown</option>
+        <option value="json">JSON</option>
+        <option value="html">HTML</option>
+      </select>
+      <button type="button" disabled={!recordIds?.length || exporter.busy} onClick={save} title="导出当前列表中的记录">
+        导出 {recordIds?.length ?? 0} 条
+      </button>
+      {exporter.error ? <span className="hint">{exporter.error.message}</span> : null}
+    </span>
+  );
 }
 
 function useClaimBadges(ownerId: string) {
@@ -71,10 +109,18 @@ function useClaimBadges(ownerId: string) {
 export function OwnerView({ ownerId }: { ownerId: string }) {
   const [tab, setTab] = useState<"records" | "document" | "raw" | "timeline">("records");
   const [mainOnly, setMainOnly] = useState(true);
-  const records = useOp<{ owner: OwnerSummary; head: { generation: number } | null; items: RecordRow[]; total: number }>(
-    "memory.records",
-    { owner_id: ownerId, main_only: mainOnly, limit: 500 },
-  );
+  const [query, setQuery] = useState("");
+  // 多选取并集；空数组表示不按类型筛选（全部）
+  const [kinds, setKinds] = useState<string[]>([]);
+  const records = useOp<{
+    owner: OwnerSummary;
+    head: { generation: number } | null;
+    items: RecordRow[];
+    total: number;
+    kind_counts: Record<string, number>;
+  }>("memory.records", { owner_id: ownerId, main_only: mainOnly, kinds: kinds.length ? kinds : null, query, limit: 500 });
+  const kindOptions = Object.entries(records.data?.kind_counts ?? {}).sort(([a], [b]) => kindOrder(a) - kindOrder(b));
+  const toggleKind = (kind: string) => setKinds((now) => (now.includes(kind) ? now.filter((k) => k !== kind) : [...now, kind]));
   const badges = useClaimBadges(ownerId);
   const owner = records.data?.owner;
   return (
@@ -108,11 +154,32 @@ export function OwnerView({ ownerId }: { ownerId: string }) {
         <ErrorBox error={records.error} />
         {tab === "records" ? (
           <>
-            <label className="hint">
-              <input type="checkbox" checked={!mainOnly} onChange={() => setMainOnly(!mainOnly)} /> 显示目标、检查点、复核等工作流记录
-            </label>
+            <div className="toolbar">
+              <input placeholder="按标题或 ID 筛选" aria-label="筛选记录" value={query} onChange={(e) => setQuery(e.target.value)} />
+              <label className="check hint">
+                <input type="checkbox" checked={!mainOnly} onChange={() => setMainOnly(!mainOnly)} /> 显示目标、检查点、复核等工作流记录
+              </label>
+              <span className="spacer" />
+              <ExportButton ownerId={ownerId} recordIds={records.data?.items.map((r) => r.record_id)} />
+            </div>
+            {kindOptions.length ? (
+              <div className="chips" role="group" aria-label="按类型筛选">
+                <label className={kinds.length ? "" : "on"}>
+                  <input type="checkbox" checked={!kinds.length} onChange={() => setKinds([])} />
+                  全部
+                </label>
+                {kindOptions.map(([kind, n]) => (
+                  <label key={kind} className={kinds.includes(kind) ? "on" : ""}>
+                    <input type="checkbox" checked={kinds.includes(kind)} onChange={() => toggleKind(kind)} />
+                    {label(KINDS, kind)} <span className="count">{n}</span>
+                  </label>
+                ))}
+              </div>
+            ) : null}
             <Loading show={records.loading && !records.data} />
-            {records.data && !records.data.items.length ? <Empty>这个对象还没有记忆记录。</Empty> : null}
+            {records.data && !records.data.items.length ? (
+              <Empty>{kinds.length || query ? "没有符合筛选条件的记录。" : "这个对象还没有记忆记录。"}</Empty>
+            ) : null}
             <table className="table">
               <thead>
                 <tr>
@@ -126,9 +193,10 @@ export function OwnerView({ ownerId }: { ownerId: string }) {
               <tbody>
                 {records.data?.items.map((r) => (
                   <tr key={r.record_id}>
-                    <td>{r.level ?? "—"}</td>
+                    <td>{r.level ? <span className={`level ${r.level}`}>{r.level}</span> : "—"}</td>
                     <td>
                       <a href={href("memory", ownerId, r.record_id)}>{r.title}</a>
+                      {r.excerpt ? <div className="excerpt">{r.excerpt}</div> : null}
                     </td>
                     <td>{label(KINDS, r.kind)}</td>
                     <td>
@@ -262,7 +330,12 @@ interface FullRecord {
 }
 
 export function RecordView({ ownerId, recordId }: { ownerId: string; recordId: string }) {
-  const record = useOp<{ record: FullRecord }>("memory.inspect", { owner_id: ownerId, record_id: recordId });
+  const current = useOp<{ record: FullRecord }>("memory.inspect", { owner_id: ownerId, record_id: recordId });
+  // 历史修订：只读回看固定版本；undefined 表示当前版本
+  const [revision, setRevision] = useState<number>();
+  const past = useOp<{ record: FullRecord }>("memory.inspect", { owner_id: ownerId, record_id: recordId, revision }, revision != null);
+  const record = revision != null ? past : current;
+  const latest = current.data?.record.revision ?? 0;
   const badges = useClaimBadges(ownerId);
   const [exported, setExported] = useState(false);
   // 交换格式视图（R12 T-P3.1）：与导出包、Markdown 库同一个渲染器
@@ -283,7 +356,22 @@ export function RecordView({ ownerId, recordId }: { ownerId: string; recordId: s
           actions={
             <>
               <Tag>{label(LEVELS, r.level) !== "—" ? label(LEVELS, r.level) : label(KINDS, r.kind)}</Tag>
-              <Tag>修订 {r.revision}</Tag>
+              {latest > 1 ? (
+                <select
+                  aria-label="查看修订"
+                  value={revision ?? latest}
+                  onChange={(e) => setRevision(Number(e.target.value) === latest ? undefined : Number(e.target.value))}
+                >
+                  {Array.from({ length: latest }, (_, i) => latest - i).map((n) => (
+                    <option key={n} value={n}>
+                      修订 {n}
+                      {n === latest ? "（当前）" : ""}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <Tag>修订 {r.revision}</Tag>
+              )}
               {handle ? <Tag>@{handle}</Tag> : null}
               <button type="button" className="small" onClick={() => setExported(!exported)}>
                 {exported ? "返回正文" : "导出视图"}
@@ -306,6 +394,14 @@ export function RecordView({ ownerId, recordId }: { ownerId: string; recordId: s
           <p className="hint">
             {r.record_reason} · <Time value={r.updated_at} /> · <code>{r.record_id}</code>
           </p>
+          {revision != null ? (
+            <div className="notice">
+              正在查看历史修订 {revision}（当前为修订 {latest}）。结论徽标显示的是当前复核状态。{" "}
+              <button type="button" className="link" onClick={() => setRevision(undefined)}>
+                回到当前版本
+              </button>
+            </div>
+          ) : null}
           {r.provenance_gap ? <div className="notice">依据缺口：{r.provenance_gap}</div> : null}
           <Markdown text={r.body_markdown} />
           {r.payload.blocks?.map((b) => <Markdown key={b.block_id} text={b.markdown} />)}

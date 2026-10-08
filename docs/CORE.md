@@ -138,6 +138,8 @@ AI 组成提交请求：{owner_id, expected_head, request_id, operations:[put_re
 
 ## 4. 阅读会话
 
+用户查询主题相关知识或找已有经验时，默认先 `reading.start`。简查选 quick，只采纳召回窗口并写笔记；完整阅读选 standard。两种策略均保留工作台可见的会话。独立 `query.*` 查询和 `memory.resume` 对象续接不会创建会话，明确只要片段/候选列表或直接查看开发状态时可使用。
+
 ```text
 start：建立会话，召回发现投影 → 每个对象 2–4 个互补窗口（可选 CE 只调窗口次序；
        显式条件只调对象次序，冲突的排后、不删除）

@@ -46,6 +46,29 @@ test("阅读会话：agent 的判断实时出现；用户批准后 agent 从 inb
   expect(response.payload.approval_id).toMatch(/^AP-/);
 });
 
+test("阅读列表：首页和会话页会显示工作台打开后新建的会话", async ({ page, request }) => {
+  const { session_id: seededSession } = state();
+
+  // 归档 e2e 种子会话，让首页和“进行中”列表都从空状态开始。
+  await op(request, "reading.archive", { session_id: seededSession });
+  await page.goto("#/");
+  await expect(page.getByText("还没有阅读会话。")).toBeVisible();
+
+  const homeQuestion = "存储与检索演进讨论：首页自动刷新";
+  const homeSession = await op(request, "reading.start", { question: homeQuestion });
+  await expect(page.getByRole("link", { name: homeQuestion })).toBeVisible({ timeout: 12_000 });
+
+  // 清掉首页用例新建的活跃会话，确保列表页也从空结果开始。
+  await op(request, "reading.archive", { session_id: homeSession.session_id });
+  await page.goto("#/reading");
+  await page.getByLabel("状态").getByText("进行中").click();
+  await expect(page.getByText("没有符合条件的阅读会话。")).toBeVisible();
+
+  const listQuestion = "存储与检索演进讨论：列表自动刷新";
+  await op(request, "reading.start", { question: listQuestion });
+  await expect(page.getByRole("link", { name: listQuestion })).toBeVisible({ timeout: 12_000 });
+});
+
 test("知识复核：确认后只看已复核的检索能找到这条结论所在记录", async ({ page }) => {
   await page.goto("#/search");
   await page.getByLabel("只看已复核").check();
@@ -82,9 +105,10 @@ test("知识中枢：预览只含已复核内容，发布后状态完成并落�
   await page.getByRole("button", { name: "确认发布" }).click();
   await expect(page.getByText("执行结果：created 1")).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText("已完成 1")).toBeVisible();
-  const files = readdirSync(join(vault, "burrowl")).filter((f) => f.endsWith(".md"));
+  // mdvault 按交换格式写入 records/<owner>/<handle>.md。
+  const files = readdirSync(join(vault, "burrowl", "records", "order-demo")).filter((f) => f.endsWith(".md"));
   expect(files).toHaveLength(1);
-  expect(readFileSync(join(vault, "burrowl", files[0]), "utf8")).toContain("burrowl_ref: burrowl://");
+  expect(readFileSync(join(vault, "burrowl", "records", "order-demo", files[0]), "utf8")).toContain("burrowl_ref: burrowl://");
   await page.getByRole("button", { name: "预览发布" }).click();
   await expect(page.getByText("已与本地一致，没有需要发布的变化。")).toBeVisible({ timeout: 20_000 });
   expect(existsSync(vault)).toBeTruthy();

@@ -22,7 +22,9 @@ def search(ctx: Ctx, question: str, keywords: list[str] | None = None,
            freshness: Literal["current", "allow_stale"] = "current", channels: list[Channel] | None = None,
            context_reach: Literal["any_readable", "same_scope"] = "any_readable", result_limit: int | None = None,
            budget: Budget | None = None, query_id: str | None = None) -> dict:
-    """检索材料并逐个回到固定版本核对，返回第一页候选（候选不是已读正文）。"""
+    """独立检索材料并核对固定版本，返回第一页候选；不建立阅读会话、不进入工作台阅读页。
+    用户查询主题相关知识、找已有经验时默认先 reading_start（简查 quick、完整阅读 standard）；
+    只有明确只要片段/候选列表或低层查询时直接使用本工具。候选不是已读正文。"""
     request = QueryRequest(question=question, keywords=keywords or [], content_source=content_source,
                            scope=scope or Scope(), review_filter=review_filter, purpose=purpose,
                            applicability=applicability, freshness=freshness,

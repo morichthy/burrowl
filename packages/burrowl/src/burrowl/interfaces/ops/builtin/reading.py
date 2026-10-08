@@ -33,7 +33,9 @@ def start(ctx: Ctx, question: Annotated[str, Field(description="要回答的问�
           field_conditions: Annotated[list[dict] | None, Field(description=(
               "可选的显式字段条件，最多 16 条：[{id, kind: literal|numeric, field, operator: eq|ne|lt|le|gt|ge, "
               "expected, unit?}]。只在原文的“字段：值”中核对，冲突的对象排后、不删除"))] = None) -> dict:
-    """创建阅读会话并立即召回，返回第一批对象筛选包（每个对象 2–4 个命中窗口，含 digest）。"""
+    """查询主题相关知识、找已有经验的默认入口：创建工作台可见阅读会话并立即召回。
+    简查选 quick（采纳片段、写笔记）；完整阅读选 standard。返回第一批对象筛选包
+    （每个对象 2–4 个命中窗口，含 digest），继续 assess → read（quick 跳过）→ note → finish。"""
     return ctx.app.reading.start(question, actor=ctx.actor, conditions=conditions, strategy=strategy,
                                  review_filter=review_filter, variants=variants, protected_terms=protected_terms,
                                  domains=domains, owner_id=owner_id, scope_owner_ids=scope_owner_ids,

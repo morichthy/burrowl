@@ -13,10 +13,12 @@ requires_tools: [reading_start, reading_assess, reading_peek, reading_read, read
 
 ## 选哪种方式
 
-- **只要几段材料、不需要完整阅读**：`query_search` → 选候选 → `query_assemble`（会补齐必要依据）。展开到经过或技术细节用 `query_expand`，读整篇文稿用 `query_documents`。
-- **要回答一个问题并完整阅读**：阅读会话，下面的步骤。
+- **用户查询某主题的相关知识、找已有经验**（如“查询 存储与检索演进讨论 相关的知识”）：默认先 `reading_start` 建立可见的阅读会话；简查选 `strategy=quick`，需要完整理解或细节依据时选 `strategy=standard`，再按下面的步骤判断、阅读、写笔记和结束。
+- **用户明确只要几个片段或候选列表**：可以直接 `query_search` → 选候选 → `query_assemble`（会补齐必要依据）。展开到经过或技术细节用 `query_expand`，读整篇文稿用 `query_documents`。
 - **查已发布到知识中枢的内容**：`hub_search`。
 - **续接已有会话**：`reading_list(owner_id=…)` 找到会话，再 `reading_status`。
+
+`query_*`、`memory_owners`、`memory_resume` 是独立查询或对象续接工具，不会建立阅读会话，也不会出现在首页“当前阅读”或“阅读会话”中。不能用这些调用代替上述默认入口，也不能把检索命中写成“已完整阅读”。直接查看已知源码、配置或开发状态仍按公共规则直接读取。
 
 ## 阅读策略（在 reading_start 时选；之后只有用户能切换）
 
@@ -36,10 +38,10 @@ requires_tools: [reading_start, reading_assess, reading_peek, reading_read, read
    - **irrelevant**：明确无关。
    - 首批不相关，不代表后面的批次也不相关，要继续判断返回的下一批。
    - quick 策略还要在 `accepted_windows` 列出可以作为笔记依据的窗口。
-3. **`reading_read`**：逐个读 relevant 对象。第 1 页附目录，按 `unread_pages` 读完全部页。
+3. **`reading_read`**：standard/associative 逐个读 relevant 对象。第 1 页附目录，按 `unread_pages` 读完全部页；quick 跳过此步，只用已采纳的窗口写笔记。
    - 图片、L0、Run 先保留固定引用，需要解释图形或复算时再展开。没展开的不能写成"已核验"。
    - 返回 STALE_BASIS 说明对象刚有新提交，从第 1 页重读。
-4. **`reading_note`**：每个对象读完后写一篇研究笔记（写法见下）。跨对象的新认识用 `reading_synthesize`。
+4. **`reading_note`**：完整阅读结束后（quick 为采纳窗口后），每个对象写一篇研究笔记（写法见下）；quick 明确写出“非全文覆盖”。跨对象的新认识用 `reading_synthesize`。
 5. **依据不足时**：
    - 响应中 `fulltext_available=true`（说明发现召回不可用、不完整或不足）时，可以 `reading_ask_user(kind=fulltext)` 申请全文补偿。用户批准后，用得到的 `approval_id` 调 `reading_recall(mode=fulltext)`。
    - associative 策略：先制定具体的子问题和关键词，再 `reading_recall(mode=association, association_text=…)`。

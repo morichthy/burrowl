@@ -655,6 +655,14 @@ claims: [{id: CLM-…, maturity: replicated, review: accepted}]   # 渲染时生
 | 2026-10-09 | T-P4.3 | 完成。SPI 可选 `SupportsCandidates.candidates()` 与 `CandidateLink`；`HubService.external_candidates` 只保留两端都对上本地已发布记录的线索；操作 `hub.candidates_pull` 写入 `link_candidates`（origin=tool:<id>，kind=external:*），之后由 `relations.candidates` 判断 | 同上 |
 | 2026-10-09 | T-P4.4 | 未做：需要用户在 WeKnora 中创建 API Key 并 `burrowl secret set` | — |
 
+### 阅读入口局部补修（2026-10-09）
+
+本轮局部补修（不计为原 P 阶段任务）：修正“查询主题相关知识”误走独立 `query.search` / `memory.resume`、导致工作台无阅读会话的入口说明。read Skill、MCP 服务说明与工具说明统一默认 `reading.start`（简查 quick、完整阅读 standard），保留低层查询的独立职责；接口回归验证 quick 会话从建立、采纳窗口、笔记到结束始终可经 `reading.list` / `reading.view` 查看。
+
+首页和阅读列表补上每 5 秒轮询与窗口聚焦刷新，发现页面打开后经 MCP 新建的会话；详情继续用 SSE 接收该会话修订。当前安装版本经 MCP 实测得到 finished 会话（`RS-01efd53c-ce22-4d22-a9f2-af09a52779a3`，revision=4，相关对象 1，笔记 1）；quick 依据为采纳片段，非全文覆盖。
+
+验证与交付：后端定向测试 11 项通过，前端组件 8 项通过，真实浏览器端到端 5 项通过（包含页面停留期间新建会话自动出现）；构建、类型检查、ruff、分层依赖与 Skill 检查通过。stdio 启动单项因本机虚拟环境的 Python 路径失效未完成；本轮真实 MCP 阅读链路已实测。修复已同步当前 0.2.0 安装包和 Codex read Skill，安装原件备份位于仓库 build/reading-context-hotfix-backup。README、ARCHITECTURE、CORE、本设计稿与自动生成的操作参考已更新；docs/README、DOCUMENTATION_MAINTENANCE、TESTING 已核对无需修改。
+
 ### 待用户决定（2026-10-09）
 
 1. **默认嵌入模型**：建议继续用 MiniLM（数据见"P1 模型实测"）；Qwen3-Q 保留为可选，真实数据题集建立后再测。

@@ -67,10 +67,10 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | `memory.owners` | 只读 | 列出可读对象（按类型分组，带各层记录数）。 | `owner_types`: array|null，`query`: string |
 | `memory.raw_material` | 只读 | 回读一个原始材料（按清单中的 ID；核对固定字节）。 | `owner_id`*: string，`material_id`*: string，`max_chars`: integer |
 | `memory.raw_materials` | 只读 | L0 原始材料清单（不读原件正文）。 | `owner_id`*: string |
-| `memory.records` | 只读 | 对象内的记录目录（按层级，分页；不含正文）。 | `owner_id`*: string，`levels`: array|null，`main_only`: boolean，`offset`: integer，`limit`: integer |
+| `memory.records` | 只读 | 对象内的记录目录（按层级，分页；不含正文）。kinds 按类型筛选，query 匹配标题或 ID；kind_counts 是类型筛选前的计数。 | `owner_id`*: string，`levels`: array|null，`kinds`: array|null，`query`: string，`main_only`: boolean，`offset`: integer，`limit`: integer |
 | `memory.recovery` | 管理 | 检查记忆目录健康状况（写锁、孤立提交、暂存残留）；只报告不修改。 | `owner_id`*: string |
 | `memory.render` | 只读 | 按交换格式把一条记录渲染为 Markdown（YAML 头 + 正文 + 自动生成的反链与关联）。只读。 | `owner_id`*: string，`record_id`*: string |
-| `memory.resume` | 只读 | 续接对象的上下文：目标→检查点→最新概览/经过/技术→路线/问题/经验（只读）。 | `owner_id`*: string |
+| `memory.resume` | 只读 | 续接对象的工作上下文：目标→检查点→最新概览/经过/技术→路线/问题/经验（只读）。 不建立阅读会话；用户查询主题相关知识、找已有经验时默认先 reading_start。 | `owner_id`*: string |
 | `memory.summary_materials` | 只读 | 跨对象总结的固定材料包（不生成总结）。 | `owner_ids`*: array，`exclude_ids`: array|null |
 | `memory.summary_save` | 写入 | 把写好的总结保存为本对象的 L3/L4；依据对象有新提交则拒绝。 | `owner_id`*: string，`draft`*: object，`basis_heads`*: object，`record_id`: string|null，`expected_revision`: integer|null，`dry_run`: boolean |
 | `memory.timeline` | 只读 | 研究时间线：全部记录的全部修订与关联 Run（不含正文）。 | `owner_id`*: string，`offset`: integer，`limit`: integer |
@@ -103,7 +103,7 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | `query.documents` | 只读 | 返回候选所属对象的完整文稿（按文稿去重，保持章节顺序）。 | `query_id`*: string，`candidate_ids`*: array，`document_type`: string |
 | `query.expand` | 只读 | 沿作者保存的固定引用展开：经验/概览 → 研究经过或技术依据。 | `query_id`*: string，`candidate_ids`*: array，`target`*: string |
 | `query.page` | 只读 | 下一页候选（沿用原范围与累计预算）。 | `query_id`*: string，`cursor`: string|null |
-| `query.search` | 只读 | 检索材料并逐个回到固定版本核对，返回第一页候选（候选不是已读正文）。 | `question`*: string，`keywords`: array|null，`content_source`: string，`scope`: ?|null，`review_filter`: string，`purpose`: string，`applicability`: string，`freshness`: string，`channels`: array|null，`context_reach`: string，`result_limit`: integer|null，`budget`: ?|null，`query_id`: string|null |
+| `query.search` | 只读 | 独立检索材料并核对固定版本，返回第一页候选；不建立阅读会话、不进入工作台阅读页。 用户查询主题相关知识、找已有经验时默认先 reading_start（简查 quick、完整阅读 standard）； 只有明确只要片段/候选列表或低层查询时直接使用本工具。候选不是已读正文。 | `question`*: string，`keywords`: array|null，`content_source`: string，`scope`: ?|null，`review_filter`: string，`purpose`: string，`applicability`: string，`freshness`: string，`channels`: array|null，`context_reach`: string，`result_limit`: integer|null，`budget`: ?|null，`query_id`: string|null |
 
 ## reading
 
@@ -124,7 +124,7 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | `reading.read` | 写入 | 完整阅读判为相关的对象：第 1 页附目录，按 unread_pages 读完全部页。quick 策略不可用。 对象在阅读期间有新提交时要求从第 1 页重读（STALE_BASIS）。 | `session_id`*: string，`owner_id`*: string，`page`: integer |
 | `reading.recall` | 写入 | 补充召回：全文补偿（需用户批准）或联想补查（associative 策略，受轮数上限）。 想换一种问法重新找，请新开一个 reading_start。 | `session_id`*: string，`mode`*: string，`approval_id`: string|null，`association_text`: string|null，`request_id`: string|null |
 | `reading.respond` | 仅用户（不暴露给 agent） | 回答 agent 的请求；批准全文补偿会生成 approval_id。 | `session_id`*: string，`request_id`*: string，`decision`*: string，`answer`: string |
-| `reading.start` | 写入 | 创建阅读会话并立即召回，返回第一批对象筛选包（每个对象 2–4 个命中窗口，含 digest）。 | `question`*: string，`conditions`: array|null，`strategy`: string|null，`review_filter`: string|null，`variants`: array|null，`protected_terms`: array|null，`domains`: array|null，`owner_id`: string|null，`scope_owner_ids`: array|null，`field_conditions`: array|null |
+| `reading.start` | 写入 | 查询主题相关知识、找已有经验的默认入口：创建工作台可见阅读会话并立即召回。 简查选 quick（采纳片段、写笔记）；完整阅读选 standard。返回第一批对象筛选包 （每个对象 2–4 个命中窗口，含 digest），继续 assess → read（quick 跳过）→ note → finish。 | `question`*: string，`conditions`: array|null，`strategy`: string|null，`review_filter`: string|null，`variants`: array|null，`protected_terms`: array|null，`domains`: array|null，`owner_id`: string|null，`scope_owner_ids`: array|null，`field_conditions`: array|null |
 | `reading.status` | 只读 | 会话概况、当前批次、交接预览、预算消耗，以及用户在工作台上的新输入（每条只交付一次）。 | `session_id`*: string |
 | `reading.synthesize` | 写入 | 跨对象综合笔记；所依据的任何单篇笔记改变或陈旧后，综合稿自动失效。 | `session_id`*: string，`note`*: string，`sources`*: array，`owner_ids`*: array，`request_id`: string|null |
 | `reading.view` | 只读 | 会话完整状态（时间线、筛选包、笔记、请求）；只读，不消费收件箱。 | `session_id`*: string |

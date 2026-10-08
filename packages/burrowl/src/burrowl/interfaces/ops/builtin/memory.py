@@ -51,10 +51,11 @@ def owner_adopt(ctx: Ctx, path: str, expected_sha256: str) -> dict:
 
 
 @op("memory.records")
-def records(ctx: Ctx, owner_id: OwnerId, levels: list[str] | None = None, main_only: bool = True,
-            offset: int = 0, limit: int = 100) -> dict:
-    """对象内的记录目录（按层级，分页；不含正文）。"""
-    return structure.records(ctx.app.storage, owner_id, levels=levels, main_only=main_only, offset=offset, limit=limit)
+def records(ctx: Ctx, owner_id: OwnerId, levels: list[str] | None = None, kinds: list[str] | None = None,
+            query: str = "", main_only: bool = True, offset: int = 0, limit: int = 100) -> dict:
+    """对象内的记录目录（按层级，分页；不含正文）。kinds 按类型筛选，query 匹配标题或 ID；kind_counts 是类型筛选前的计数。"""
+    return structure.records(ctx.app.storage, owner_id, levels=levels, kinds=kinds, query=query, main_only=main_only,
+                             offset=offset, limit=limit)
 
 
 @op("memory.kinds")
@@ -132,7 +133,8 @@ def raw_read(ctx: Ctx, owner_id: OwnerId, material_id: str, max_chars: int = 200
 
 @op("memory.resume")
 def resume(ctx: Ctx, owner_id: OwnerId) -> dict:
-    """续接对象的上下文：目标→检查点→最新概览/经过/技术→路线/问题/经验（只读）。"""
+    """续接对象的工作上下文：目标→检查点→最新概览/经过/技术→路线/问题/经验（只读）。
+    不建立阅读会话；用户查询主题相关知识、找已有经验时默认先 reading_start。"""
     return workflow.resume(ctx.app.memory, owner_id)
 
 

@@ -78,3 +78,50 @@ def test_prompts_carry_rules_and_contract_tool(server):
             body = json.loads(text_of(contract))
             assert body["level"] == "L3" and body["example_operation"]["draft"]["kind"] == "experience"
     anyio.run(scenario)
+
+
+def test_quick_knowledge_lookup_is_visible_through_mcp(server):
+    """主题知识简查走真实 MCP 会话，工作台同源列表和详情可见进度与笔记。
+
+    先确认低层查询/对象续接不会伪造阅读记录，再验证 quick 的完整交接链。
+    所有状态均经工具读回，避免只验证说明文本而漏掉实际工具调用失败。
+    """
+    async def scenario():
+        async with Client(server) as client:
+            async def invoke(name, **kwargs):
+                result = await client.call_tool(name, kwargs)
+                assert not result.is_error, text_of(result)
+                # MCP 把列表结果拆为多个内容块；空列表没有文本块。
+                if name == "reading_list":
+                    return [json.loads(block.text) for block in result.content if getattr(block, "text", "")]
+                return json.loads(text_of(result))
+
+            await invoke("query_search", question="浮点求和顺序误差")
+            await invoke("memory_resume", owner_id=OWNER)
+            assert await invoke("reading_list") == []
+
+            started = await invoke("reading_start", question="查询 浮点求和 相关的知识", strategy="quick",
+                                   scope_owner_ids=[OWNER])
+            sid = started["session_id"]
+            assert sid in {s["session_id"] for s in await invoke("reading_list")}
+            packet = next(p for p in started["batch"] if p["owner_id"] == OWNER)
+            window = packet["windows"][0]
+            await invoke("reading_assess", session_id=sid, judgments=[{
+                "owner_id": OWNER, "verdict": "relevant", "reason": "窗口包含浮点求和的已有知识",
+                "digest": packet["digest"], "accepted_windows": [window["entry_id"]],
+            }])
+            note = f"非全文覆盖：采纳窗口提供浮点求和依据（{window['record_id']}）。"
+            await invoke("reading_note", session_id=sid, owner_id=OWNER, note=note,
+                         sources=[window["record_id"]])
+            visible = await invoke("reading_view", session_id=sid)
+            assert visible["strategy"] == "quick"
+            assert visible["owners"][OWNER]["note"]["text"] == note
+            done = await invoke("reading_finish", session_id=sid, outcome="已完成主题知识简查")
+            assert note in done["handoff"]["markdown"]
+            assert any(g["code"] == "QUICK_MODE" for g in done["handoff"]["gaps"])
+            listed = await invoke("reading_list")
+            assert sid in {s["session_id"] for s in listed}
+            finished = await invoke("reading_view", session_id=sid)
+            assert finished["status"] == "finished"
+            assert finished["owners"][OWNER]["note"]["text"] == note
+    anyio.run(scenario)

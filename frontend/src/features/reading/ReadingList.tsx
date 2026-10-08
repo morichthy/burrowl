@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useOp } from "../../api";
 import { label, SESSION_STATUS, STRATEGIES } from "../../labels";
 import { Empty, ErrorBox, href, Loading, Panel, Tag, Time } from "../../ui";
@@ -33,6 +33,15 @@ export function ReadingList() {
     owner_id: owner.trim() || null,
     limit: 200,
   });
+  // 新会话由 MCP/CLI 侧创建；周期刷新和窗口重新聚焦时补刷列表。
+  useEffect(() => {
+    const timer = window.setInterval(list.reload, 5_000);
+    window.addEventListener("focus", list.reload);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", list.reload);
+    };
+  }, [list.reload]);
   return (
     <Panel
       title="阅读会话"

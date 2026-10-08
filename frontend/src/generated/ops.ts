@@ -670,7 +670,7 @@ export declare namespace MemoryOwnerAdopt {
 
 export declare namespace MemoryRecords {
   /**
-   * 对象内的记录目录（按层级，分页；不含正文）。
+   * 对象内的记录目录（按层级，分页；不含正文）。kinds 按类型筛选，query 匹配标题或 ID；kind_counts 是类型筛选前的计数。
    */
   export interface Args {
     /**
@@ -678,6 +678,8 @@ export declare namespace MemoryRecords {
      */
     owner_id: string;
     levels?: string[] | null;
+    kinds?: string[] | null;
+    query?: string;
     main_only?: boolean;
     offset?: number;
     limit?: number;
@@ -818,7 +820,8 @@ export declare namespace MemoryRawMaterial {
 
 export declare namespace MemoryResume {
   /**
-   * 续接对象的上下文：目标→检查点→最新概览/经过/技术→路线/问题/经验（只读）。
+   * 续接对象的工作上下文：目标→检查点→最新概览/经过/技术→路线/问题/经验（只读）。
+   * 不建立阅读会话；用户查询主题相关知识、找已有经验时默认先 reading_start。
    */
   export interface Args {
     /**
@@ -952,7 +955,9 @@ export declare namespace MemoryRecovery {
 
 export declare namespace QuerySearch {
   /**
-   * 检索材料并逐个回到固定版本核对，返回第一页候选（候选不是已读正文）。
+   * 独立检索材料并核对固定版本，返回第一页候选；不建立阅读会话、不进入工作台阅读页。
+   * 用户查询主题相关知识、找已有经验时默认先 reading_start（简查 quick、完整阅读 standard）；
+   * 只有明确只要片段/候选列表或低层查询时直接使用本工具。候选不是已读正文。
    */
   export interface Args {
     question: string;
@@ -1111,7 +1116,9 @@ export declare namespace QueryDocuments {
 
 export declare namespace ReadingStart {
   /**
-   * 创建阅读会话并立即召回，返回第一批对象筛选包（每个对象 2–4 个命中窗口，含 digest）。
+   * 查询主题相关知识、找已有经验的默认入口：创建工作台可见阅读会话并立即召回。
+   * 简查选 quick（采纳片段、写笔记）；完整阅读选 standard。返回第一批对象筛选包
+   * （每个对象 2–4 个命中窗口，含 digest），继续 assess → read（quick 跳过）→ note → finish。
    */
   export interface Args {
     /**

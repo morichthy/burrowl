@@ -133,7 +133,8 @@ handle 分配和正文链接解析发生在第 1 步（`MemoryService.prepare`�
 
 ### 阅读会话与用户交互
 
-- agent 通过 `reading.*` 推进；用户在工作台实时查看，通过 SSE 接收会话的修订推送。
+- agent 通过 `reading.*` 推进；首页与阅读列表每 5 秒轮询并在窗口聚焦时刷新，发现 MCP 在页面打开后新建的会话。会话详情通过 SSE 接收该会话的修订推送。
+- 主题知识查询、找已有经验默认由 read Skill 引导 `reading.start`：简查 quick、完整阅读 standard。独立的 `query.*` 和 `memory.resume` 保持查询/续接职责，不隐式创建会话；阅读页只消费真实阅读会话状态。
 - 用户操作写入会话的收件箱，在 agent 下一次调用时交付一次。
 - 支持 MCP elicitation 的宿主会在对话中直接弹出询问。
 - 笔记固定写作时的对象 HEAD，交接时重新核对，陈旧的不交付。
