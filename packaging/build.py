@@ -89,12 +89,19 @@ def main() -> None:
     # 4. 可选模型
     if options.with_models:
         sys.path.insert(0, str(ROOT / "packages/burrowl/src"))
-        from burrowl.index.model_store import default_models_dir, status  # noqa: PLC0415 - 构建脚本按需导入
+        from burrowl.index.model_store import (  # noqa: PLC0415 - 构建脚本按需导入
+            EMBEDDING_DIR,
+            RERANKER_DIR,
+            default_models_dir,
+            status,
+        )
         source = default_models_dir()
         state = status(source)
         if not (state["embedding"]["installed"] and state["reranker"]["installed"]):
             raise SystemExit("本机模型未安装完整：先运行 burrowl models install")
-        shutil.copytree(source, stage / "models")
+        # 只打包默认模型（MiniLM 嵌入 + 重排）；可选的长上下文模型（如 Qwen3，约 1.1 GB）由用户按需安装
+        for name in (EMBEDDING_DIR, RERANKER_DIR):
+            shutil.copytree(source / name, stage / "models" / name, ignore=shutil.ignore_patterns(".cache"))
 
     # 5. 启动器与安装脚本
     # Windows 脚本统一 CRLF；.cmd 必须是纯 ASCII（cmd 按控制台代码页读）；.ps1 加 BOM（PowerShell 5.1 才按 UTF-8 读）。
