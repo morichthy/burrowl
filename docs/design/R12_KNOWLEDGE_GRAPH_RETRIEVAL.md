@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 状态 | 实施中：P0–P3 完成；P4 完成 T-P4.2、T-P4.3，T-P4.1（LightRAG）因 T-P4.0 发现与 D-22 不符而暂停，T-P4.4 需要 WeKnora 密钥（2026-10-09）。待用户决定的事项见 §10 末尾 |
+| 状态 | P0–P4 实现完成（T-P4.4 WeKnora 实测需要用户的 API Key）；待用户的验收与决定见 §10 末尾（2026-10-09） |
 | 决定记录 | [DEVELOPMENT_HISTORY 的 R12](../DEVELOPMENT_HISTORY.md#r12-知识图谱与检索升级2026-10-09) 写演进思路和被放弃的方法；本文只写"做什么、怎么做、怎样算完成" |
 | 适用范围 | 记录契约（CORE）、规范写入（MEM）、检索（IDX、QUERY、READ）、关系（MAINT）、复核（REVIEW）、中枢与连接器（HUB）、工作台、Skill 与文档 |
 | 维护方式 | 每完成一个任务，更新 [§10 进度记录](#10-进度记录)；决定有变化时先改 §2 并在 DEVELOPMENT_HISTORY 补记，再改代码 |
@@ -59,7 +59,7 @@
 | D-19 | 嵌入方面：先修截断（P0）；再换长上下文模型（首选 Qwen3-Embedding-0.6B，以实测为准）；用确定性的**上下文信封**（只加入向量文本，不加入 FTS 文本）；记录级和块级两种粒度都生成向量；L0 原件按结构切分并加标题链 | 当前问题主要是窗口太小；记录长度都在 2k token 以内，可以整体嵌入；按结构切分在全库检索中优于让 LLM 决定切分点 |
 | D-20 | 先做"按结构补上下文"；late chunking 只作为 P1 之后的独立对照实验。上下文信封只放标题链和简短字段，**不把同一段概览复制到每个块** | 两种方法同时上，无法判断收益来自哪里；复制概览会让不同块的向量越来越相似 |
 | D-21 | **交换格式 v1** 由 burrowl 定义并维护版本：Markdown 库 + 图 JSONL + manifest。每个外部工具一个薄适配器，只做"交换格式 → 该工具"的映射 | 内部字段变化时只改导出器；新工具接入的成本很小 |
-| D-22 | 第一个本地外部连接器选 LightRAG（先做图模式，即导入我们的图，跳过它自己的抽取）；WeKnora 保留，作为团队或中心知识库 | 不需要 Docker；支持导入自定义图；可以按文档删除 |
+| D-22 | 第一个本地外部连接器选 LightRAG（先做图模式，即导入我们的图，跳过它自己的抽取）；WeKnora 保留，作为团队或中心知识库。**2026-10-09 修订**：自定义图导入不能按文档删除（T-P4.0），改为"按需重建 + 嵌入缓存 + 后台替换"：只有新增时追加，有修改或删除时在新目录整体重建、成功后切换 | 不需要 Docker；支持导入自定义图；重建时未变内容的嵌入来自缓存，代价主要是文件读写 |
 | D-23 | 外部检索作为 RRF 中的一路（"中枢"信号族）；命中必须取回本地 ID，回到固定版本核验后才能交付；外部不可用时自动退回本地，并在缺口里报告 | 落实 D-02、D-04 |
 | D-24 | **评估集先行**（P0）。每一阶段都在同一批问题上比较，没有收益就不默认开启；图路线默认关闭 | ARCHITECTURE 评价标准 3；教训 E4；文献显示图在简单查找上可能变差 |
 | D-25 | 送给外部工具处理（尤其是 LLM 抽取）的内容按敏感级别过滤，默认 confidential 及以上不发送 | 数据不随意离开本机 |
@@ -650,7 +650,7 @@ claims: [{id: CLM-…, maturity: replicated, review: accepted}]   # 渲染时生
 | 2026-10-09 | T-P2.12 | 完成。RECORDING（L1 结论与拆分、relation、链接写法与各层链接要求）、RULES（成熟度阶梯与执行者限制、关联还是结论）、burrowl-work（随手链接与快速关联）、burrowl-consolidate（候选处理、概念库维护、成熟度评估、两层体检）；`burrowl skills check` 通过 | — |
 
 | 2026-10-09 | T-P4.0 | 完成（独立虚拟环境，lightrag-hku **1.5.7**，假向量 + 假 LLM，不联网）。① `insert_custom_kg(custom_kg, full_doc_id)`：chunks / entities / relationships，导入时不调用 LLM，实体名会被规范化，自环会被拒绝；② **按文档删除不可用**：自定义图导入不写文档状态，`adelete_by_doc_id` 返回 not_found，实体仍在；只能用 `adelete_by_entity` / `adelete_by_relation` 逐个删除（共享的概念实体不能随一条记录删除）；文档自己也注明该路径"不在文档级恢复保证之内"；③ `aquery_data(QueryParam(only_need_context=True, hl_keywords, ll_keywords))` 不调用 LLM（不给关键词时会调用一次 LLM 抽关键词）；返回的 chunk 带我们写入的 `file_path`，实体的 `source_id` 是 chunk 的哈希 ID。**与 D-22 的假设"可以按文档删除"不符，按 §6 的规定先停下来，由用户选择方案后再改本文** | 探查脚本 `scratchpad/lightrag_probe.py`（不入库） |
-| 2026-10-09 | T-P4.1 | 暂停（见 T-P4.0） | — |
+| 2026-10-09 | T-P4.1 | 完成（用户选定方案 A，D-22 已修订）。`packages/burrowl-connector-lightrag`（入口点 `lightrag`，可选依赖 `[runtime]` 锁定 lightrag-hku==1.5.7）：upsert/delete 只写暂存表；发布后 `finalize()` 比较上次构建——无变化跳过、只有新增且实体名都是新的就追加、否则在新目录整体重建后切换并删除旧构建；嵌入按文本指纹缓存（按模型指纹隔离）；LLM 函数在图模式下一被调用就报错；用逐字符分词器代替 tiktoken（tiktoken 首次使用要联网下载）；chunk 的 file_path 写 local_key 派生的标记（LightRAG 会规范化路径）。中枢侧：SPI 增加 `graph_import` 能力、`PublishItem.graph`、可选 `finalize()`；发布时只附上本条目声明的、端点满足发布策略的实体与关系（结构边和证据边不外发） | `tests/connectors/test_lightrag.py`（假 LightRAG 合约测试 + 真实 1.5.7 在断网条件下通过） |
 | 2026-10-09 | T-P4.2 | 完成。配置 `index.hub_route`（connectors 为空即关闭、weight、timeout_s、limit）；材料查询调用 `HubService.search`，命中按本地固定引用映射回当前投影、同样过滤的记录级条目，作为 hub 路线参与融合；超时、出错报告缺口；对不上本地的命中以 `external_only` 缺口提示 | `tests/service/test_hub.py::test_hub_route_and_external_candidates` |
 | 2026-10-09 | T-P4.3 | 完成。SPI 可选 `SupportsCandidates.candidates()` 与 `CandidateLink`；`HubService.external_candidates` 只保留两端都对上本地已发布记录的线索；操作 `hub.candidates_pull` 写入 `link_candidates`（origin=tool:<id>，kind=external:*），之后由 `relations.candidates` 判断 | 同上 |
 | 2026-10-09 | T-P4.4 | 未做：需要用户在 WeKnora 中创建 API Key 并 `burrowl secret set` | — |
@@ -660,11 +660,7 @@ claims: [{id: CLM-…, maturity: replicated, review: accepted}]   # 渲染时生
 1. **默认嵌入模型**：建议继续用 MiniLM（数据见"P1 模型实测"）；Qwen3-Q 保留为可选，真实数据题集建立后再测。
 2. **图路线是否默认打开**：建议保持关闭，等有概念链接和关联的真实数据评估。
 3. **requested_maturity 的放宽**（见"实施中的澄清与偏离"）。
-4. **LightRAG 方案**（T-P4.0 的发现）：
-   - A（建议）：连接器每次发布时按交换包**整体重建** LightRAG 工作目录（图模式导入，本地嵌入，不需要删除接口）。个人知识库规模下重建成本低，一致性最简单。
-   - B：记录每个 local_key 写入了哪些实体和关系，按实体/关系逐个删除；共享概念实体要做引用计数，复杂且容易出错。
-   - C：只用文本模式（`ainsert_custom_chunks` 可按文档删除），让 LightRAG 自己抽取实体，需要配置 LLM（oneapi），放弃导入整理图。
-   - D：暂不接 LightRAG，先用 Markdown 库 + qmd 等本地工具。
+4. ~~LightRAG 方案~~：用户选定 A（按需重建 + 嵌入缓存 + 后台替换），已实现（T-P4.1）。剩下的是本机人工验收：配置 lightrag 连接器 → 发布 → 检索 → 核验（AC-P4）。
 5. **真实数据评估集**与 **Obsidian 人工验收**（`build/exchange-sample/vault`）：等用户有空。
 6. **概念库**：用户已定名称"概念库"、不预设领域。需要在用户安装新版本、重启 MCP 之后再建（旧版本不支持 knowledge 业务卡，也不能用新版本代码直接改用户数据目录的索引，否则旧版本会因索引结构版本不同而报错）。
 

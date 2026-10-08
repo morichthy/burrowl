@@ -65,7 +65,9 @@ class App:
         memory = MemoryService(storage, index=index, claim_lookup_factory=claim_lookup_factory(storage),
                                concept_owner=lambda: config_service.current().graph.concept_owner_id)
         review = ReviewService(storage, memory)
-        hub = HubService(storage, config_service.current)
+        hub = HubService(storage, config_service.current,
+                         graph_source=lambda: (index.ensure_graph(), index.db.graph_nodes(),
+                                               index.db.graph_all_edges())[1:])
         reranker = Path(cfg.index.reranker.path) if cfg.index.reranker.path else (shared / RERANKER_DIR if shared else None)
         if reranker is not None and not reranker.is_absolute():
             reranker = workspace.root / reranker

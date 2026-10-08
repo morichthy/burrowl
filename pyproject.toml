@@ -5,11 +5,13 @@ members = ["packages/*"]
 [tool.uv.sources]
 burrowl = { workspace = true }
 burrowl-connector-weknora = { workspace = true }
+burrowl-connector-lightrag = { workspace = true }
 
 [dependency-groups]
 dev = [
     "burrowl",
     "burrowl-connector-weknora",
+    "burrowl-connector-lightrag",
     "pytest>=8.3",
     "ruff>=0.8",
     "import-linter>=2.1",

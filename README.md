@@ -273,6 +273,7 @@ burrowl serve
   1. 在 WeKnora 中创建 API Key；
   2. 运行 `burrowl secret set keyring:burrowl/weknora`，把它写入本机凭据管理器；
   3. 在设置页添加连接器（type=weknora）。
+- **LightRAG**（本地，不需要 Docker）：type 填 `lightrag`，`options.path` 填一个空目录。导入 burrowl 整理好的图，嵌入用本机模型，检索不调用 LLM。发布时只有新增就追加，有修改或撤回就在后台整体重建，未变的内容不重算向量。
 - **Markdown 库**：type 填 `mdvault`，`options.path` 填库目录。页面按交换格式写（`records/<对象>/<handle>.md`，链接指向库内文件，带自动生成的反链与关联），Obsidian 可以直接打开。
 
 发布流程是：测试连接 → 预览发布（默认只含已复核内容）→ 确认执行。

@@ -9,7 +9,7 @@
 | 单元 | `tests/unit/` | core：校验、哈希、原子写与锁、路径安全；查询计划、重排条件；备份包 | `uv run pytest tests/unit` |
 | 服务 | `tests/service/` | 在临时数据目录（浮点样例的副本）上测各服务的行为与失败边界；使用确定性的假向量 | `uv run pytest tests/service` |
 | 接口 | `tests/interfaces/` | HTTP 安全与路由、MCP（进程内与 stdio 真实拉起）、操作经组合根的完整链路 | `uv run pytest tests/interfaces` |
-| 连接器 | `tests/connectors/` | WeKnora 适配器（模拟 v0.8 REST）与同步引擎的端到端 | `uv run pytest tests/connectors` |
+| 连接器 | `tests/connectors/` | WeKnora 适配器（模拟 v0.8 REST）与同步引擎的端到端；LightRAG 连接器（假实现的合约测试，装了 lightrag-hku 时再跑真实 1.5.7） | `uv run pytest tests/connectors` |
 | 前端组件 | `frontend/src/**/*.test.tsx` | 页面行为与发给后端的参数（模拟 fetch） | `npm --prefix frontend test` |
 | 浏览器端到端 | `frontend/e2e/` | 真实后端 + 构建产物 + 系统 Edge：阅读会话双向交互、复核后过滤、中枢发布、维护与原始材料 | `npm --prefix frontend run e2e` |
 | 打包 | `packaging/build.py` 与一次真实离线安装 | 中文和空格路径、版本切换、MCP 登记与拉起 | 见下文"不能省略的检查" |

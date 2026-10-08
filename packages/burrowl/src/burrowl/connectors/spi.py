@@ -25,6 +25,7 @@ class Capabilities:
     wiki_read: bool = False
     wiki_write: bool = False
     wiki_auto: bool = False
+    graph_import: bool = False     # 接收整理图（PublishItem.graph），如 LightRAG 的图模式
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -49,6 +50,9 @@ class PublishItem:
     # 交换格式（R12 T-P3.3）：渲染好的库内相对路径与 YAML 头字段。只有写 Markdown 库的连接器使用，其他连接器忽略。
     path: str | None = None
     front_matter: dict | None = None
+    # 整理图（R12 T-P4.1）：本条目声明的实体与关系，只给 capabilities().graph_import 为真的连接器。
+    # {"entities": [{id, name, type, description}], "relationships": [{src, dst, type, category, certainty, state}]}
+    graph: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -120,6 +124,12 @@ class CandidateLink:
     dst_local_key: str
     kind: str = "related"          # 外部工具自己的关系名或类别
     score: float = 0.0
+
+
+@runtime_checkable
+class SupportsFinalize(Protocol):
+    """一次发布执行完所有条目之后调用（例如按全部条目重建外部索引）。返回执行摘要。"""
+    def finalize(self, collection: Collection) -> dict[str, Any]: ...
 
 
 @runtime_checkable

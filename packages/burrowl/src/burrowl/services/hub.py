@@ -20,6 +20,7 @@ from ..connectors.spi import (
     ExternalRef,
     PublishItem,
     SupportsCandidates,
+    SupportsFinalize,
     SupportsWiki,
     WikiPage,
 )
@@ -43,7 +44,10 @@ BADGE_LABELS = {"accepted": "已确认", "not-reviewed": "未复核", "disputed"
 BLOCKING = {"ACCESS_DENIED", "UNSAFE_PATH"}  # 依据链上有受限来源时，派生文本也不能外发
 SENSITIVITY_RANK = {"public": 0, "internal": 1, "confidential": 2, "restricted": 3}
 DEFAULT_COLLECTION = "burrowl"
-WIKI_PREFIX = "burrowl-"  # 宿主 AI 编写的页面统一放在 <type>/burrowl-* 命名空间，与外部自动生成的页面分开
+WIKI_PREFIX = "burrowl-"
+# 交给外部图的边类别（R12 T-P4.1）：结构边和证据边留在本地，外部只拿导航与概念关系
+GRAPH_EXPORT_CATEGORIES = {"reference", "navigation", "concept", "claim_relation"}
+GRAPH_EXCLUDED_STATES = {"rejected", "withdrawn", "invalid"}  # 宿主 AI 编写的页面统一放在 <type>/burrowl-* 命名空间，与外部自动生成的页面分开
 
 
 def ref_uri(record: dict) -> str:
@@ -83,9 +87,10 @@ def _document_markdown(doc: dict) -> str:
 
 class HubService:
     def __init__(self, storage: Storage, config: Callable[[], BurrowlConfig], *, state: HubState | None = None,
-                 factory: Callable[..., Any] = registry.create):
+                 factory: Callable[..., Any] = registry.create, graph_source: Callable[[], tuple] | None = None):
         self.storage = storage
         self.config = config
+        self.graph_source = graph_source  # () -> (节点, 边)：本地图投影，给接收整理图的连接器用
         self.state = state or HubState(storage.ws)
         self.factory = factory
         self._cache: dict[str, tuple[str, Any]] = {}
@@ -129,8 +134,9 @@ class HubService:
                  "available": c.type in registry.factories()} for c in self.config().connectors]
 
     # ---------- 应发布集合 ----------
-    def desired(self, cfg: ConnectorConfig) -> dict[str, tuple[str, PublishItem]]:
-        """local_key → (channel, 条目)。channel：item（知识条目）/ wiki（宿主编写的 Wiki 页）。"""
+    def desired(self, cfg: ConnectorConfig, conn=None) -> dict[str, tuple[str, PublishItem]]:
+        """local_key → (channel, 条目)。channel：item（知识条目）/ wiki（宿主编写的 Wiki 页）。
+        conn 支持 graph_import 时，记录条目附带它声明的整理图（只含同样满足发布策略的端点）。"""
         policy = cfg.publish
         index = self.storage.owners.scan()
         graph = ClaimGraph(self.storage, index)
@@ -165,6 +171,61 @@ class HubService:
                         chosen[item.local_key] = record
         if cfg.type == MarkdownVault.type:
             out = self._as_exchange(out, chosen)
+        if conn is not None and conn.capabilities().graph_import and self.graph_source is not None:
+            out = self._with_graph(out, chosen, graph, excluded)
+        return out
+
+    def _with_graph(self, items: dict[str, tuple[str, PublishItem]], chosen: dict[str, dict], graph: ClaimGraph,
+                    excluded: set[str]) -> dict[str, tuple[str, PublishItem]]:
+        """给每个记录条目附上它声明的实体与关系（R12 T-P4.1）。端点只能是本次发布的记录及其结论，或敏感级别
+        允许的概念页；其他端点（未发布的记录、来源文件）不外发，相关的边一并省略。"""
+        nodes, edges = self.graph_source()
+        node_by_id = {n["node_id"]: n for n in nodes}
+        published = {r["record_id"]: r for key, r in chosen.items() if not key.startswith("wiki:")}
+        claims = {c["claim_id"]: (c, r) for r in published.values() for c in r["payload"].get("claims", []) or []}
+
+        def entity(node_id: str) -> dict | None:
+            node_id = node_id.split("#", 1)[0]                     # 块 → 所在记录
+            if node_id in published:
+                record = published[node_id]
+                return {"id": node_id, "name": f"{record['title']} [{node_id[4:12]}]", "type": "record",
+                        "description": f"{record.get('level') or record['kind']}：{record['title']}"}
+            if node_id in claims:
+                claim, _record = claims[node_id]
+                return {"id": node_id, "name": node_id, "type": "claim",
+                        "description": f"{claim['statement']}（适用范围：{claim['scope']}）"}
+            node = node_by_id.get(node_id)
+            record = graph.records.get(node_id)
+            if node and node["node_type"] == "concept" and record and record["sensitivity"] not in excluded:
+                return {"id": node_id, "name": record["title"], "type": "concept",
+                        "description": (record["body_markdown"] or record["title"])[:500]}
+            return None
+
+        out = {}
+        for key, (channel, item) in items.items():
+            record = chosen[key]
+            if channel != "item" or record["record_id"] not in published:
+                out[key] = (channel, item)
+                continue
+            declared = {record["record_id"], *(c["claim_id"] for c in record["payload"].get("claims", []) or [])}
+            entities = {e["id"]: e for e in map(entity, sorted(declared)) if e}
+            relationships = []
+            for edge in edges:
+                if edge["declared_by"] not in declared or edge["category"] not in GRAPH_EXPORT_CATEGORIES \
+                        or edge["state"] in GRAPH_EXCLUDED_STATES:
+                    continue
+                src, dst = entity(edge["src"]), entity(edge["dst"])
+                if src is None or dst is None or src["id"] == dst["id"]:
+                    continue
+                entities.setdefault(src["id"], src)
+                entities.setdefault(dst["id"], dst)
+                relationships.append({"src": src["id"], "dst": dst["id"], "type": edge["type"],
+                                      "category": edge["category"], "certainty": edge["certainty"],
+                                      "state": edge["state"]})
+            payload = {"entities": sorted(entities.values(), key=lambda e: e["id"]),
+                       "relationships": sorted(relationships, key=lambda r: (r["src"], r["dst"], r["type"]))}
+            out[key] = (channel, dataclasses.replace(
+                item, graph=payload, content_hash=canonical_hash({"base": item.content_hash, "graph": payload})))
         return out
 
     def _as_exchange(self, items: dict[str, tuple[str, PublishItem]],
@@ -232,7 +293,7 @@ class HubService:
     # ---------- 预览 / 执行 ----------
     def plan(self, connector_id: str) -> dict:
         cfg, conn = self.connector(connector_id)
-        desired = self.desired(cfg)
+        desired = self.desired(cfg, conn)
         mapped = self.state.mappings(connector_id)
         caps = conn.capabilities()
         actions = []
@@ -265,7 +326,7 @@ class HubService:
         if preview["plan_hash"] != plan_hash:
             raise BurrowlError("CONFLICT", "预览之后本地数据或策略已变化，请重新预览", {"plan_hash": preview["plan_hash"]})
         cfg, conn = self.connector(connector_id)
-        desired = {key: item for key, (_channel, item) in self.desired(cfg).items()}
+        desired = {key: item for key, (_channel, item) in self.desired(cfg, conn).items()}
         collection = self._collection(cfg, conn)
         mapped = self.state.mappings(connector_id)
         if any(a["op"] == "create" and a["channel"] == "item" for a in preview["actions"]) and                 conn.capabilities().listing:
@@ -291,7 +352,13 @@ class HubService:
             results.append({"local_key": key, "op": action["op"], **outcome})
         summary = {r: sum(x["result"] == r for x in results) for r in {x["result"] for x in results}}
         self.state.finish_run(run_id, summary)
-        return {"connector_id": connector_id, "run_id": run_id, "summary": summary, "results": results}
+        out = {"connector_id": connector_id, "run_id": run_id, "summary": summary, "results": results}
+        if isinstance(conn, SupportsFinalize):  # 例如 LightRAG：按全部条目重建或追加外部索引
+            try:
+                out["finalize"] = conn.finalize(collection)
+            except ConnectorError as exc:
+                out["finalize"] = {"ok": False, "error": str(exc)}
+        return out
 
     def _apply_item(self, cid: str, conn, collection: Collection, action: dict, item: PublishItem | None,
                     current: dict | None) -> dict:

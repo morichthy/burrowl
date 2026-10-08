@@ -1,0 +1,17 @@
+[project]
+name = "burrowl-connector-lightrag"
+version = "0.1.0"
+description = "burrowl 知识中枢连接器：LightRAG 图模式（导入 burrowl 整理的图；本地嵌入；查询不调用 LLM）"
+requires-python = ">=3.12"
+dependencies = ["burrowl"]
+
+[project.optional-dependencies]
+# 锁定 T-P4.0 实测的版本：LightRAG 接口变动频繁，升级前先重跑 tests/connectors/test_lightrag.py
+runtime = ["lightrag-hku==1.5.7"]
+
+[project.entry-points."burrowl.connectors"]
+lightrag = "burrowl_connector_lightrag:create"
+
+[build-system]
+requires = ["uv_build>=0.8,<0.13"]
+build-backend = "uv_build"

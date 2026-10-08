@@ -76,7 +76,7 @@ core         记录模型与校验、契约说明、哈希、原子写与锁、�
 | IDX 检索 | `index/`（db、projections（含上下文信封）、graph（图投影）、fusion、query_plan、rerank、conditions、extract、embed、model_store）、`services/indexing.py`（同步、图路线、关联候选、缺口） | QUERY、READ 的召回；关系图页；模型安装；索引重建；发现可见性语义；评估脚本 `tools/eval_retrieval.py` |
 | QUERY 材料查询 | `services/query/`（search、page、assemble、expand、deepen、documents，以及预算） | 检索页；read Skill 的片段模式；context_reach 语义 |
 | READ 阅读会话 | `services/reading/`（service、screening、notes、text、session） | 阅读会话页（SSE）；read Skill；配置中的阅读默认值与预算 |
-| HUB 知识中枢 | `services/hub.py`、`storage/hub_state.py`、`connectors/`（spi、registry、fake、mdvault），以及独立包 `burrowl-connector-weknora` | 发布策略与复核类别；中枢页；wiki_page 记录；合约测试 |
+| HUB 知识中枢 | `services/hub.py`、`storage/hub_state.py`、`connectors/`（spi、registry、fake、mdvault），以及独立包 `burrowl-connector-weknora`、`burrowl-connector-lightrag`（图模式，按需重建） | 发布策略与复核类别；中枢页；wiki_page 记录；合约测试；LightRAG 版本锁定在 1.5.7，升级前重跑 `tests/connectors/test_lightrag.py` |
 | MAINT 维护与监测 | `services/maintenance.py`、`services/monitor.py`、`services/relations.py`（读取图投影、关联候选） | 维护页、关系图页；consolidate Skill |
 | CFG 配置 | `core/config.py`（BurrowlConfig）、`services/config.py`（CAS 与影响提示）、`storage/config_store.py`、`storage/secrets.py` | 所有读取默认值的服务；设置页；MCP 工具组 |
 | PORT 可移植包 | `portable/bundle.py`（burrowl-bundle 备份、校验、恢复） | 数据目录布局变化；排除规则 |
@@ -101,7 +101,7 @@ core         记录模型与校验、契约说明、哈希、原子写与锁、�
 | 监测 | `.burrowl/monitor/`：基线、观察记录、候选状态 | 只是观察，不改证据；扫描不完整时不更新基线 |
 | 中枢映射 | `.burrowl/hub/state.sqlite3` | 派生状态，丢失后按外部元数据中的 local_key 认领 |
 | 交换包 | 数据目录的 `exports/<名称>/`（manifest、vault、graph），由 `exchange.export` 生成 | 派生数据，可以删除重建；不进备份包；在其中的修改不会回到 burrowl |
-| 外部中枢内容 | WeKnora 等 | 派生副本，可以由本地重新发布 |
+| 外部中枢内容 | WeKnora 等；LightRAG 的暂存表、构建目录与嵌入缓存在连接器 `options.path` 下 | 派生副本，可以由本地重新发布；LightRAG 每次有修改或删除时整体重建，切换成功前旧构建照常可查 |
 | 工作台偏好 | `.burrowl/workbench/`（关系图视图、随手笔记） | 本机偏好，不是研究记录 |
 | 当前任务上下文 | 任务的 Markdown 工作清单，由 AI 编辑 | 不是后台同步的状态；检查点保存交接时点 |
 | 模型 | `%LOCALAPPDATA%\burrowl\models`（或 `BURROWL_MODELS_DIR`） | 嵌入模型变化会改变指纹，向量投影要重建 |
@@ -170,7 +170,7 @@ handle 分配和正文链接解析发生在第 1 步（`MemoryService.prepare`�
 - 检索评估只有浮点样例的小题集（13 题，`tools/eval_retrieval.py`），只能看相对变化；基于真实数据目录的 40–60 题评估集待用户抽查后建立（R12 的 T-P0.2）。样例只有一个对象、没有链接和结论，图路线在上面没有可测的收益。
 - 默认 MiniLM 的输入上限只有 128 token，长记录被切成很多小窗口；Qwen3 长上下文模型已可选安装，是否改为默认待用户根据实测决定（R12 §10）。
 - 交换包尚未在 Obsidian 中人工验收（R12 AC-P3）。
-- LightRAG 连接器暂停：自定义图导入不能按文档删除，方案待用户选择（R12 设计稿 §10）。中枢路线（`index.hub_route`）已实现，默认关闭。
+- LightRAG 连接器只有自动测试（假实现 + 真实 1.5.7 断网运行），尚未在本机做"发布 → 检索 → 核验"的人工验收（R12 AC-P4）。中枢路线（`index.hub_route`）默认关闭。
 - WeKnora 连接器只用模拟接口测试，尚未连真实服务实测。
 - 宿主 token 用量不由本项目保证。
 - 第二台物理机安装与真实业务验收尚未进行。

@@ -244,6 +244,8 @@ status：轮询外部异步解析
 search：联邦检索，命中能对上本地时附固定引用和按本地当前状态计算的复核类别
 中枢路线（index.hub_route）：材料查询时外部命中映射回本地记录，作为一路参与融合；外部不可用只报告缺口
 外部候选（hub.candidates_pull）：外部工具发现的关系 → 关联候选（origin=tool:<id>），从不直接写成记录
+LightRAG（图模式）：条目附带本条目声明的整理图；upsert/delete 只写暂存，apply 结束后 finalize：
+    无变化跳过 | 只有新增 → 追加 | 有修改或删除 → 新目录整体重建、成功后切换；嵌入按文本指纹缓存
 交换包（exchange.export）：Markdown 库 + 图 JSONL + manifest，按敏感级别过滤、增量写入；mdvault 用同一渲染器发布
 wiki：外部被人修改（漂移）时不覆盖，除非显式 force
 ```
