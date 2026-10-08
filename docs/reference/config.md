@@ -72,7 +72,10 @@
       "provider": "fastembed",
       "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
       "path": null,
-      "dim": 384
+      "dim": 384,
+      "max_tokens": null,
+      "query_prefix": null,
+      "passage_prefix": null
     },
     "vector": {
       "kind": "sqlite-vec",
@@ -82,7 +85,31 @@
     "reranker": {
       "path": null
     },
-    "ocr_enabled": true
+    "ocr_enabled": true,
+    "graph_route": {
+      "enabled": false,
+      "hops": 1,
+      "seeds": 20,
+      "fanout": 20,
+      "weight": 0.5,
+      "category_weights": {
+        "structure": 0.3,
+        "evidence": 1.0,
+        "reference": 0.6,
+        "navigation_supported": 0.7,
+        "navigation_plausible": 0.4,
+        "navigation_speculative": 0.2,
+        "concept": 0.5,
+        "claim_relation": 0.6
+      },
+      "algorithm": "hops"
+    },
+    "hub_route": {
+      "connectors": [],
+      "weight": 0.5,
+      "timeout_s": 10.0,
+      "limit": 20
+    }
   },
   "server": {
     "host": "127.0.0.1",
@@ -98,6 +125,7 @@
       "relations",
       "maintenance",
       "monitor",
+      "exchange",
       "runs",
       "sources",
       "index",
@@ -108,7 +136,10 @@
     ],
     "mode": "auto"
   },
-  "connectors": []
+  "connectors": [],
+  "graph": {
+    "concept_owner_id": null
+  }
 }
 ```
 
@@ -226,6 +257,71 @@
         }
       },
       "title": "Budget",
+      "type": "object"
+    },
+    "CategoryWeights": {
+      "additionalProperties": false,
+      "description": "图路线中各类边的权重（R12 §4.4）。关联边按确定度取三档之一。",
+      "properties": {
+        "structure": {
+          "default": 0.3,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Structure",
+          "type": "number"
+        },
+        "evidence": {
+          "default": 1.0,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Evidence",
+          "type": "number"
+        },
+        "reference": {
+          "default": 0.6,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Reference",
+          "type": "number"
+        },
+        "navigation_supported": {
+          "default": 0.7,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Navigation Supported",
+          "type": "number"
+        },
+        "navigation_plausible": {
+          "default": 0.4,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Navigation Plausible",
+          "type": "number"
+        },
+        "navigation_speculative": {
+          "default": 0.2,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Navigation Speculative",
+          "type": "number"
+        },
+        "concept": {
+          "default": 0.5,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Concept",
+          "type": "number"
+        },
+        "claim_relation": {
+          "default": 0.6,
+          "description": "再乘结论的成熟度系数",
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Claim Relation",
+          "type": "number"
+        }
+      },
+      "title": "CategoryWeights",
       "type": "object"
     },
     "Collaboration": {
@@ -390,9 +486,163 @@
           "minimum": 1,
           "title": "Dim",
           "type": "integer"
+        },
+        "max_tokens": {
+          "anyOf": [
+            {
+              "maximum": 131072,
+              "minimum": 16,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "模型输入上限（token）；为空时读取模型自带值。只能调小，不能超过模型真实上限",
+          "title": "Max Tokens"
+        },
+        "query_prefix": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "查询指令前缀（如 Qwen3 的 Instruct…Query:）；fastembed 不会自动添加",
+          "title": "Query Prefix"
+        },
+        "passage_prefix": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "文档指令前缀；多数模型不需要",
+          "title": "Passage Prefix"
         }
       },
       "title": "Embedding",
+      "type": "object"
+    },
+    "GraphRoute": {
+      "additionalProperties": false,
+      "description": "图路线（R12 §4.11）：从关键词与向量融合后的前几名出发沿图扩展，作为 RRF 中的一路。只是导航。",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "description": "默认关闭；评估显示收益后再由用户决定是否打开（D-24）",
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "hops": {
+          "default": 1,
+          "maximum": 2,
+          "minimum": 1,
+          "title": "Hops",
+          "type": "integer"
+        },
+        "seeds": {
+          "default": 20,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Seeds",
+          "type": "integer"
+        },
+        "fanout": {
+          "default": 20,
+          "description": "每个节点最多扩展的边数",
+          "maximum": 200,
+          "minimum": 1,
+          "title": "Fanout",
+          "type": "integer"
+        },
+        "weight": {
+          "default": 0.5,
+          "description": "在 RRF 融合中的路线权重",
+          "maximum": 2,
+          "minimum": 0,
+          "title": "Weight",
+          "type": "number"
+        },
+        "category_weights": {
+          "$ref": "#/$defs/CategoryWeights"
+        },
+        "algorithm": {
+          "const": "hops",
+          "default": "hops",
+          "title": "Algorithm",
+          "type": "string"
+        }
+      },
+      "title": "GraphRoute",
+      "type": "object"
+    },
+    "GraphSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "concept_owner_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "概念库对象（owner_type=knowledge）的 owner_id；为空时 [[概念]] 链接都记为未解析，不阻塞提交",
+          "title": "Concept Owner Id"
+        }
+      },
+      "title": "GraphSettings",
+      "type": "object"
+    },
+    "HubRoute": {
+      "additionalProperties": false,
+      "description": "中枢路线（R12 §4.11、D-23）：外部检索作为 RRF 中的一路。命中必须对上本地记录、回到固定版本核验。",
+      "properties": {
+        "connectors": {
+          "description": "参与的连接器 id；为空表示关闭",
+          "items": {
+            "type": "string"
+          },
+          "title": "Connectors",
+          "type": "array"
+        },
+        "weight": {
+          "default": 0.5,
+          "maximum": 2,
+          "minimum": 0,
+          "title": "Weight",
+          "type": "number"
+        },
+        "timeout_s": {
+          "default": 10.0,
+          "description": "单次外部检索的超时；超时按不可用处理并报告缺口",
+          "exclusiveMinimum": 0,
+          "maximum": 120,
+          "title": "Timeout S",
+          "type": "number"
+        },
+        "limit": {
+          "default": 20,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Limit",
+          "type": "integer"
+        }
+      },
+      "title": "HubRoute",
       "type": "object"
     },
     "IndexConfig": {
@@ -417,6 +667,12 @@
           "default": true,
           "title": "Ocr Enabled",
           "type": "boolean"
+        },
+        "graph_route": {
+          "$ref": "#/$defs/GraphRoute"
+        },
+        "hub_route": {
+          "$ref": "#/$defs/HubRoute"
         }
       },
       "title": "IndexConfig",
@@ -840,6 +1096,9 @@
       },
       "title": "Connectors",
       "type": "array"
+    },
+    "graph": {
+      "$ref": "#/$defs/GraphSettings"
     }
   },
   "title": "BurrowlConfig",

@@ -32,12 +32,21 @@ def _contains(text: str, term: str) -> bool:
     return re.search(r"(?<![A-Za-z0-9_])" + re.escape(term) + r"(?![A-Za-z0-9_])", text, re.I) is not None
 
 
+def contains(text: str, term: str) -> bool:
+    """术语是否出现在文本中（与术语扩展同一套边界规则）。"""
+    return _contains(text, term)
+
+
 def _preserves(text: str, term: str) -> bool:
     return re.search(r"(?<![A-Za-z0-9_])" + re.escape(term) + r"(?![A-Za-z0-9_])", text) is not None
 
 
+_NUMERIC = re.compile(r"(?<![A-Za-z0-9])(?:[A-Za-z]+[-_]?)?\d+(?:[._-]\d+)*(?:[eE][+-]?\d+)?[A-Za-z0-9]*")
+
+
 def numeric_tokens(text: str) -> list[str]:
-    return re.findall(r"(?<![A-Za-z0-9])(?:[A-Za-z]+[-_]?)?\d+(?:[._-]\d+)*(?:[A-Za-z]+)?", text)
+    """数值与型号（X200、3.12.10、1e16）。整段取到字母数字边界，避免把 1e16 截成"1e"后误判为未保留。"""
+    return _NUMERIC.findall(text)
 
 
 def _language(text: str) -> str:

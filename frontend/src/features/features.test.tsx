@@ -67,6 +67,29 @@ describe("知识复核", () => {
     expect(calls.filter((c) => c.name === "review.submit").map((c) => c.args.dry_run)).toEqual([true, false]);
   });
 
+  it("AI 提出的“已确立”升级由人在工作台确认，必须选择证据类型", async () => {
+    const proposed = {
+      ...claim,
+      status: "maturity-requested",
+      maturity: "preliminary",
+      requested_maturity: "established",
+      stats: { supports: 2, contradicts: 0, open_counterexamples: 0, cited_by: 1, run_inputs: 0 },
+      review: { state: "not-reviewed", reason: "两次复算一致", scope: null, updated_at: "2026-10-09T00:00:00Z", revision: 1 },
+    };
+    handlers["review.queue"] = () => ({ items: [proposed], total: 1, counts: { "maturity-requested": 1 } });
+    handlers["review.submit"] = () => ({ writes: 1 });
+    render(<Review />);
+    expect(await screen.findByText(/提议升级为已确立/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "确认升级为已确立" }));
+    const submitButton = await screen.findByRole("button", { name: "提交确认" });
+    expect(submitButton).toBeDisabled();   // 还没选证据类型
+    fireEvent.change(screen.getByLabelText(/证据类型/), { target: { value: "replication" } });
+    fireEvent.click(screen.getByRole("button", { name: "提交确认" }));
+    await waitFor(() => expect(calls.some((c) => c.name === "review.submit")).toBe(true));
+    const sent = calls.find((c) => c.name === "review.submit")!;
+    expect(sent.args).toMatchObject({ state: "accepted", maturity: "established", evidence_basis: "replication", dry_run: false });
+  });
+
   it("批量质疑把所选结论一次提交", async () => {
     handlers["review.queue"] = () => ({ items: [claim, { ...claim, claim_id: "CLM-2", statement: "另一条" }], total: 2, counts: {} });
     handlers["review.batch"] = (args) => ({ succeeded: (args.items as unknown[]).length, failed: 0 });

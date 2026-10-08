@@ -22,19 +22,25 @@ def owners(ctx: Ctx, owner_types: list[str] | None = None, query: str = "") -> d
 
 
 @op("memory.owner_create", effect="write")
-def owner_create(ctx: Ctx, owner_type: Literal["research", "project", "core-algorithm", "data", "tool", "report"],
+def owner_create(ctx: Ctx, owner_type: Literal["research", "project", "core-algorithm", "data", "tool", "report",
+                                               "knowledge"],
                  slug: Annotated[str, Field(description="小写字母/数字/连字符")], title: str,
                  description: str = "", keywords: list[str] | None = None,
                  source_document: Annotated[str | None, Field(description=(
                      "core-algorithm 必填：定义该算法的公司算法/模块文档（路径或文档编号）"))] = None,
+                 short_name: Annotated[str | None, Field(description=(
+                     "可选的可读短名，供 [[@短名/handle]] 链接其他对象的记录"))] = None,
                  sensitivity: Literal["public", "internal", "confidential", "restricted"] = "internal") -> dict:
     """新建对象（写入业务卡；首次提交记忆时才建立记忆目录）。Run 用 runs.create 建立。
 
     先用 memory.owners 查找：同一目标的继续或子任务沿用已有对象；主题相似只引用；独立交付目标才新建。
-    core-algorithm 只用于公司文档定义的关键算法，普通脚本/模块/工具不要建算法卡。"""
+    core-algorithm 只用于公司文档定义的关键算法，普通脚本/模块/工具不要建算法卡。
+    knowledge 用于全库唯一的概念库（建好后把 owner_id 填进配置 graph.concept_owner_id）。"""
     fields = {"description": description, "keywords": keywords or [], "sensitivity": sensitivity}
     if source_document:
         fields["source_document"] = source_document
+    if short_name:
+        fields["short_name"] = short_name
     return ctx.app.storage.owners.create(owner_type, slug, title, fields).summary()
 
 

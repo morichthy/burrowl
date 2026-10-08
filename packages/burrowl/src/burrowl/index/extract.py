@@ -46,7 +46,7 @@ def _member(package: zipfile.ZipFile, name: str) -> bytes:
 class _Extraction:
     def __init__(self, cache_dir: Path, ocr_enabled: bool, max_assets: int):
         self.cache_dir, self.ocr_enabled, self.max_assets = cache_dir, ocr_enabled, max_assets
-        self.units: list[tuple[str, str]] = []
+        self.units: list[tuple[str, ...]] = []  # (标签, 文本[, 标题路径])
         self.assets: list[dict] = []
         self.warnings: list[str] = []
 
@@ -166,19 +166,46 @@ class _Extraction:
         if len(rows) == 1:
             self.units.append(("Header", " | ".join(header)))
 
-    def text(self, raw: bytes) -> None:
+    def text(self, raw: bytes, *, markdown: bool = False) -> None:
+        """文本按 80 行分段；Markdown 先按标题切成章节（R12 T-P1.6），章节过长再按 80 行分，
+        每段带"标题路径"（进入向量的上下文信封）。标签仍是行号区间，作为稳定的定位符。"""
         text = raw.decode("utf-8-sig")
         if "\x00" in text:
             raise BurrowlError("INVALID_ARGUMENT", "不是文本文件")
-        lines, start = text.splitlines(), 0
-        for i in range(0, max(1, len(lines)), 80):
-            chunk = lines[i:i + 80]
-            self.units.append((f"Lines {i + 1}-{i + len(chunk)}", "\n".join(chunk)))
-            start += len(chunk)
+        lines = text.splitlines()
+        sections = _markdown_sections(lines) if markdown else [(0, len(lines), "")]
+        for begin, end, path in sections or [(0, 0, "")]:
+            for i in range(begin, max(begin + 1, end), 80):
+                chunk = lines[i:min(end, i + 80)]
+                self.units.append((f"Lines {i + 1}-{i + len(chunk)}", "\n".join(chunk), path))
+
+
+_MD_HEADING = re.compile(r"^ {0,3}(#{1,6})\s+(.*?)\s*#*\s*$")
+_MD_FENCE = re.compile(r"^ {0,3}(```|~~~)")
+
+
+def _markdown_sections(lines: list[str]) -> list[tuple[int, int, str]]:
+    """按 ATX 标题切分：返回 [(起始行, 结束行(不含), "一级 › 二级 › …")]；代码围栏内的 # 不算标题。"""
+    starts: list[tuple[int, str]] = [(0, "")]
+    stack: list[tuple[int, str]] = []
+    fence = None
+    for number, line in enumerate(lines):
+        if match := _MD_FENCE.match(line):
+            fence = None if fence == match.group(1) else (fence or match.group(1))
+            continue
+        if fence or not (match := _MD_HEADING.match(line)):
+            continue
+        depth = len(match.group(1))
+        stack = [(d, t) for d, t in stack if d < depth] + [(depth, match.group(2))]
+        starts.append((number, " › ".join(t for _d, t in stack)))
+    bounds = [(start, (starts[i + 1][0] if i + 1 < len(starts) else len(lines)), path)
+              for i, (start, path) in enumerate(starts)]
+    return [b for b in bounds if b[1] > b[0] and any(line.strip() for line in lines[b[0]:b[1]])]
 
 
 def extract(name: str, raw: bytes, *, cache_dir: Path, ocr_enabled: bool = True, max_assets: int = 40) -> dict:
-    """返回 {"units": [{label, text}], "assets": [...], "warnings": [...]}；不支持的格式抛 INVALID_ARGUMENT。"""
+    """返回 {"units": [{label, text, path}], "assets": [...], "warnings": [...]}；不支持的格式抛 INVALID_ARGUMENT。
+    path 是 Markdown 的标题路径（其他格式为空），只用于上下文信封。"""
     suffix = Path(name).suffix.lower()
     job = _Extraction(cache_dir / hashlib.sha256(raw).hexdigest()[:24], ocr_enabled, max_assets)
     if suffix == ".pptx":
@@ -193,11 +220,12 @@ def extract(name: str, raw: bytes, *, cache_dir: Path, ocr_enabled: bool = True,
         job.xlsx(raw)
     else:
         try:  # 其他后缀（如 .snapshot、无后缀）只要是 UTF-8 文本就按文本处理
-            job.text(raw)
+            job.text(raw, markdown=suffix in {".md", ".markdown"})
         except (UnicodeError, BurrowlError) as exc:
             raise BurrowlError("INVALID_ARGUMENT", "不支持的来源格式（不是文本也不是已知文档格式）",
                            {"suffix": suffix}) from exc
     if not job.units:
         job.warnings.append("没有可抽取的内容，需要转换格式或补充说明")
-    return {"units": [{"label": label, "text": text.strip()} for label, text in job.units],
+    return {"units": [{"label": unit[0], "text": unit[1].strip(), "path": unit[2] if len(unit) > 2 else ""}
+                      for unit in job.units],
             "assets": job.assets, "warnings": job.warnings}

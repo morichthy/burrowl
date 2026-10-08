@@ -94,13 +94,64 @@ export declare namespace WikiConfigure {
   }
 }
 
+export declare namespace HubCandidatesPull {
+  /**
+   * 把外部工具发现的关系线索拉回为关联候选（origin=tool:<连接器>，只写派生的候选表，不写记录）。
+   * 之后用 relations.candidates 查看并判断。
+   */
+  export interface Args {
+    connector_id: string;
+    limit?: number;
+  }
+}
+
+export declare namespace ExchangeExport {
+  /**
+   * 把记录导出为交换包（Markdown 库 + 图 JSONL + manifest）到数据目录的 exports/<名称>/。
+   * 派生数据，可删除重建；增量写入，内容没变的文件不改写。可以用 Obsidian 直接打开其中的 vault 目录。
+   */
+  export interface Args {
+    /**
+     * 导出名称：字母、数字、点、下划线、连字符
+     */
+    name: string;
+    owner_ids?: string[] | null;
+    owner_types?: string[] | null;
+    /**
+     * 不导出的敏感级别；默认 [confidential]，restricted 永远不导出
+     */
+    exclude_sensitivity?: string[] | null;
+  }
+}
+
+export declare namespace MemoryRender {
+  /**
+   * 按交换格式把一条记录渲染为 Markdown（YAML 头 + 正文 + 自动生成的反链与关联）。只读。
+   */
+  export interface Args {
+    owner_id: string;
+    record_id: string;
+  }
+}
+
 export declare namespace ReviewQueue {
   /**
-   * 待复核队列：默认列出未复核、已失效、有争议、被上游阻断的结论。
+   * 待复核队列：默认列出未复核、已失效、有争议、被上游阻断、有升级提议的结论；
+   * 每项带有效成熟度与派生统计（支持数按原始来源去重，"用得多"不等于"对"）。
    */
   export interface Args {
     states?:
-      ("not-reviewed" | "stale" | "disputed" | "upstream-blocked" | "accepted" | "retracted" | "superseded")[] | null;
+      | (
+          | "not-reviewed"
+          | "stale"
+          | "disputed"
+          | "upstream-blocked"
+          | "maturity-requested"
+          | "accepted"
+          | "retracted"
+          | "superseded"
+        )[]
+      | null;
     owner_id?: string | null;
     query?: string;
     limit?: number;
@@ -111,6 +162,7 @@ export declare namespace ReviewQueue {
 export declare namespace ReviewSubmit {
   /**
    * 复核一条结论。accepted 需要适用范围与支持性证据；superseded 需要替代结论。dry_run 只预检。
+   * 成熟度与复核状态分开：可以在 not-reviewed 时登记 conjecture/preliminary；established 必须 accepted。
    */
   export interface Args {
     target_claim_id: string;
@@ -123,6 +175,18 @@ export declare namespace ReviewSubmit {
         }[]
       | null;
     replacement_claim_id?: string | null;
+    /**
+     * 成熟度：conjecture 有推理无数据；preliminary 至少一次 Run 或小样本支持；replicated 多份独立依据都成立；established 只能由人或授权流程登记（AI 改用 requested_maturity）
+     */
+    maturity?: ("conjecture" | "preliminary" | "replicated" | "established") | null;
+    /**
+     * established 的证据类型
+     */
+    evidence_basis?: ("engineering_case" | "proof" | "authoritative_source" | "replication") | null;
+    /**
+     * AI 提议升级为已确立，由用户在复核队列中确认
+     */
+    requested_maturity?: "established" | null;
     dry_run?: boolean;
   }
 }
@@ -188,7 +252,8 @@ export declare namespace ProvenanceFormal {
 
 export declare namespace RelationsGraph {
   /**
-   * 材料关系图（子图）：对象、记录、来源与作者保存的类型化关系。
+   * 材料关系图（子图）：对象、记录、块、结论、概念、来源，以及按类别区分的边（来自图投影）。
+   * categories 只看某几类边；domains / excluded_domains 按领域筛选或屏蔽概念。
    */
   export interface Args {
     center?: string | null;
@@ -198,6 +263,10 @@ export declare namespace RelationsGraph {
     levels?: string[] | null;
     excluded?: string[] | null;
     limit?: number;
+    categories?: ("structure" | "evidence" | "reference" | "navigation" | "concept" | "claim_relation")[] | null;
+    domains?: string[] | null;
+    excluded_domains?: string[] | null;
+    node_types?: ("owner" | "record" | "block" | "claim" | "concept" | "source")[] | null;
   }
 }
 
@@ -225,17 +294,31 @@ export declare namespace RelationsAssociations {
 export declare namespace RelationsDecide {
   /**
    * 保存关联判断（candidate/accepted/rejected/withdrawn）；只能是导航关系。
+   * "A 会影响 B"这类可以验证的判断写成结论（inference），不要写成关联。
    */
   export interface Args {
     owner_id: string;
     /**
-     * {from, to, relation, explanation, shared_structure, transfer_limits[], basis_refs[], status}
+     * {from, to, relation, explanation, shared_structure, transfer_limits[], basis_refs[], status, certainty?(speculative|plausible|supported), origin?, observed_in?}；快速添加只给 {from, to, explanation}：自动设为 related_to + speculative + accepted
      */
     payload: {
       [k: string]: unknown;
     };
     reason: string;
     dry_run?: boolean;
+  }
+}
+
+export declare namespace RelationsCandidates {
+  /**
+   * 待判断的线索：正文提到概念却没链接（concept_mention）、向量近邻（similar）、外部工具回流（external:*）。
+   * 已判断过的端点对会被过滤。只读。
+   */
+  export interface Args {
+    record_id?: string | null;
+    owner_id?: string | null;
+    kinds?: string[] | null;
+    limit?: number;
   }
 }
 
@@ -555,7 +638,7 @@ export declare namespace MemoryOwnerCreate {
    * 新建对象（写入业务卡；首次提交记忆时才建立记忆目录）。Run 用 runs.create 建立。
    */
   export interface Args {
-    owner_type: "research" | "project" | "core-algorithm" | "data" | "tool" | "report";
+    owner_type: "research" | "project" | "core-algorithm" | "data" | "tool" | "report" | "knowledge";
     /**
      * 小写字母/数字/连字符
      */
@@ -567,6 +650,10 @@ export declare namespace MemoryOwnerCreate {
      * core-algorithm 必填：定义该算法的公司算法/模块文档（路径或文档编号）
      */
     source_document?: string | null;
+    /**
+     * 可选的可读短名，供 [[@短名/handle]] 链接其他对象的记录
+     */
+    short_name?: string | null;
     sensitivity?: "public" | "internal" | "confidential" | "restricted";
   }
 }
@@ -1437,7 +1524,8 @@ export declare namespace IndexReconcile {
 
 export declare namespace IndexGaps {
   /**
-   * 发现层的确定性缺口（缺 L4 概览、技术单元缺检索说明）；内容是否充分仍需阅读判断。
+   * 确定性缺口：缺 L4 概览、技术单元缺检索说明、L1 块过长、结果块没声明依赖、未解析的概念链接、
+   * 没有入边的概念页、有未处理反例的结论、待确认的成熟度升级。内容是否充分仍需阅读判断。
    */
   export interface Args {}
 }
@@ -1502,6 +1590,9 @@ export interface OpArgs {
   "wiki.list": WikiList.Args;
   "wiki.read": WikiRead.Args;
   "wiki.configure": WikiConfigure.Args;
+  "hub.candidates_pull": HubCandidatesPull.Args;
+  "exchange.export": ExchangeExport.Args;
+  "memory.render": MemoryRender.Args;
   "review.queue": ReviewQueue.Args;
   "review.submit": ReviewSubmit.Args;
   "review.batch": ReviewBatch.Args;
@@ -1514,6 +1605,7 @@ export interface OpArgs {
   "relations.similar": RelationsSimilar.Args;
   "relations.associations": RelationsAssociations.Args;
   "relations.decide": RelationsDecide.Args;
+  "relations.candidates": RelationsCandidates.Args;
   "relations.view": RelationsView.Args;
   "relations.view_save": RelationsViewSave.Args;
   "relations.notes": RelationsNotes.Args;
@@ -1614,6 +1706,9 @@ export const OP_EFFECTS: Record<OpName, string> = {
   "wiki.list": "read",
   "wiki.read": "read",
   "wiki.configure": "admin",
+  "hub.candidates_pull": "write",
+  "exchange.export": "write",
+  "memory.render": "read",
   "review.queue": "read",
   "review.submit": "write",
   "review.batch": "write",
@@ -1626,6 +1721,7 @@ export const OP_EFFECTS: Record<OpName, string> = {
   "relations.similar": "read",
   "relations.associations": "read",
   "relations.decide": "write",
+  "relations.candidates": "read",
   "relations.view": "read",
   "relations.view_save": "user",
   "relations.notes": "read",

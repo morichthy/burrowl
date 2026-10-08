@@ -1,5 +1,7 @@
 """关系图、监测与结构导航（样例数据）。"""
+from burrowl.core.config import IndexConfig
 from burrowl.services import monitor, relations
+from burrowl.services.indexing import IndexService
 from burrowl.services.memory import structure
 from burrowl.services.memory.context import Storage
 
@@ -8,10 +10,12 @@ OWNER = "RES-FLOATING-POINT-SUMMATION"
 
 def test_graph_and_subgraph(sample_workspace):
     storage = Storage.open(sample_workspace)
-    graph = relations.build_graph(storage)
+    graph = relations.build_graph(storage, IndexService.open(storage, IndexConfig(), fake_vectors=True))
     types = {n["type"] for n in graph["nodes"]}
-    assert types == {"owner", "record", "source"}
-    assert any(e["type"] == "belongs_to" for e in graph["edges"])
+    assert types == {"owner", "record", "source", "block"}   # 样例没有结论和概念页
+    assert any(e["type"] == "belongs_to" and e["category"] == "structure" for e in graph["edges"])
+    evidence = relations.subgraph(graph, categories=["evidence"], node_types=["record", "source"])
+    assert evidence["edges"] and {e["category"] for e in evidence["edges"]} == {"evidence"}
     near = relations.subgraph(graph, center=OWNER, hops=1)
     assert OWNER in near["centers"] and len(near["nodes"]) > 1
     found = relations.subgraph(graph, query="Kahan")

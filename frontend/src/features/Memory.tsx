@@ -264,7 +264,12 @@ interface FullRecord {
 export function RecordView({ ownerId, recordId }: { ownerId: string; recordId: string }) {
   const record = useOp<{ record: FullRecord }>("memory.inspect", { owner_id: ownerId, record_id: recordId });
   const badges = useClaimBadges(ownerId);
+  const [exported, setExported] = useState(false);
+  // 交换格式视图（R12 T-P3.1）：与导出包、Markdown 库同一个渲染器
+  const rendered = useOp<{ markdown: string; path: string }>("memory.render", { owner_id: ownerId, record_id: recordId }, exported);
   const r = record.data?.record;
+  const links = (r as unknown as { links?: { text: string; status: string; ref: { target_id: string } | null }[] })?.links ?? [];
+  const handle = (r as unknown as { handle?: string })?.handle;
   return (
     <>
       <p>
@@ -279,9 +284,25 @@ export function RecordView({ ownerId, recordId }: { ownerId: string; recordId: s
             <>
               <Tag>{label(LEVELS, r.level) !== "—" ? label(LEVELS, r.level) : label(KINDS, r.kind)}</Tag>
               <Tag>修订 {r.revision}</Tag>
+              {handle ? <Tag>@{handle}</Tag> : null}
+              <button type="button" className="small" onClick={() => setExported(!exported)}>
+                {exported ? "返回正文" : "导出视图"}
+              </button>
             </>
           }
         >
+          {exported ? (
+            <>
+              <ErrorBox error={rendered.error} />
+              <Loading show={rendered.loading} />
+              {rendered.data ? (
+                <>
+                  <p className="hint">交换包中的路径：{rendered.data.path}（链接只指向本对象内的记录；完整导出用 exchange.export）</p>
+                  <pre className="raw">{rendered.data.markdown}</pre>
+                </>
+              ) : null}
+            </>
+          ) : null}
           <p className="hint">
             {r.record_reason} · <Time value={r.updated_at} /> · <code>{r.record_id}</code>
           </p>
@@ -300,6 +321,19 @@ export function RecordView({ ownerId, recordId }: { ownerId: string; recordId: s
                         适用范围：{c.scope} · <a href={href("review")}>去复核</a>
                       </div>
                     </div>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+          {links.length ? (
+            <>
+              <h3>正文链接（{links.length}）</h3>
+              <ul className="sources">
+                {links.map((l) => (
+                  <li key={l.text}>
+                    <code>[[{l.text}]]</code> →{" "}
+                    {l.ref ? <code>{l.ref.target_id}</code> : <span className="hint">概念库中还没有这个概念</span>}
                   </li>
                 ))}
               </ul>

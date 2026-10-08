@@ -20,7 +20,7 @@ L0–L4 是**内容压缩与展开的层级**，同时决定检索时的"发现�
 | 层 | 类型（kind） | 正文写在哪 | 关键结构字段 |
 |---|---|---|---|
 | L0 | source | `body_markdown`：登记说明 | `source_ref`（先 `sources_register`）、`acquisition`、`completeness` |
-| L1 | detail | **`payload.blocks`**；`body_markdown` 必须是空字符串 | `unit_type`、`run_ref`、`retrieval_description`、`blocks` |
+| L1 | detail | **`payload.blocks`**；`body_markdown` 必须是空字符串 | `unit_type`、`run_ref`、`retrieval_description`、`blocks`、`claims`（只限 fact / calculation） |
 | L2 | narrative | `body_markdown` | `question`、`stages[]`、`limitations`、`claims` |
 | L3 | experience | `body_markdown` | `problem_structure`、`recommendation`、`applicable`、`prohibited`、`failure_modes`、`knowledge_type`、`claims` |
 | L4 | overview | `body_markdown` | `question`、`methods`、`results`、`current_stage`、`limitations`、`open_questions` |
@@ -71,6 +71,8 @@ L0–L4 是**内容压缩与展开的层级**，同时决定检索时的"发现�
 - `unit_type`：experiment / method / derivation / analysis。**experiment 必须用 `run_ref` 绑定真实 Run**；其他类型 `run_ref` 为 null，但仍要给出固定依据或写明缺口。不要为了凑字段虚构 Run。
 - `retrieval_description`：question、method、key_findings[]、applicable[]、not_applicable[]、limitations[]。它只用于发现候选，**不是正文**。
 - `blocks`：每块有稳定的 `block_id`、`role`（definitions / methods / inputs / derivation / results / discussion / limitations / appendix / introduction）、`markdown` 和 `requires_block_ids`。
+- **拆分**：一个技术单元围绕一个问题或方法；条件明显不同、且结论能各自独立复用时拆成两个单元。
+- **结论**：实验事实和计算结果可以直接写成 L1 的 `claims`（kind 只能是 fact 或 calculation），用 `block_id` 指向给出结果的块。推断和建议写在 L2–L4。
 
 正文按读者能独立复核的顺序组织，短小节可以合并，但不能只留题目、总评和附件链接：
 
@@ -87,7 +89,7 @@ $S_{\mathrm{ref}}=\sum_i \operatorname{Fraction}(x_i)$，$e_{\mathrm{abs}}=|\ope
 
 ## 5. 结论（claim）怎么写
 
-需要被复核、被正式引用的判断写进 L2–L4 的 `payload.claims`，每条包含：
+需要被复核、被正式引用的判断写进 `payload.claims`（L1 只写 fact / calculation，L2–L4 不限），每条包含：
 
 - `claim_id`：全库唯一，建议 `CLM-<对象>-<短名>`。
 - `statement`：一句可判断真假的话。
@@ -95,8 +97,10 @@ $S_{\mathrm{ref}}=\sum_i \operatorname{Fraction}(x_i)$，$e_{\mathrm{abs}}=|\ope
 - `scope`：适用范围。
 - `evidence_refs`：支持它的固定引用（relation 用 supports 或 input）。
 
+- 可选 `relation`：结论是"主体—谓词—对象"形式时填写，例如 `{subject: "[[补偿求和]]", predicate: "fails_on", object: "[[大数抵消]]"}`。谓词用 improves / degrades / causes / prevents / fails_on / applies_to / requires / equivalent_to / contradicts / part_of，或以 `x-` 开头自定义。条件始终留在 scope 里，图上的"补偿求和 → 大数抵消"只是由这条结论派生的快捷边。
 - **scope 要具体**。"有限 binary64 输入、存在大数抵消"是好的；"一般情况下""大多数场景"不是范围。复核时确认的范围必须与 scope 一致。
 - 改了结论或所在记录的正文，原复核会自动失效，需要重新复核。
+- 成熟度（设想 / 初步 / 重复验证 / 已确立）随复核登记，不写在结论里；谁可以登记见 RULES 第 4 节。
 
 ## 6. 引用与三种关系
 
@@ -108,9 +112,24 @@ $S_{\mathrm{ref}}=\sum_i \operatorname{Fraction}(x_i)$，$e_{\mathrm{abs}}=|\ope
 |---|---|---|
 | 展开 / 组成 | `process_refs`（指向 L2）、`technical_refs`（L1）、`experience_refs`（L3）；章节的 `unit` 块；文稿的 `section_refs` | 怎样从概括展开到细节 |
 | 证据 | 引用的 `relation` 为 supports、input、contradicts；claim 的 `evidence_refs` | 判断依据什么成立或被反驳 |
-| 导航 | association 记录（same_problem、same_failure_mode、analogous_to…），用 `relations_decide` 保存 | 相似、对照、可能迁移；**不是证据** |
+| 导航 | association 记录（same_problem、same_failure_mode、analogous_to、related_to…），用 `relations_decide` 保存，带 `certainty`（speculative / plausible / supported） | 相似、对照、可能迁移；**不是证据** |
 
-相似度、同一对象、阅读线索都不能自动变成 supports 或复核。
+相似度、同一对象、阅读线索都不能自动变成 supports 或复核。"值得放在一起看"写成关联；"A 会影响 B"这类可以验证的判断写成结论（kind=inference），再链接两端。
+
+**正文链接**（知识节点之间的可读链接，提交时由服务解析并固定版本，写进记录的 `links`；正文里不出现 ID 或哈希）：
+
+| 写法 | 指向 |
+|---|---|
+| `[[补偿求和]]` | 概念库里的概念（按标题或别名匹配；找不到不阻塞提交，会列为缺口） |
+| `[[@第三轮实验]]`、`[[@浮点求和/第三轮实验]]` | 本对象或其他对象的记录（按 `handle`，斜杠前是对象短名） |
+| `[[@第三轮实验#kahan]]` | L1 记录中的块 |
+| `[[!补偿抵消失效]]` | 结论（claim_id 的短名部分） |
+| `[[…\|显示文字]]` | 竖线后是显示文字 |
+
+- 记录、块、结论链接解析不了时提交失败（`UNRESOLVED_LINK`），错误里给出候选，改写后再提交。
+- 修订时没改动的链接保持原来固定的版本；要指向目标的新版本，在操作里加 `repin: true`。
+- 链接是导航和引用，不是证据；证据仍然写在 `sources` / `evidence_refs`。
+- 链接哪些概念：L4 链接对象涉及的主要概念，L3 链接问题结构和失败模式涉及的概念，L1、L2 按需链接；结论陈述里也可以写链接。
 
 **固定引用怎样拿**：
 

@@ -1,5 +1,19 @@
 // 界面统一的中文标签。后端值保持英文，只在这里翻译。
 
+// 证据成熟度（R12 §4.8）：结论在证据阶梯上的位置，与复核状态分开
+export const MATURITY: Record<string, string> = {
+  conjecture: "设想",
+  preliminary: "初步",
+  replicated: "重复验证",
+  established: "已确立",
+};
+export const EVIDENCE_BASIS: Record<string, string> = {
+  engineering_case: "真实工程案例",
+  proof: "严格证明",
+  authoritative_source: "公认结果（教科书或标准）",
+  replication: "充分的重复实验",
+};
+
 export const REVIEW_BADGES: Record<string, { label: string; tone: string }> = {
   accepted: { label: "已确认", tone: "good" },
   "not-reviewed": { label: "未复核", tone: "muted" },
@@ -8,6 +22,7 @@ export const REVIEW_BADGES: Record<string, { label: string; tone: string }> = {
   superseded: { label: "已替代", tone: "warn" },
   stale: { label: "已失效", tone: "bad" },
   "upstream-blocked": { label: "依据受阻", tone: "bad" },
+  "maturity-requested": { label: "待确认升级", tone: "warn" },
   // 记录级的复核类别（检索结果）
   none: { label: "无结论", tone: "muted" },
   unreviewed: { label: "未复核", tone: "muted" },

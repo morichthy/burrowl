@@ -1,6 +1,6 @@
 {
   "kind": "wiki_page",
-  "note": "Wiki 页面（level=null）：宿主 AI 编写、经 hub.plan/hub.apply 发布到知识中枢；slug 为 <类型>/<名称>，source_refs 必须是固定引用。",
+  "note": "Wiki 页面（level=null）。概念页（page_type=concept/entity）写在全库唯一的概念库对象里（配置 graph.concept_owner_id）：标题和别名就是概念的身份，同名不同义用限定名（如“收敛（数值）”）；只为被实质讨论过、或至少出现在两条记录中的概念建页，正文可以只是一句短定义。合并用 status=merged + merged_into，拆分用 status=split + split_into，从不删除。slug 可省略（只给外部中枢用，格式 <类型>/<名称>）；source_refs 必须是固定引用。",
   "operation": {
     "op": "put_record",
     "client_key": "new-wiki_page",
@@ -9,7 +9,7 @@
       "kind": "wiki_page",
       "title": "补偿求和",
       "keywords": [],
-      "body_markdown": "补偿求和（Kahan 求和）在每一步保存舍入误差并在下一步补回，能减小一般输入的舍入误差；在大数抵消输入上仍可能丢失小量，需要用精确基准核对。",
+      "body_markdown": "补偿求和（Kahan 求和）在每一步保存舍入误差并在下一步补回，能减小一般输入的舍入误差；在 [[大数抵消]] 输入上仍可能丢失小量，需要用精确基准核对。",
       "record_reason": "整理概念页",
       "sensitivity": "internal",
       "sources": [
@@ -32,10 +32,18 @@
       ],
       "provenance_gap": null,
       "payload": {
-        "slug": "concept/compensated-summation",
         "page_type": "concept",
         "aliases": [
-          "Kahan 求和"
+          "Kahan 求和",
+          "compensated summation"
+        ],
+        "concept_kind": "method",
+        "domains": [
+          "数值计算"
+        ],
+        "category_path": [
+          "算法",
+          "求和"
         ],
         "source_refs": [
           {

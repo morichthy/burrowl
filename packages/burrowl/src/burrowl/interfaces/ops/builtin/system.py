@@ -56,7 +56,8 @@ def index_reconcile(ctx: Ctx, owner_id: str | None = None, force: bool = False, 
 
 @op("index.gaps")
 def index_gaps(ctx: Ctx) -> list:
-    """发现层的确定性缺口（缺 L4 概览、技术单元缺检索说明）；内容是否充分仍需阅读判断。"""
+    """确定性缺口：缺 L4 概览、技术单元缺检索说明、L1 块过长、结果块没声明依赖、未解析的概念链接、
+    没有入边的概念页、有未处理反例的结论、待确认的成熟度升级。内容是否充分仍需阅读判断。"""
     return ctx.app.index.gaps()
 
 

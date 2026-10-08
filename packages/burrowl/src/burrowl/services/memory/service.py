@@ -8,6 +8,7 @@ import uuid
 from copy import deepcopy
 from typing import Any
 
+from ...core import links as link_syntax
 from ...core.clock import Clock, utc_now
 from ...core.errors import BurrowlError
 from ...core.hashing import canonical_hash, sha256_bytes
@@ -15,9 +16,10 @@ from ...core.ports import IndexSink, NullIndex
 from ...core.records import content_hash, record_hash, validate_commit_request, validate_record
 from ...storage.memory_store import Snapshot
 from ...storage.owners import SENSITIVITY_RANK, Owner, OwnerIndex
-from . import policy, rules
-from .claims import blocked_records
+from . import concepts, policy, rules
+from .claims import ClaimGraph, blocked_records
 from .context import RefResolver, Storage
+from .links import LinkResolver
 
 SUPPORT_RELATIONS = {"supports", "input"}
 
@@ -54,12 +56,14 @@ def _iter_refs(value: Any):
 
 class MemoryService:
     def __init__(self, storage: Storage, *, index: IndexSink | None = None, clock: Clock = utc_now,
-                 claim_lookup_factory=None):
+                 claim_lookup_factory=None, concept_owner=None):
         self.storage = storage
         self.index = index or NullIndex()
         self.clock = clock
         # 复核图在 review 服务中构建；提交含 claim 引用的记录时按需取用。
         self.claim_lookup_factory = claim_lookup_factory
+        # 概念库对象 ID 的读取函数（来自配置 graph.concept_owner_id，R12 D-12）；None 表示未配置
+        self.concept_owner = concept_owner or (lambda: None)
 
     # ---------- 读取 ----------
     def owners(self) -> OwnerIndex:
@@ -88,8 +92,14 @@ class MemoryService:
         records = {rid: snapshot.records[rid] for rid in readable if rid not in blocked}
         omitted = [{"record_id": rid, "reason": "依据链包含受限或不可用的来源", "problems": problems}
                    for rid, problems in blocked.items()]
+        # R12 T-P2.6：每条结论的复核徽标、有效成熟度与派生统计（派生数据，随时可重算）
+        graph = ClaimGraph(self.storage, index)
+        claims = {cid: {"record_id": record["record_id"], "badge": graph.badge(cid), **graph.maturity(cid),
+                        "stats": graph.stats(cid)}
+                  for cid, (_claim, record) in sorted(graph.claims.items()) if record["record_id"] in records}
         return {"owner": owner.summary(), "head": snapshot.head, "records": records, "omitted": omitted,
-                "policy": self.owner_policy(owner, snapshot), "index": self.index.status(owner.owner_id)}
+                "claims": claims, "policy": self.owner_policy(owner, snapshot),
+                "index": self.index.status(owner.owner_id)}
 
     # ---------- 写入 ----------
     def _check_request(self, request: dict, *, allow_review: bool = False) -> dict:
@@ -128,6 +138,11 @@ class MemoryService:
                 raise BurrowlError("INVALID_SCHEMA", "不能改变已有记录的类型", {"record_id": rid})
             resolver.pending[rid] = {**draft, "record_id": rid, "revision": old["revision"] + 1 if old else 1}
             operations.append((operation, rid, draft, old))
+        self._assign_handles(operations, snapshot)
+        for _operation, rid, draft, _old in operations:
+            resolver.pending[rid]["handle"] = draft["handle"]
+        link_resolver = LinkResolver(self.storage, index, owner, snapshot.records, resolver.pending,
+                                     self.concept_owner())
 
         def read_source(ref: dict) -> str:
             source = self.storage.sources.resolve(ref["target_id"])
@@ -143,6 +158,11 @@ class MemoryService:
             if errors:
                 raise BurrowlError(errors[0].get("code", "INVALID_SCHEMA"), "记录草案验证失败", errors=errors)
             rules.validate_change(old, record, record_id=rid, resolve=resolver)
+            # R12 T-P2.2：解析正文链接并固定版本；没有链接时省略 links（D-27，保持旧记录指纹）
+            resolved = link_resolver.resolve(record, record_id=rid, previous=old.get("links") if old else None,
+                                             repin=bool(operation.get("repin")))
+            if resolved:
+                record["links"] = resolved
             self._check_sensitivity(record, resolver)
             digest = content_hash(record)
             if old and digest == old["content_hash"]:
@@ -160,13 +180,46 @@ class MemoryService:
             resolver.pending[rid] = record
             # record_hash 与现成的固定引用直接给出，AI 引用刚保存的记录时不必再读一次
             results.append({"client_key": operation.get("client_key"), "record_id": rid,
+                            "handle": record.get("handle"),
+                            "unresolved_concepts": [x["text"] for x in record.get("links", [])
+                                                    if x["status"] == "unresolved_concept"],
                             "revision": record["revision"], "content_hash": record["content_hash"],
                             "record_hash": record["record_hash"], "status": status,
                             "fixed_ref": {"target_kind": "record", "target_id": rid, "revision": record["revision"],
                                           "sha256": record["record_hash"], "locator": "record",
                                           "relation": "references"}})
         self._reject_support_cycles(resolver.pending)
+        if owner_id == self.concept_owner():  # R12 T-P2.4：概念库内有效概念的名称与别名唯一，合并/拆分目标有效
+            concepts.check_library({**snapshot.records, **resolver.pending}, {r["record_id"] for r in changed})
         return changed, results, resolver
+
+    @staticmethod
+    def _assign_handles(operations: list, snapshot: Snapshot) -> None:
+        """R12 D-28 / T-P2.3：handle 在对象内唯一、创建后不可修改；未提供时按标题生成（冲突追加 -2、-3）。
+        旧记录没有 handle 时，在它下一次修订时补上（handle 不进内容指纹，不会让复核失效）。"""
+        revising = {rid for _op, rid, _d, old in operations if old}
+        taken: dict[str, str] = {}  # 规范形 → 占用它的 record_id
+        for rid, record in snapshot.records.items():
+            if rid not in revising or record.get("handle"):
+                handle = record.get("handle") or link_syntax.make_handle(record["title"])
+                taken.setdefault(link_syntax.normalize(handle), rid)
+        explicit = [(op, rid, draft, old) for op, rid, draft, old in operations if "handle" in draft]
+        for _op, rid, draft, old in explicit + [x for x in operations if "handle" not in x[2]]:
+            if old and old.get("handle"):
+                if draft.setdefault("handle", old["handle"]) != old["handle"]:
+                    raise BurrowlError("INVALID_TRANSITION", "handle 创建后不能修改",
+                                       {"record_id": rid, "handle": old["handle"]})
+                continue
+            if "handle" in draft:
+                owner_of = taken.get(link_syntax.normalize(draft["handle"]))
+                if owner_of not in (None, rid):
+                    raise BurrowlError("INVALID_SCHEMA", "handle 在本对象内已被使用",
+                                       {"handle": draft["handle"], "record_id": owner_of},
+                                       errors=[{"path": "/handle", "message": "handle already used"}])
+            else:
+                draft["handle"] = link_syntax.unique_handle(link_syntax.make_handle(draft.get("title", "")),
+                                                            {k for k, v in taken.items() if v != rid})
+            taken[link_syntax.normalize(draft["handle"])] = rid
 
     @staticmethod
     def _assign_ids(request: dict, snapshot: Snapshot) -> dict[str, str]:

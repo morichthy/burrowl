@@ -1,6 +1,6 @@
 """结论（claim）与复核（review）的只读图：复核状态、证据有效性、来源可见性、正式投影。
 
-claim 写在 narrative / experience / overview 记录的 payload.claims 中；
+claim 写在 detail（只限 fact/calculation）/ narrative / experience / overview 记录的 payload.claims 中；
 复核是独立的不可变 review 记录，同时绑定所在记录的 content_hash 与 claim 本身的指纹，
 任一变化即"复核失效"（STALE_BASIS）。
 
@@ -20,9 +20,11 @@ from ...storage.owners import OwnerIndex
 from .context import Storage
 
 DEPENDENT = {"supports", "input"}
+ROOT_RELATIONS = {"supports", "input", "derived_from"}  # 追溯 L0 根来源时沿这些关系向下（D-17）
 STATES = ("not-reviewed", "accepted", "disputed", "retracted", "superseded")
+MATURITIES = ("conjecture", "preliminary", "replicated", "established")
 UNSAFE = {"disputed", "retracted", "superseded"}
-CLAIM_KINDS = {"narrative", "experience", "overview"}
+CLAIM_KINDS = {"detail", "narrative", "experience", "overview"}  # detail：R12 D-07，L1 可写事实与计算类结论
 BLOCKING = {"ACCESS_DENIED", "UNSAFE_PATH"}  # 依据链上出现这些问题时，派生内容也不能交付
 
 
@@ -303,11 +305,95 @@ class ClaimGraph:
                 errors.append(issue("UNRESOLVED_REFERENCE", current, "来源目标不存在", list(reversed(path))))
         return errors
 
+    # ---------- 成熟度与派生统计（R12 D-15、D-16、D-17）----------
+    def maturity(self, claim_id: str) -> dict:
+        """有效成熟度 = 当前复核中的 maturity；复核失效后显示为"失效（原为 X）"，升级提议也随之失效。"""
+        review = self.reviews.get(claim_id)
+        if review is None:
+            return {"maturity": None, "stale_maturity": None, "requested_maturity": None, "evidence_basis": None}
+        _state, own = self.review_state(claim_id)
+        stale = any(e["code"] == "STALE_BASIS" for e in own)
+        p = review["payload"]
+        return {"maturity": None if stale else p.get("maturity"), "stale_maturity": p.get("maturity") if stale else None,
+                "requested_maturity": None if stale else p.get("requested_maturity"),
+                "evidence_basis": None if stale else p.get("evidence_basis")}
+
+    def roots(self, ref: dict, _active: frozenset = frozenset()) -> frozenset[str]:
+        """依据追溯到的 L0 根：已登记文件 SRC-…、对象（如 Run）、或没有更深依据的记录/结论本身。
+        同一份原始数据派生出的多条记录只算一份支持（D-17）。"""
+        if not hasattr(self, "_roots"):
+            self._roots: dict[str, frozenset[str]] = {}
+        target, kind = ref.get("target_id"), ref.get("target_kind")
+        if kind in {"file", "owner"}:
+            return frozenset({target})
+        if target in self._roots:
+            return self._roots[target]
+        if target in _active:
+            return frozenset({target})  # 依赖环：就地截断
+        if kind == "claim" and target in self.claims:
+            claim, _record = self.claims[target]
+            refs = [r for r in claim["evidence_refs"] if r.get("relation") in ROOT_RELATIONS]
+        elif target in self.records:
+            record = self.records[target]
+            refs = list(record["sources"]) + list(iter_refs(record["payload"]))
+            if record["kind"] == "source":
+                refs.append(dict(record["payload"]["source_ref"], relation="input"))
+            refs = [r for r in refs if r.get("relation") in ROOT_RELATIONS]
+        else:
+            return frozenset({target})
+        found = frozenset().union(*(self.roots(r, _active | {target}) for r in refs)) if refs else frozenset({target})
+        self._roots[target] = found
+        return found
+
+    def _incoming(self) -> dict[str, list[tuple[dict, dict, dict | None]]]:
+        """被引用目标 → [(引用它的记录, 引用, 引用所在的结论或 None)]；按需构建一次。"""
+        if not hasattr(self, "_incoming_refs"):
+            found: dict[str, list[tuple[dict, dict, dict | None]]] = {}
+            for record in self.records.values():
+                if record["kind"] == "review" or record["sensitivity"] == "restricted":
+                    continue
+                claims = (record["payload"].get("claims") or []) if record["kind"] in CLAIM_KINDS else []
+                in_claims = {id(r): c for c in claims for r in c["evidence_refs"]}
+                for ref in [*record["sources"], *iter_refs(record["payload"])]:
+                    found.setdefault(ref["target_id"], []).append((record, ref, in_claims.get(id(ref))))
+            self._incoming_refs = found
+        return self._incoming_refs
+
+    def stats(self, claim_id: str) -> dict:
+        """派生统计（不持久化，可随时重算）。"用得多"不等于"对"：这些数只用于排序和提示，不改变复核状态。
+
+        supports：本结论（含当前复核）的 supports/input 依据追溯到的独立 L0 根数；
+        contradicts / open_counterexamples：指向本结论或其所在记录的 contradicts（未被撤回或替代的算未处理）；
+        cited_by：在依据类字段中引用本结论或其所在记录的其他记录数；run_inputs：以 input 引用它的 Run 对象数；
+        feedback_adopted：以它为目标且已被采纳的反馈数。"""
+        claim, record = self.claims[claim_id]
+        evidence = list(claim["evidence_refs"])
+        if claim_id in self.reviews:
+            evidence += self.reviews[claim_id]["payload"]["evidence_refs"]
+        supporting = [r for r in evidence if r.get("relation") in DEPENDENT]
+        support_roots = frozenset().union(*(self.roots(r) for r in supporting)) if supporting else frozenset()
+        incoming = [x for target in (claim_id, record["record_id"]) for x in self._incoming().get(target, [])
+                    if x[0]["record_id"] != record["record_id"]]
+        contradicting = [(r, c) for r, ref, c in incoming if ref.get("relation") == "contradicts"]
+        contradicting += [(record, None) for ref in claim["evidence_refs"] if ref.get("relation") == "contradicts"]
+        open_counter = [1 for _r, c in contradicting
+                        if c is None or self.badge(c["claim_id"]) not in {"retracted", "superseded"}]
+        cited = {r["record_id"] for r, ref, _c in incoming
+                 if ref.get("relation") in {*DEPENDENT, "background", "prerequisite", "used_in"}}
+        runs = {r["owner_id"] for r, ref, _c in incoming if ref.get("relation") == "input"
+                and (o := self.index.find(r["owner_id"])) is not None and o.owner_type == "run"}
+        adopted = [1 for r, ref, _c in incoming if r["kind"] == "feedback" and ref is r["payload"].get("target")
+                   and r["payload"].get("adopted_in")]
+        return {"supports": len(support_roots), "contradicts": len(contradicting),
+                "open_counterexamples": len(open_counter), "cited_by": len(cited), "run_inputs": len(runs),
+                "feedback_adopted": len(adopted)}
+
     # ---------- 复核草案 ----------
     def prepare_review(self, request: dict) -> dict:
         """生成可信的复核记录草案（服务在锁内会再调用一次）。"""
         allowed = {"request_id", "expected_head", "dry_run", "actor", "target_claim_id", "state", "reason", "scope",
-                   "evidence_refs", "replacement_claim_id", "expected_content_hash"}
+                   "evidence_refs", "replacement_claim_id", "expected_content_hash", "maturity", "evidence_basis",
+                   "requested_maturity"}
         if set(request) - allowed:
             raise BurrowlError("INVALID_SCHEMA", "复核请求含未知字段", {"fields": sorted(set(request) - allowed)})
         cid = request.get("target_claim_id")
@@ -326,6 +412,7 @@ class ClaimGraph:
         elif replacement:
             raise BurrowlError("INVALID_SCHEMA", "只有 superseded 状态可以指定替代结论")
         evidence_refs = deepcopy(request.get("evidence_refs", []))
+        maturity = self._check_maturity(request, evidence_refs)
         draft = {"owner_id": record["owner_id"], "kind": "review", "title": "结论复核：" + cid, "body_markdown": "",
                  "record_reason": request.get("reason", ""), "change_reason": request.get("reason", ""),
                  "sources": [{"target_kind": "claim", "target_id": cid, "revision": None, "sha256": value["sha256"],
@@ -335,7 +422,8 @@ class ClaimGraph:
                  "provenance_gap": None, "discovery": record["discovery"], "sensitivity": record["sensitivity"],
                  "payload": {"target_claim_id": cid, "target_content_hash": record["content_hash"], "state": state,
                              "reviewer": request.get("actor"), "reason": request.get("reason", ""),
-                             "evidence_refs": evidence_refs, "scope": scope, "replacement_claim_id": replacement}}
+                             "evidence_refs": evidence_refs, "scope": scope, "replacement_claim_id": replacement,
+                             **maturity}}
         normalized, errors = validate_record(draft, allow_review=True)
         if errors:
             code = "EVIDENCE_INELIGIBLE" if state == "accepted" else "INVALID_SCHEMA"
@@ -355,6 +443,32 @@ class ClaimGraph:
         return {"owner_id": record["owner_id"], "draft": normalized, "claim_id": cid,
                 "record_id": previous["record_id"] if previous else None,
                 "expected_revision": previous["revision"] if previous else None}
+
+    def _check_maturity(self, request: dict, evidence_refs: list[dict]) -> dict:
+        """成熟度登记规则（R12 §4.8）。只返回请求中实际给出的字段（D-27：不补默认值）。
+
+        程序强制（D-16）：actor.kind=ai 不能登记 established，只能提交 requested_maturity，由人或授权流程确认。
+        preliminary 必须引用依据；replicated 必须引用至少两份独立依据（按 L0 根来源去重）。"""
+        fields = {k: request[k] for k in ("maturity", "evidence_basis", "requested_maturity")
+                  if request.get(k) is not None}
+        maturity = fields.get("maturity")
+        if maturity is not None and maturity not in MATURITIES:
+            raise BurrowlError("INVALID_SCHEMA", "未知成熟度", {"maturity": maturity})
+        actor = request.get("actor") or {}
+        if maturity == "established" and actor.get("kind") == "ai":
+            raise BurrowlError("PERMISSION_DENIED", "AI 不能登记“已确立”；请改为提交 requested_maturity=established，"
+                               "由用户在复核队列中确认", {"actor": actor})
+        supporting = [r for r in evidence_refs if r.get("relation") in DEPENDENT]
+        if maturity in {"preliminary", "replicated", "established"} and not supporting:
+            raise BurrowlError("EVIDENCE_INELIGIBLE", "该成熟度必须引用支持性依据", {"maturity": maturity})
+        if maturity == "replicated":
+            roots = frozenset().union(*(self.roots(r) for r in supporting))
+            if len(roots) < 2:
+                raise BurrowlError("EVIDENCE_INELIGIBLE", "重复验证需要至少两份独立依据（追溯到不同的原始来源）",
+                                   {"independent_roots": sorted(roots)})
+        if "requested_maturity" in fields and request.get("state") not in {"not-reviewed", "accepted"}:
+            raise BurrowlError("INVALID_SCHEMA", "升级提议只能与 not-reviewed 或 accepted 一起提交")
+        return fields
 
     # ---------- 正式投影 ----------
     def formal_projection(self, refs: list, scope: str) -> dict:

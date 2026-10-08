@@ -6,7 +6,7 @@
 - 模块关系与变化影响只维护在 [ARCHITECTURE](../ARCHITECTURE.md)。
 - 术语见 [GLOSSARY](GLOSSARY.md)。
 
-核对日期：2026-10-08，依据当前工作树。相关实现变化时同步维护本页；当前没有自动同步文档的服务。
+核对日期：2026-10-09，依据当前工作树（含 R12 的 P0–P2）。相关实现变化时同步维护本页；当前没有自动同步文档的服务。
 
 ## 功能块、定义与边界
 
@@ -60,9 +60,11 @@ AI 按任务选择 Skill：
     → 区分事实、计算、推断、建议
 
 有用内容按职责保存（缺层正常）：
-    L0 登记原件与 Run       L1 完整技术内容 + 检索说明
+    L0 登记原件与 Run       L1 完整技术内容 + 检索说明 + 事实/计算类结论
     L2 有上下文的经过        L3 可复用认识与边界        L4 自足的发现入口
     需要时编排文稿（章节 → 文稿根）
+正文里用可读链接连起知识节点：[[概念]]、[[@handle]]、[[@handle#块]]、[[!结论短名]]
+"值得放在一起看"→ 快速添加关联；"A 会影响 B"→ 写成结论（成熟度从设想起）
 
 先保存被引用的内容，再保存引用它的；逐条脱离上下文回读
 ```
@@ -76,12 +78,23 @@ AI 按任务选择 Skill：
 - **record ID** 保持内容身份；**revision** 是单条记录的修订号；**commit** 把一个 Owner 的若干变化一起发布。
 - 每次提交只写变化后的完整记录；清单（manifest）保留全部当前版本的指针；旧修订留在父提交链中。
 - 引用是"身份 + 版本 + 指纹"，目标更新后不会悄悄指向新版。
+- 每条记录都由**外壳**和 **payload** 两部分组成：
+  - **外壳**：所有类型共用，包括身份、所属对象、类型和层级、标题、正文 `body_markdown`、来源 `sources`、修订信息。程序据此统一处理保存、版本、权限和检索。
+  - **payload**：随类型变化，存放程序需要读取或校验的结构化字段，例如 L1 的技术块和检索说明、L3 的适用与禁用条件、association 的两个端点，以及各层的结论 `claims`。
+  - 给人读的完整内容写在正文里（L1 写在 blocks 里），不要只放在 payload 中。
+- 固定引用在任何位置都是同一种格式，可以出现在 `sources`、结论的依据和关联的端点等处；引用中的 `relation` 说明这条引用的用途。各类型的具体字段由 `memory.contract(kind)` 给出。
+- 外壳还有两个服务端维护的字段：`handle`（本对象内的可读短名，创建后不可改，不进内容指纹）和 `links`（正文链接的解析结果，进内容指纹；没有链接时省略）。契约只做增量，已有记录的指纹不变。
+- 记录中的引用、链接、结论、关联怎样变成关系图的点和线，见 [R12 设计稿 §4.1 的直观示例](design/R12_KNOWLEDGE_GRAPH_RETRIEVAL.md#直观示例一条记录会变成哪些点和线)和第 5 节。
 
 ```text
 AI 组成提交请求：{owner_id, expected_head, request_id, operations:[put_record…]}
     （可先 dry_run 预检）
 保存服务：
+    handle：修订沿用原值（改动 → INVALID_TRANSITION）；新建未提供时按标题生成，本对象内冲突追加 -2、-3
+    解析正文链接 → links：概念找不到记为 unresolved_concept（不阻塞）；记录/块/结论找不到或有歧义
+        → UNRESOLVED_LINK + 候选；修订时原文未变的链接沿用旧固定版本，repin=true 才改指当前版本
     校验结构、领域规则、引用和授权（受限来源、敏感级别不得降低、支持关系不能成环）
+    提交到概念库对象时：有效概念的名称与别名唯一，合并/拆分目标必须是有效概念
     同一 request_id 且内容相同 → 返回原回执（幂等）
     HEAD 已变化 → VERSION_CONFLICT
     内容无变化 → 不产生新修订
@@ -100,12 +113,22 @@ AI 组成提交请求：{owner_id, expected_head, request_id, operations:[put_re
 ```text
 构造查询计划：原问题 + 最多 2 条等义改写（技术问题加英文）
               保护词（型号、数值原样）+ 术语库扩展
-多路召回：精确身份 | 关键词（FTS5，中日韩按二元切分）| 向量（sqlite-vec，按模型指纹）
+多路召回：精确身份 | 关键词（FTS5，中日韩按二元切分）| 向量（sqlite-vec，按模型指纹；
+          窗口按模型真实输入上限切分，查询超限时报告 query_truncated 缺口；
+          向量文本 = 上下文信封 + 正文，信封只进向量不进关键词）
           在所选投影内：fulltext 全文 / discovery 发现 / source 原件
+图路线（index.graph_route，默认关闭）：从前几名出发沿图投影扩展 1–2 跳，按边类别和确定度加权、
+          热门节点按度数降权，映射回同一投影、同样过滤的条目，命中附 via（经过的边）
 过滤：范围、排除、敏感级别、owner_only 可见性、复核过滤（review_filter）
 融合：RRF，同一信号族只计一票；按规范身份去重
 回源：命中回到固定版本核对；索引落后时给出缺口而不是"没有结果"
 ```
+
+- **上下文信封**：对象标题 › 层级与记录标题 › 块标题，加 L1 的检索问题和依赖的定义块原文；最多占模型窗口的 1/4，超出时从尾部裁（先裁定义块，标题链最后裁）。
+- **技术单元的两种粒度**：记录级条目包含检索说明和全部块正文，块级条目各自一条，融合时按记录折叠。
+- **原件分段**：Markdown 按标题切节（过长再按 80 行），PDF 按页，PPTX 按幻灯片；信封为"文件名 › 标题路径"。
+- **术语扩展**：`.burrowl/query-terms.json` 词库之外，问题中出现的概念名或别名也会带上该概念的全部别名（阅读会话）。
+- 索引结构或分词规则升级后，索引文件整库清空重建（`index.reconcile` 报告 `index_rebuilt_from`）；换模型或切窗规则后，向量按指纹自动作废重建。
 
 - **发现投影**：只含 L4/L3 正文、L2 摘要、L1 检索说明和对象元数据，是阅读会话的默认召回面。
 - **全文投影**：包含技术块、结论等，用于材料查询和用户批准的全文补偿。
@@ -133,14 +156,26 @@ finish：交接文本 = 有效综合稿或逐对象笔记；陈旧笔记、超�
 
 实现：`services/reading/`；工作台页面 `frontend/src/features/reading/`。
 
-## 5. 关联怎样保存和查找
+## 5. 关联、概念与关系图
 
-- `relations.similar` 按关键词重合或语义近邻给出候选，候选只是待判断的线索。
-- 判断后用 `relations.decide` 保存为 association 记录（candidate / accepted / rejected / withdrawn）。类比必须写共享结构和迁移边界。
+```text
+图投影（每次同步对象时与检索条目一起更新，可删除重建）：
+    节点：对象、记录、L1 块、结论、概念页、被引用的来源（restricted 与被隐藏的记录不进图）
+    边（通用抽边，新记录类型不改代码）：记录归属与块依赖 | sources 与 payload 中任意固定引用 |
+        正文 links | 结论的依据、relation 两端与派生的快捷边 | association 两端（rejected/withdrawn 除外）|
+        复核中的 superseded
+    category 按关系名查表：structure / evidence / reference / navigation / concept / claim_relation
+关联候选（保存后只对变化的记录计算）：正文提到概念名或别名却没链接；已存向量的近邻（前 5，相似度 ≥ 0.75）
+    → relations.candidates（已判断过的端点对不再出现）→ 改写链接或 relations.decide
+关联：relations.decide 保存（带 certainty、origin、observed_in）；只给两端和说明时
+      按快速添加处理：related_to + speculative + accepted；关联不能是 supports/input
+概念库：全库唯一的 knowledge 对象（graph.concept_owner_id），概念页可按 domains 筛选或屏蔽
+```
+
 - 关联只做导航：不会进入 supports 证据，也不会改变复核状态。
-- 关系图从当前记录实时构建，包含对象、记录、来源和作者保存的类型化关系；视图偏好和随手笔记保存在本机。
+- 关系图页（`relations.graph`）读取图投影，不新鲜的对象先补齐图（不调用嵌入模型）；可按边类别、节点类型、领域筛选；颜色区分类别，线型区分确定度；节点面板可以快速添加关联。视图偏好和随手笔记保存在本机。
 
-实现：`services/memory/associations.py`、`services/relations.py`。
+实现：`index/graph.py`、`services/relations.py`、`services/memory/associations.py`、`services/memory/concepts.py`、`services/memory/links.py`、`core/links.py`。
 
 ## 6. 正文和必要上下文怎样组装
 
@@ -185,9 +220,12 @@ assemble(已选候选)：
 ## 9. 复核与正式使用
 
 ```text
-review.queue：跨对象列出结论及状态（未复核、已失效、有争议、依据受阻……）与原因
+review.queue：跨对象列出结论及状态（未复核、已失效、有争议、依据受阻、待确认升级……）、原因、
+    有效成熟度与派生统计（独立依据按原件去重、反例与未处理反例、被引用、Run 输入、被采纳反馈）
 review.submit：确认需要范围与证据；替代需要替代结论；dry_run 预检
-    复核记录绑定"所在记录的内容指纹 + 结论指纹"，任一变化 → 已失效
+    可同时登记成熟度：preliminary 需依据，replicated 需至少两份独立依据，
+    established 需 accepted + 证据类型 + 依据，且执行者不能是 ai（ai 只能提交 requested_maturity）
+    复核记录绑定"所在记录的内容指纹 + 结论指纹"，任一变化 → 已失效（成熟度随之失效）
 检索：记录的复核类别（none/accepted/unreviewed/mixed/unsafe）进入投影，按 review_filter 过滤
 正式用途：只返回在指定范围内 accepted、未失效、来源可见的结论
 ```
@@ -204,6 +242,9 @@ plan：与映射对比 → 新增/更新/删除/标记撤回 + plan_hash
 apply(plan_hash)：哈希一致才执行；映射丢失时按外部 local_key 认领；逐条记录结果
 status：轮询外部异步解析
 search：联邦检索，命中能对上本地时附固定引用和按本地当前状态计算的复核类别
+中枢路线（index.hub_route）：材料查询时外部命中映射回本地记录，作为一路参与融合；外部不可用只报告缺口
+外部候选（hub.candidates_pull）：外部工具发现的关系 → 关联候选（origin=tool:<id>），从不直接写成记录
+交换包（exchange.export）：Markdown 库 + 图 JSONL + manifest，按敏感级别过滤、增量写入；mdvault 用同一渲染器发布
 wiki：外部被人修改（漂移）时不覆盖，除非显式 force
 ```
 

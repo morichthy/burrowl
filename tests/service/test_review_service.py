@@ -71,3 +71,34 @@ def test_batch_and_dispute(claim_setup):
     assert review.queue()["items"][0]["status"] == "disputed"
     formal = review.graph().formal_projection(["CLM-ORDER-1"], "整数输入")
     assert formal["claims"] == [] and formal["rejected"]
+
+
+def test_maturity_levels_and_ai_cannot_establish(claim_setup):
+    """R12 T-P2.5（D-15、D-16）：成熟度存在复核里；AI 不能登记 established，只能提出升级，由人确认。"""
+    from tests.service.helpers import AI  # noqa: PLC0415
+
+    storage, _memory, review, *_rest, evidence = claim_setup
+    base = {"target_claim_id": "CLM-ORDER-1", "reason": "一次固定输入实验支持", "evidence_refs": [evidence]}
+    with pytest.raises(BurrowlError) as caught:
+        review.submit({**base, "state": "accepted", "scope": "整数输入", "actor": AI, "maturity": "established",
+                       "evidence_basis": "replication"})
+    assert caught.value.code == "PERMISSION_DENIED"
+    with pytest.raises(BurrowlError) as caught:   # 只有一个原始来源，不够"重复验证"
+        review.submit({**base, "state": "not-reviewed", "actor": AI, "maturity": "replicated"})
+    assert caught.value.code == "EVIDENCE_INELIGIBLE"
+
+    review.submit({**base, "state": "not-reviewed", "actor": AI, "maturity": "preliminary",
+                   "requested_maturity": "established"})
+    item = review.queue()["items"][0]
+    assert item["status"] == "maturity-requested" and item["maturity"] == "preliminary"
+    assert item["requested_maturity"] == "established" and item["stats"]["supports"] == 1
+
+    second = register_source(storage, "SRC-ORDER-2", "research/order/data/rerun.txt", "复算误差 0.0\n")
+    review.submit({**base, "evidence_refs": [evidence, second], "state": "accepted", "scope": "整数输入",
+                   "actor": HUMAN, "maturity": "established", "evidence_basis": "replication",
+                   "reason": "用户在工作台确认：两次独立复算一致"})
+    done = review.queue(states=["accepted"])["items"][0]
+    assert done["maturity"] == "established" and done["requested_maturity"] is None
+    assert done["stats"]["supports"] == 2
+    with pytest.raises(BurrowlError):   # established 必须带证据类型
+        review.submit({**base, "state": "accepted", "scope": "整数输入", "actor": HUMAN, "maturity": "established"})

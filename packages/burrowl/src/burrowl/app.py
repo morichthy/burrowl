@@ -9,7 +9,7 @@ from pathlib import Path
 
 from .core.config import BurrowlConfig
 from .index.embed import Embedder
-from .index.model_store import EMBEDDING_DIR, RERANKER_DIR, default_models_dir
+from .index.model_store import EMBEDDING_DIR, RERANKER_DIR, default_models_dir, embedding_dir_for
 from .services.config import ConfigService
 from .services.hub import HubService
 from .services.indexing import IndexService, build_embedder
@@ -58,20 +58,24 @@ class App:
         shared = default_models_dir()
         if embedder is None and not fake_vectors:
             embedder = build_embedder(cfg.index, workspace.root,
-                                      default_model_dir=shared / EMBEDDING_DIR if shared else None)
-        index = IndexService.open(storage, cfg.index, embedder=embedder, fake_vectors=fake_vectors)
-        memory = MemoryService(storage, index=index, claim_lookup_factory=claim_lookup_factory(storage))
+                                      default_model_dir=(embedding_dir_for(shared, cfg.index.embedding.model)
+                                                         or shared / EMBEDDING_DIR) if shared else None)
+        index = IndexService.open(storage, cfg.index, embedder=embedder, fake_vectors=fake_vectors,
+                                  concept_owner=lambda: config_service.current().graph.concept_owner_id)
+        memory = MemoryService(storage, index=index, claim_lookup_factory=claim_lookup_factory(storage),
+                               concept_owner=lambda: config_service.current().graph.concept_owner_id)
         review = ReviewService(storage, memory)
+        hub = HubService(storage, config_service.current)
         reranker = Path(cfg.index.reranker.path) if cfg.index.reranker.path else (shared / RERANKER_DIR if shared else None)
         if reranker is not None and not reranker.is_absolute():
             reranker = workspace.root / reranker
         return cls(root=workspace.root, storage=storage, config=config_service, index=index, memory=memory,
-                   review=review, query=QueryService(storage, index, config_service.current),
+                   review=review, query=QueryService(storage, index, config_service.current, hub=hub),
                    reading=ReadingService(storage, index, config_service.current,
                                           reranker_dir=reranker if reranker and reranker.is_dir() else None),
                    runs=RunService(storage), maintenance=MaintenanceService(memory, review),
                    monitor=Monitor(storage), prefs=WorkbenchPrefs(storage),
-                   hub=HubService(storage, config_service.current))
+                   hub=hub)
 
     def capabilities(self) -> dict:
         """当前可用能力（供工作台与 agent 了解降级情况）。"""

@@ -20,6 +20,7 @@
 | 文档职责与维护规则 | 本页 | Skill 只引用规则，不复制 |
 | 测试选择与风险检查 | docs/TESTING | 具体断言在测试代码里 |
 | 选择理由、删除的功能、历史错误、未决讨论 | docs/DEVELOPMENT_HISTORY | 讨论全局方案前读，开发后补记 |
+| 跨多个阶段的开发计划：决定编号、契约变更、任务、验收、进度 | docs/design/（设计稿） | 理由只在 DEVELOPMENT_HISTORY 写一次；设计稿不代表功能已实现，某阶段完成后把稳定说明迁到 CORE / ARCHITECTURE，并更新设计稿的进度记录 |
 | 术语 | docs/GLOSSARY | — |
 | AI 的工作规则与写作标准 | skills/RULES、skills/RECORDING | 各 Skill 引用，不重复 |
 | 工具参数、配置字段 | 自动生成的 docs/reference | 不手写参数表 |

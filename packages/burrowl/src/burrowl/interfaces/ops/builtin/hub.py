@@ -7,6 +7,7 @@ from typing import Annotated
 from pydantic import Field
 
 from ....core.config import ReviewFilter
+from ....services import exchange, render
 from ..registry import Ctx, op
 
 
@@ -65,3 +66,39 @@ def wiki_read(ctx: Ctx, connector_id: str, slug: str) -> dict:
 def wiki_configure(ctx: Ctx, connector_id: str) -> dict:
     """按配置 wiki.mode 开启/关闭外部自动 Wiki（auto/both 开启）。"""
     return ctx.app.hub.wiki_configure(connector_id)
+
+
+@op("hub.candidates_pull", effect="write")
+def hub_candidates_pull(ctx: Ctx, connector_id: str, limit: int = 200) -> dict:
+    """把外部工具发现的关系线索拉回为关联候选（origin=tool:<连接器>，只写派生的候选表，不写记录）。
+    之后用 relations.candidates 查看并判断。"""
+    pulled = ctx.app.hub.external_candidates(connector_id, limit)
+    by_owner: dict[str, list[dict]] = {}
+    for row in pulled["rows"]:
+        by_owner.setdefault(row["owner_id"], []).append(row)
+    for owner_id, rows in by_owner.items():
+        ctx.app.index.db.add_candidates(owner_id, rows, origin=f"tool:{connector_id}")
+    return {"connector_id": connector_id, "added": len(pulled["rows"]), "unmatched": pulled["unmatched"],
+            "supported": pulled["supported"]}
+
+
+# ---------- 交换包（R12 T-P3.2，格式见 docs/reference/exchange-format.md）----------
+@op("exchange.export", effect="write")
+def exchange_export(ctx: Ctx, name: Annotated[str, Field(description="导出名称：字母、数字、点、下划线、连字符")],
+                    owner_ids: list[str] | None = None, owner_types: list[str] | None = None,
+                    exclude_sensitivity: Annotated[list[str] | None, Field(description=(
+                        "不导出的敏感级别；默认 [confidential]，restricted 永远不导出"))] = None) -> dict:
+    """把记录导出为交换包（Markdown 库 + 图 JSONL + manifest）到数据目录的 exports/<名称>/。
+    派生数据，可删除重建；增量写入，内容没变的文件不改写。可以用 Obsidian 直接打开其中的 vault 目录。"""
+    return exchange.export(ctx.app.storage, ctx.app.index, name, owner_ids=owner_ids, owner_types=owner_types,
+                           exclude_sensitivity=exclude_sensitivity,
+                           concept_owner=ctx.app.config.current().graph.concept_owner_id)
+
+
+@op("memory.render")
+def memory_render(ctx: Ctx, owner_id: str, record_id: str) -> dict:
+    """按交换格式把一条记录渲染为 Markdown（YAML 头 + 正文 + 自动生成的反链与关联）。只读。"""
+    ctx.app.index.ensure_graph()
+    return render.render_one(ctx.app.storage, owner_id, record_id,
+                             concept_owner=ctx.app.config.current().graph.concept_owner_id,
+                             edges=ctx.app.index.db.graph_all_edges())

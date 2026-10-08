@@ -12,11 +12,18 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | `config.secret_set` | 仅用户（不暴露给 agent） | 把密钥写入本机凭据管理器（只在工作台/CLI；不暴露给 agent）。 | `secret_ref`*: string，`value`*: string |
 | `config.update` | 管理 | 修改配置（如数据库/索引位置、嵌入模型、向量后端、默认阅读策略、连接器）。返回需要的后续动作。 | `patch`*: object，`expected_revision`*: string，`dry_run`: boolean |
 
+## exchange
+
+| 操作 | 类型 | 说明 | 参数 |
+|---|---|---|---|
+| `exchange.export` | 写入 | 把记录导出为交换包（Markdown 库 + 图 JSONL + manifest）到数据目录的 exports/<名称>/。 派生数据，可删除重建；增量写入，内容没变的文件不改写。可以用 Obsidian 直接打开其中的 vault 目录。 | `name`*: string，`owner_ids`: array|null，`owner_types`: array|null，`exclude_sensitivity`: array|null |
+
 ## hub
 
 | 操作 | 类型 | 说明 | 参数 |
 |---|---|---|---|
 | `hub.apply` | 管理 | 执行发布。逐条记录结果，单条失败不影响其他条目。 | `connector_id`*: string，`plan_hash`*: string，`force_wiki`: boolean |
+| `hub.candidates_pull` | 写入 | 把外部工具发现的关系线索拉回为关联候选（origin=tool:<连接器>，只写派生的候选表，不写记录）。 之后用 relations.candidates 查看并判断。 | `connector_id`*: string，`limit`: integer |
 | `hub.connectors` | 只读 | 已配置的连接器、发布策略与已发布条目数。 | 无 |
 | `hub.health` | 只读 | 测试连接：服务版本、兼容性、能力、密钥是否已设置（不返回密钥）。 | `connector_id`*: string |
 | `hub.plan` | 只读 | 预览发布：按策略（默认只发已复核的 L4/L3 与成稿文档）列出新增/更新/删除，返回 plan_hash。 | `connector_id`*: string |
@@ -27,7 +34,7 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 
 | 操作 | 类型 | 说明 | 参数 |
 |---|---|---|---|
-| `index.gaps` | 只读 | 发现层的确定性缺口（缺 L4 概览、技术单元缺检索说明）；内容是否充分仍需阅读判断。 | 无 |
+| `index.gaps` | 只读 | 确定性缺口：缺 L4 概览、技术单元缺检索说明、L1 块过长、结果块没声明依赖、未解析的概念链接、 没有入边的概念页、有未处理反例的结论、待确认的成熟度升级。内容是否充分仍需阅读判断。 | 无 |
 | `index.reconcile` | 管理 | 按当前 HEAD 补齐检索投影（不改记忆）；sources=true 同时更新来源文件投影。 | `owner_id`: string|null，`force`: boolean，`sources`: boolean |
 | `index.search` | 只读 | 直接检索投影（调试/诊断用；正式查询请用 query.search，它会回到固定版本核对）。 | `query`*: string，`corpus`: string，`owner_ids`: array|null，`levels`: array|null，`review_filter`: string，`group`: string，`limit`: integer |
 | `index.status` | 只读 | 某对象各投影/通道的就绪状态（stale 表示落后于当前 HEAD）。 | `owner_id`*: string |
@@ -56,12 +63,13 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | `memory.inspect` | 只读 | 读取对象的当前快照，或某条记录的当前/指定修订（含完整正文与固定引用）。 | `owner_id`*: string，`record_id`: string|null，`revision`: integer|null |
 | `memory.kinds` | 只读 | 全部记录类型：层级、版本、由哪个操作写入、一句话用途。 | 无 |
 | `memory.owner_adopt` | 写入 | 把内容树中已有的文档登记为对象（原件不修改；须给出你看到的字节指纹）。 | `path`*: string，`expected_sha256`*: string |
-| `memory.owner_create` | 写入 | 新建对象（写入业务卡；首次提交记忆时才建立记忆目录）。Run 用 runs.create 建立。 先用 memory.owners 查找：同一目标的继续或子任务沿用已有对象；主题相似只引用；独立交付目标才新建。 core-algorithm 只用于公司文档定义的关键算法，普通脚本/模块/工具不要建算法卡。 | `owner_type`*: string，`slug`*: string，`title`*: string，`description`: string，`keywords`: array|null，`source_document`: string|null，`sensitivity`: string |
+| `memory.owner_create` | 写入 | 新建对象（写入业务卡；首次提交记忆时才建立记忆目录）。Run 用 runs.create 建立。 先用 memory.owners 查找：同一目标的继续或子任务沿用已有对象；主题相似只引用；独立交付目标才新建。 core-algorithm 只用于公司文档定义的关键算法，普通脚本/模块/工具不要建算法卡。 knowledge 用于全库唯一的概念库（建好后把 owner_id 填进配置 graph.concept_owner_id）。 | `owner_type`*: string，`slug`*: string，`title`*: string，`description`: string，`keywords`: array|null，`source_document`: string|null，`short_name`: string|null，`sensitivity`: string |
 | `memory.owners` | 只读 | 列出可读对象（按类型分组，带各层记录数）。 | `owner_types`: array|null，`query`: string |
 | `memory.raw_material` | 只读 | 回读一个原始材料（按清单中的 ID；核对固定字节）。 | `owner_id`*: string，`material_id`*: string，`max_chars`: integer |
 | `memory.raw_materials` | 只读 | L0 原始材料清单（不读原件正文）。 | `owner_id`*: string |
 | `memory.records` | 只读 | 对象内的记录目录（按层级，分页；不含正文）。 | `owner_id`*: string，`levels`: array|null，`main_only`: boolean，`offset`: integer，`limit`: integer |
 | `memory.recovery` | 管理 | 检查记忆目录健康状况（写锁、孤立提交、暂存残留）；只报告不修改。 | `owner_id`*: string |
+| `memory.render` | 只读 | 按交换格式把一条记录渲染为 Markdown（YAML 头 + 正文 + 自动生成的反链与关联）。只读。 | `owner_id`*: string，`record_id`*: string |
 | `memory.resume` | 只读 | 续接对象的上下文：目标→检查点→最新概览/经过/技术→路线/问题/经验（只读）。 | `owner_id`*: string |
 | `memory.summary_materials` | 只读 | 跨对象总结的固定材料包（不生成总结）。 | `owner_ids`*: array，`exclude_ids`: array|null |
 | `memory.summary_save` | 写入 | 把写好的总结保存为本对象的 L3/L4；依据对象有新提交则拒绝。 | `owner_id`*: string，`draft`*: object，`basis_heads`*: object，`record_id`: string|null，`expected_revision`: integer|null，`dry_run`: boolean |
@@ -126,8 +134,9 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | 操作 | 类型 | 说明 | 参数 |
 |---|---|---|---|
 | `relations.associations` | 只读 | 已保存的关联记录。 | `status`: string|null，`record_id`: string|null |
-| `relations.decide` | 写入 | 保存关联判断（candidate/accepted/rejected/withdrawn）；只能是导航关系。 | `owner_id`*: string，`payload`*: object，`reason`*: string，`dry_run`: boolean |
-| `relations.graph` | 只读 | 材料关系图（子图）：对象、记录、来源与作者保存的类型化关系。 | `center`: string|null，`hops`: integer，`query`: string，`kinds`: array|null，`levels`: array|null，`excluded`: array|null，`limit`: integer |
+| `relations.candidates` | 只读 | 待判断的线索：正文提到概念却没链接（concept_mention）、向量近邻（similar）、外部工具回流（external:*）。 已判断过的端点对会被过滤。只读。 | `record_id`: string|null，`owner_id`: string|null，`kinds`: array|null，`limit`: integer |
+| `relations.decide` | 写入 | 保存关联判断（candidate/accepted/rejected/withdrawn）；只能是导航关系。 "A 会影响 B"这类可以验证的判断写成结论（inference），不要写成关联。 | `owner_id`*: string，`payload`*: object，`reason`*: string，`dry_run`: boolean |
+| `relations.graph` | 只读 | 材料关系图（子图）：对象、记录、块、结论、概念、来源，以及按类别区分的边（来自图投影）。 categories 只看某几类边；domains / excluded_domains 按领域筛选或屏蔽概念。 | `center`: string|null，`hops`: integer，`query`: string，`kinds`: array|null，`levels`: array|null，`excluded`: array|null，`limit`: integer，`categories`: array|null，`domains`: array|null，`excluded_domains`: array|null，`node_types`: array|null |
 | `relations.note_add` | 仅用户（不暴露给 agent） | 添加关系图笔记。 | `kind`*: string，`title`*: string，`text`: string，`refs`: array|null |
 | `relations.note_resolve` | 仅用户（不暴露给 agent） | 更新关系图笔记状态。 | `note_id`*: string，`status`*: string |
 | `relations.notes` | 只读 | 关系图上的随手笔记（分组名、桥接问题、关系设想）。 | 无 |
@@ -141,8 +150,8 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 |---|---|---|---|
 | `review.batch` | 写入 | 批量复核（逐条串行；单条失败不影响其他）。每项字段同 review.submit。 | `items`*: array，`dry_run`: boolean |
 | `review.history` | 只读 | 一条结论的复核历史。 | `claim_id`*: string |
-| `review.queue` | 只读 | 待复核队列：默认列出未复核、已失效、有争议、被上游阻断的结论。 | `states`: array|null，`owner_id`: string|null，`query`: string，`limit`: integer，`offset`: integer |
-| `review.submit` | 写入 | 复核一条结论。accepted 需要适用范围与支持性证据；superseded 需要替代结论。dry_run 只预检。 | `target_claim_id`*: string，`state`*: string，`reason`*: string，`scope`: string|null，`evidence_refs`: array|null，`replacement_claim_id`: string|null，`dry_run`: boolean |
+| `review.queue` | 只读 | 待复核队列：默认列出未复核、已失效、有争议、被上游阻断、有升级提议的结论； 每项带有效成熟度与派生统计（支持数按原始来源去重，"用得多"不等于"对"）。 | `states`: array|null，`owner_id`: string|null，`query`: string，`limit`: integer，`offset`: integer |
+| `review.submit` | 写入 | 复核一条结论。accepted 需要适用范围与支持性证据；superseded 需要替代结论。dry_run 只预检。 成熟度与复核状态分开：可以在 not-reviewed 时登记 conjecture/preliminary；established 必须 accepted。 | `target_claim_id`*: string，`state`*: string，`reason`*: string，`scope`: string|null，`evidence_refs`: array|null，`replacement_claim_id`: string|null，`maturity`: string|null，`evidence_basis`: string|null，`requested_maturity`: string|null，`dry_run`: boolean |
 
 ## runs
 

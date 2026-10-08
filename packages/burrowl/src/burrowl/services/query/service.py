@@ -7,6 +7,8 @@ import time
 import uuid
 from collections import OrderedDict
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
 from dataclasses import dataclass, field
 
 from ...core.clock import is_utc
@@ -62,10 +64,11 @@ def excerpt(text: str, terms: list[str]) -> str:
 
 
 class QueryService:
-    def __init__(self, storage: Storage, index: IndexService, config: Callable[[], BurrowlConfig]):
+    def __init__(self, storage: Storage, index: IndexService, config: Callable[[], BurrowlConfig], *, hub=None):
         self.storage = storage
         self.index = index
         self.config = config
+        self.hub = hub  # 中枢服务（可选）；配置了 index.hub_route.connectors 时作为一路召回
         self._states: OrderedDict[str, QueryState] = OrderedDict()
         self._lock = threading.Lock()
 
@@ -112,11 +115,20 @@ class QueryService:
             plan = query_plan.build(request.question, keywords=request.keywords)
             dense = "dense" in request.channels and self._charge_dense(state, plan)
             explicit = request.scope.owner_ids is not None
+            limits = (state.ledger.remaining("graph_nodes"), state.ledger.remaining("graph_edges"))
+            hub_hits, hub_gaps = self._hub_hits(request.question, config.index.hub_route,
+                                                review)
             result = self.index.search_plan(
                 plan, corpus="fulltext", owner_ids=state.owner_ids, explicit_owners=explicit,
                 levels=CONTENT_LEVELS[request.content_source], kinds=request.scope.kinds, review_filter=review,
                 per_route=min(200, budget.candidates or 1), dense=dense,
-                channels=tuple(c for c in request.channels if c != "dense") + (("dense",) if dense else ()))
+                channels=tuple(c for c in request.channels if c != "dense") + (("dense",) if dense else ()),
+                graph_route=config.index.graph_route if all(limits) else None, graph_limits=limits,
+                hub_hits=hub_hits, hub_weight=config.index.hub_route.weight)
+            result["gaps"] = list(result["gaps"]) + hub_gaps
+            if graph := result.get("graph"):  # 图路线按实际走过的节点和边记账（R12 §4.11）
+                state.ledger.charge("graph_nodes", graph["nodes"])
+                state.ledger.charge("graph_edges", graph["edges"])
             state.ranked, state.gaps = result["items"], list(result["gaps"])
             if request.content_source == "all" and request.purpose != "formal":
                 sources = self.index.search_plan(plan, corpus="source", per_route=50, dense=dense,
@@ -126,6 +138,35 @@ class QueryService:
             if request.freshness == "allow_stale":
                 state.ranked += self._history_hits(state, plan)
         return self._page(state)
+
+    def _hub_hits(self, question: str, settings, review_filter: str) -> tuple[list[dict], list[dict]]:
+        """中枢路线（R12 T-P4.2、D-23）：外部检索命中 → 本地记录 ID。外部不可用或超时时退回本地并报告缺口；
+        对不上本地的命中只作为 external_only 提示，不进入融合。"""
+        if not settings.connectors or self.hub is None:
+            return [], []
+        hits, gaps = [], []
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(self.hub.search, question, connector_ids=settings.connectors, limit=settings.limit,
+                                 review_filter=review_filter)
+            try:
+                found = future.result(timeout=settings.timeout_s)
+            except FutureTimeout:
+                return [], [{"channel": "hub", "reason": "timeout", "connectors": settings.connectors}]
+            except BurrowlError as exc:
+                return [], [{"channel": "hub", "reason": exc.code, "connectors": settings.connectors}]
+        gaps.extend({"channel": "hub", "reason": "unavailable", "connector_id": e["connector_id"]}
+                    for e in found.get("errors", []))
+        external_only = []
+        for hit in found["hits"]:
+            ref = hit.get("fixed_ref")
+            if ref and ref.get("target_kind") == "record":
+                hits.append({"record_id": ref["target_id"], "connector_id": hit["connector_id"]})
+            else:
+                external_only.append({"connector_id": hit["connector_id"], "title": hit["title"],
+                                      "external_id": hit["external_id"]})
+        if external_only:
+            gaps.append({"channel": "hub", "reason": "external_only", "hits": external_only[:10]})
+        return list({h["record_id"]: h for h in hits}.values()), gaps
 
     def _charge_dense(self, state: QueryState, plan: dict) -> bool:
         embedder = self.index.db.embedder

@@ -8,7 +8,7 @@ from copy import deepcopy
 from typing import Any
 
 from ...core.errors import BurrowlError
-from ...core.records import CONTENT_FIELDS, content_hash
+from ...core.records import CONTENT_FIELDS, SERVER_FIELDS, content_hash
 
 QUESTION_TRANSITIONS = {
     "open": {"investigating", "blocked", "resolved", "superseded"},
@@ -163,9 +163,9 @@ def _validate_route(old: dict | None, record: dict, record_id: str, resolve: Res
 
 # ---------- 操作构造器（便于 AI 只传语义字段） ----------
 def draft_from(record: dict) -> dict:
-    """剥离服务字段，得到可再次提交的草案。"""
+    """剥离服务字段（含服务端解析的 links），得到可再次提交的草案。"""
     return {k: deepcopy(record[k]) for k in ("schema_version", *CONTENT_FIELDS, "record_reason", "change_reason")
-            if k in record}
+            if k in record and k not in SERVER_FIELDS}
 
 
 def transition_question(record: dict, state: str, basis: dict) -> dict:

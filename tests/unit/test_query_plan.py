@@ -27,3 +27,10 @@ def test_variants_must_keep_protected_numbers():
     with pytest.raises(BurrowlError):
         query_plan.build("误差", variants=[{"language": "en", "question": "a"}, {"language": "en", "question": "b"},
                                          {"language": "en", "question": "c"}])
+
+
+def test_numeric_tokens_keep_scientific_notation_whole():
+    """1e16 曾被切成 "1e"，导致 build 报"保护项必须来自原问题"。"""
+    assert query_plan.numeric_tokens("为什么 1e16 加 1 还是 1e16，X200 与 3.12.10") == ["1e16", "1", "1e16", "X200", "3.12.10"]
+    plan = query_plan.build("三项 [1e16, 1, -1e16] 下 Kahan 会失败吗")
+    assert "1e16" in plan["protected_terms"]

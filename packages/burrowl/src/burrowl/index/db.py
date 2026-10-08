@@ -4,8 +4,12 @@
     entries_fts    FTS5 关键词表（存切分后的词）
     vectors        向量窗口（嵌入 BLOB，按模型指纹隔离），用 sqlite-vec 的 vec_distance_cosine 排序
     index_state    每个 (owner, corpus, channel) 的水位：对应哪个 HEAD、投影版本、模型指纹、状态
+    graph_nodes    图投影的节点（R12 §4.10；按投影它的对象分行，来源节点可在多个对象下各有一行）
+    graph_edges    图投影的边（由声明它的对象负责写入和删除；另一端缺失时保留，查询时排除并报告）
+    link_candidates 待判断的关联与概念链接候选（R12 T-P2.10；派生数据，只是线索）
 
 水位只在该通道全部写入成功后推进；任何失败都如实记录为 failed/pending，不冒充已就绪。
+索引是派生数据：结构版本或分词规则不匹配时整库清空重建（R12 T-P1.5），由 reconcile 补齐。
 """
 import json
 import sqlite3
@@ -19,10 +23,17 @@ from ..core.errors import BurrowlError
 from .embed import Embedder, pack
 from .tokenize import TOKENIZER_VERSION, fts_document, fts_query
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 5  # v2：entries.embed_prefix；v3：graph_nodes / graph_edges；v4：link_candidates；v5：graph_nodes.ref
 _ENTRY_COLUMNS = ("entry_id", "corpus", "owner_id", "owner_type", "record_id", "canonical_id", "kind", "level",
                   "revision", "content_hash", "block_id", "title", "text", "fixed_ref", "discovery", "sensitivity",
-                  "review", "signature")
+                  "review", "signature", "embed_prefix")
+_TABLES = ("entries_fts", "entries", "vectors", "index_state", "graph_nodes", "graph_edges", "link_candidates",
+           "link_candidate_state", "meta")
+NODE_COLUMNS = ("owner_id", "node_id", "node_type", "record_id", "title", "level", "kind", "domains", "sensitivity",
+                "discovery", "review", "maturity", "block_id", "ref")
+_JSON_NODE_COLUMNS = {"domains", "ref"}
+EDGE_COLUMNS = ("edge_id", "src", "dst", "category", "type", "certainty", "state", "origin", "declared_by",
+                "declared_owner", "declared_rev", "field", "derived")
 _SCHEMA = f"""
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS entries (
@@ -36,6 +47,24 @@ CREATE TABLE IF NOT EXISTS vectors (
     window_count INTEGER NOT NULL, embedding BLOB NOT NULL);
 CREATE INDEX IF NOT EXISTS vectors_entry ON vectors(entry_id, model_fp);
 CREATE INDEX IF NOT EXISTS vectors_scope ON vectors(model_fp, corpus, owner_id);
+CREATE TABLE IF NOT EXISTS graph_nodes (
+    owner_id TEXT NOT NULL, node_id TEXT NOT NULL, node_type TEXT NOT NULL, record_id TEXT, title TEXT, level TEXT,
+    kind TEXT, domains TEXT, sensitivity TEXT, discovery TEXT, review TEXT, maturity TEXT, block_id TEXT, ref TEXT,
+    PRIMARY KEY(owner_id, node_id));
+CREATE INDEX IF NOT EXISTS graph_nodes_id ON graph_nodes(node_id);
+CREATE TABLE IF NOT EXISTS graph_edges (
+    edge_id TEXT PRIMARY KEY, src TEXT NOT NULL, dst TEXT NOT NULL, category TEXT NOT NULL, type TEXT NOT NULL,
+    certainty TEXT, state TEXT, origin TEXT, declared_by TEXT NOT NULL, declared_owner TEXT NOT NULL,
+    declared_rev INTEGER, field TEXT, derived INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS graph_edges_src ON graph_edges(src);
+CREATE INDEX IF NOT EXISTS graph_edges_dst ON graph_edges(dst);
+CREATE INDEX IF NOT EXISTS graph_edges_owner ON graph_edges(declared_owner);
+CREATE TABLE IF NOT EXISTS link_candidates (
+    owner_id TEXT NOT NULL, src TEXT NOT NULL, dst TEXT NOT NULL, kind TEXT NOT NULL, score REAL NOT NULL,
+    origin TEXT NOT NULL, computed_at TEXT NOT NULL, PRIMARY KEY(src, dst, kind, origin));
+CREATE INDEX IF NOT EXISTS link_candidates_owner ON link_candidates(owner_id);
+CREATE TABLE IF NOT EXISTS link_candidate_state (
+    record_id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, revision INTEGER NOT NULL, signature TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS index_state (
     owner_id TEXT NOT NULL, corpus TEXT NOT NULL, channel TEXT NOT NULL, head TEXT, generation INTEGER,
     projection_version TEXT, model_fp TEXT, owner_fingerprint TEXT, signature TEXT,
@@ -59,12 +88,20 @@ class IndexDB:
         self.path = Path(path)
         self.embedder = embedder
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.rebuilt_from: dict | None = None  # 本次打开时因版本不匹配而清空的旧版本（供状态报告）
+        expected = {"schema_version": str(SCHEMA_VERSION), "tokenizer": TOKENIZER_VERSION}
         with self.connect() as db:
-            db.executescript(_SCHEMA)
+            db.execute("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
             stored = dict(db.execute("SELECT key, value FROM meta").fetchall())
-            expected = {"schema_version": str(SCHEMA_VERSION), "tokenizer": TOKENIZER_VERSION}
             if stored and stored != expected:
-                raise BurrowlError("INTEGRITY_ERROR", "索引文件版本不匹配；删除后重建即可", {"path": str(self.path)})
+                # 派生数据，不报错要求用户删文件：整库清空，所有对象变为 not_indexed，由 reconcile 重建
+                db.execute("BEGIN IMMEDIATE")
+                for table in _TABLES:
+                    db.execute(f"DROP TABLE IF EXISTS {table}")
+                db.execute("COMMIT")
+                db.execute("VACUUM")
+                self.rebuilt_from = stored
+            db.executescript(_SCHEMA)
             db.executemany("INSERT OR IGNORE INTO meta VALUES(?, ?)", expected.items())
 
     @contextmanager
@@ -163,7 +200,7 @@ class IndexDB:
         removed = set(existing) - set(current)
         windows = []
         for entry in changed:
-            for window in self.embedder.windows(entry["title"], entry["text"]):
+            for window in self.embedder.windows(entry["embed_prefix"] or entry["title"], entry["text"]):
                 windows.append((entry, window))
         try:
             vectors = self.embedder.embed_passages([w.text for _e, w in windows]) if windows else []
@@ -180,6 +217,8 @@ class IndexDB:
                 db.execute("BEGIN IMMEDIATE")
                 for key in removed | {e["entry_id"] for e in changed}:
                     db.execute("DELETE FROM vectors WHERE entry_id=? AND model_fp=?", (key, fp))
+                # 换模型或切窗规则后，旧指纹的窗口不会再被查询，顺带清掉以免索引文件只增不减
+                db.execute("DELETE FROM vectors WHERE owner_id=? AND corpus=? AND model_fp!=?", (owner_id, corpus, fp))
                 db.executemany(
                     'INSERT INTO vectors(entry_id, model_fp, owner_id, corpus, signature, start, "end", window_count, '
                     "embedding) VALUES(?,?,?,?,?,?,?,?,?)",
@@ -195,14 +234,186 @@ class IndexDB:
                 raise
         return {"status": "indexed", "encoded_entries": len(changed), "windows": len(windows), "removed": len(removed)}
 
+    def sync_graph(self, owner_id: str, nodes: list[dict], edges: list[dict], *, head: dict | None, version: str,
+                   owner_fingerprint: str, signature: str) -> dict:
+        """一个事务内替换该对象投影的节点与它声明的边，并推进图水位（corpus=graph，channel=edges）。"""
+        with self.connect() as db:
+            try:
+                db.execute("BEGIN IMMEDIATE")
+                db.execute("DELETE FROM graph_nodes WHERE owner_id=?", (owner_id,))
+                db.execute("DELETE FROM graph_edges WHERE declared_owner=?", (owner_id,))
+                db.executemany(f"INSERT INTO graph_nodes ({','.join(NODE_COLUMNS)}) VALUES "
+                               f"({','.join('?' * len(NODE_COLUMNS))})",
+                               [[json.dumps(n.get(c) if c == "ref" else (n.get(c) or []), ensure_ascii=False)
+                                 if c in _JSON_NODE_COLUMNS else n.get(c) for c in NODE_COLUMNS] for n in nodes])
+                db.executemany(f"INSERT OR REPLACE INTO graph_edges ({','.join(EDGE_COLUMNS)}) VALUES "
+                               f"({','.join('?' * len(EDGE_COLUMNS))})",
+                               [[int(e[c]) if c == "derived" else e.get(c) for c in EDGE_COLUMNS] for e in edges])
+                self._set_state(db, owner_id, "graph", "edges", head=json.dumps(head),
+                                generation=(head or {}).get("generation", 0), projection_version=version,
+                                owner_fingerprint=owner_fingerprint, signature=signature, status="indexed", error=None)
+                db.execute("COMMIT")
+            except BaseException:
+                if db.in_transaction:
+                    db.execute("ROLLBACK")
+                raise
+        return {"nodes": len(nodes), "edges": len(edges)}
+
+    def graph_edges(self, node_ids: list[str], *, categories: list[str] | None = None) -> list[dict]:
+        """与给定节点相连的边（两个方向）。只返回两端节点都存在的边（悬空边由 graph_dangling 报告）。"""
+        if not node_ids:
+            return []
+        marks = ",".join("?" * len(node_ids))
+        where = f"(e.src IN ({marks}) OR e.dst IN ({marks}))"
+        params: list[Any] = [*node_ids, *node_ids]
+        if categories is not None:
+            where += f" AND e.category IN ({','.join('?' * len(categories))})"
+            params += categories
+        with self.connect() as db:
+            rows = db.execute(f"SELECT DISTINCT e.* FROM graph_edges e WHERE {where} "
+                              f"AND EXISTS (SELECT 1 FROM graph_nodes a WHERE a.node_id = e.src) "
+                              f"AND EXISTS (SELECT 1 FROM graph_nodes b WHERE b.node_id = e.dst)", params).fetchall()
+        return [dict(r) | {"derived": bool(r["derived"])} for r in rows]
+
+    def graph_nodes(self, node_ids: list[str] | None = None) -> list[dict]:
+        """节点（同一节点在多个对象下有行时只取一行，优先取其归属对象自己投影的那一行）。"""
+        with self.connect() as db:
+            if node_ids is None:
+                rows = db.execute("SELECT * FROM graph_nodes").fetchall()
+            elif not node_ids:
+                rows = []
+            else:
+                rows = db.execute(f"SELECT * FROM graph_nodes WHERE node_id IN ({','.join('?' * len(node_ids))})",
+                                  node_ids).fetchall()
+        found: dict[str, dict] = {}
+        for row in rows:
+            value = dict(row) | {"domains": json.loads(row["domains"] or "[]"), "ref": json.loads(row["ref"] or "null")}
+            if row["node_id"] not in found or row["node_type"] != "source":
+                found.setdefault(row["node_id"], value)
+        return list(found.values())
+
+    def graph_degrees(self, node_ids: list[str]) -> dict[str, int]:
+        if not node_ids:
+            return {}
+        marks = ",".join("?" * len(node_ids))
+        with self.connect() as db:
+            rows = db.execute(f"SELECT node, COUNT(*) n FROM (SELECT src AS node FROM graph_edges WHERE src IN ({marks}) "
+                              f"UNION ALL SELECT dst FROM graph_edges WHERE dst IN ({marks})) GROUP BY node",
+                              [*node_ids, *node_ids]).fetchall()
+        return {r["node"]: r["n"] for r in rows}
+
+    def entries_for_nodes(self, corpus: str, node_ids: list[str], owner_ids: list[str], *,
+                          levels: list[str] | None = None, kinds: list[str] | None = None,
+                          review: list[str] | None = None, explicit_owners: bool = False) -> list[dict]:
+        """把图节点映射回当前投影的检索条目，并施加与其他路线相同的过滤（层级、类型、复核、敏感级别、
+        owner_only）。记录节点 → 记录级条目；块节点 → 块条目；结论节点 → 结论条目；映射不到的节点丢弃。"""
+        if not node_ids or not owner_ids:
+            return []
+        where, params = self._where(corpus, owner_ids, levels=levels, kinds=kinds, review=review,
+                                    explicit_owners=explicit_owners)
+        plain = [n for n in node_ids if "#" not in n]
+        blocks = [n.split("#", 1) for n in node_ids if "#" in n]
+        clauses, values = [], []
+        if plain:
+            marks = ",".join("?" * len(plain))
+            clauses.append(f"((e.record_id IN ({marks}) AND e.block_id IS NULL AND e.kind != 'claim') "
+                           f"OR (e.kind = 'claim' AND e.canonical_id IN ({marks})))")
+            values += [*plain, *plain]
+        for record_id, block_id in blocks:
+            clauses.append("(e.record_id = ? AND e.block_id = ?)")
+            values += [record_id, block_id]
+        with self.connect() as db:
+            rows = db.execute(f"SELECT e.* FROM entries e WHERE {where} AND ({' OR '.join(clauses)})",
+                              [*params, *values]).fetchall()
+        return [_decode(r) for r in rows]
+
+    def graph_all_edges(self) -> list[dict]:
+        with self.connect() as db:
+            rows = db.execute("SELECT * FROM graph_edges").fetchall()
+        return [dict(r) | {"derived": bool(r["derived"])} for r in rows]
+
+    def graph_dangling(self) -> int:
+        """另一端节点不存在（或不可读未投影）的边数。"""
+        with self.connect() as db:
+            return db.execute("SELECT COUNT(*) FROM graph_edges e WHERE NOT EXISTS "
+                              "(SELECT 1 FROM graph_nodes a WHERE a.node_id = e.src) OR NOT EXISTS "
+                              "(SELECT 1 FROM graph_nodes b WHERE b.node_id = e.dst)").fetchone()[0]
+
     def drop_owner(self, owner_id: str) -> None:
         with self.connect() as db:
             db.execute("BEGIN IMMEDIATE")
             for key, in db.execute("SELECT entry_id FROM entries WHERE owner_id=?", (owner_id,)).fetchall():
                 db.execute("DELETE FROM entries_fts WHERE entry_id=?", (key,))
-            for table in ("entries", "vectors", "index_state"):
+            for table in ("entries", "vectors", "index_state", "graph_nodes"):
+                db.execute(f"DELETE FROM {table} WHERE owner_id=?", (owner_id,))
+            db.execute("DELETE FROM graph_edges WHERE declared_owner=?", (owner_id,))
+            for table in ("link_candidates", "link_candidate_state"):
                 db.execute(f"DELETE FROM {table} WHERE owner_id=?", (owner_id,))
             db.execute("COMMIT")
+
+    # ---------- 关联候选（R12 T-P2.10）----------
+    def candidate_state(self, owner_id: str) -> dict[str, str]:
+        with self.connect() as db:
+            return {r["record_id"]: r["signature"] for r in db.execute(
+                "SELECT record_id, signature FROM link_candidate_state WHERE owner_id=?", (owner_id,))}
+
+    def replace_candidates(self, owner_id: str, computed: dict[str, tuple[str, list[dict]]], removed: set[str]) -> None:
+        """computed：record_id → (签名, 候选列表)。只替换程序自己算出的候选（origin=index），外部回流的保留。"""
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            for record_id in set(computed) | removed:
+                db.execute("DELETE FROM link_candidates WHERE src=? AND origin='index'", (record_id,))
+                db.execute("DELETE FROM link_candidate_state WHERE record_id=?", (record_id,))
+            now = utc_now()
+            for record_id, (signature, rows) in computed.items():
+                db.execute("INSERT INTO link_candidate_state VALUES(?,?,?,?)", (record_id, owner_id, 0, signature))
+                db.executemany("INSERT OR REPLACE INTO link_candidates VALUES(?,?,?,?,?,?,?)",
+                               [(owner_id, r["src"], r["dst"], r["kind"], r["score"], "index", now) for r in rows])
+            db.execute("COMMIT")
+
+    def add_candidates(self, owner_id: str, rows: list[dict], origin: str) -> int:
+        """外部工具回流的候选（origin=tool:<id>，R12 T-P4.3）；从不直接写成记录。"""
+        now = utc_now()
+        with self.connect() as db:
+            db.executemany("INSERT OR REPLACE INTO link_candidates VALUES(?,?,?,?,?,?,?)",
+                           [(owner_id, r["src"], r["dst"], r["kind"], float(r.get("score", 0)), origin, now)
+                            for r in rows])
+        return len(rows)
+
+    def candidates(self, *, record_ids: list[str] | None = None, owner_id: str | None = None) -> list[dict]:
+        clauses, params = [], []
+        if record_ids:
+            marks = ",".join("?" * len(record_ids))
+            clauses.append(f"(src IN ({marks}) OR dst IN ({marks}))")
+            params += [*record_ids, *record_ids]
+        if owner_id:
+            clauses.append("owner_id = ?")
+            params.append(owner_id)
+        with self.connect() as db:
+            rows = db.execute("SELECT * FROM link_candidates" + (" WHERE " + " AND ".join(clauses) if clauses else "")
+                              + " ORDER BY score DESC", params).fetchall()
+        return [dict(r) for r in rows]
+
+    def nearest_records(self, entry_id: str, *, limit: int = 5, min_similarity: float = 0.75) -> list[tuple[str, float]]:
+        """用已保存的向量找最相近的其他记录（不调用模型）：取该条目第一个窗口的向量，与全部记录级条目比较。"""
+        if self.embedder is None:
+            return []
+        fp = self.embedder.fingerprint
+        with self.connect() as db:
+            if not self.vector_ready:
+                return []
+            row = db.execute("SELECT embedding FROM vectors WHERE entry_id=? AND model_fp=? ORDER BY start LIMIT 1",
+                             (entry_id, fp)).fetchone()
+            if row is None:
+                return []
+            source = db.execute("SELECT record_id FROM entries WHERE entry_id=?", (entry_id,)).fetchone()
+            rows = db.execute(
+                "SELECT e.record_id, MIN(vec_distance_cosine(v.embedding, ?)) AS distance FROM vectors v "
+                "JOIN entries e ON e.entry_id = v.entry_id WHERE v.model_fp=? AND e.corpus='fulltext' "
+                "AND e.block_id IS NULL AND e.kind != 'claim' AND e.sensitivity != 'restricted' AND e.record_id != ? "
+                "GROUP BY e.record_id ORDER BY distance LIMIT ?",
+                (row["embedding"], fp, source["record_id"] if source else "", limit)).fetchall()
+        return [(r["record_id"], round(1 - r["distance"], 4)) for r in rows if 1 - r["distance"] >= min_similarity]
 
     # ---------- 查询 ----------
     @staticmethod

@@ -1,7 +1,7 @@
 ---
 name: burrowl-consolidate
 description: 用户要求记录或整理当前成果、阶段总结、交接，或结果/反例/适用范围/方向发生实质变化时使用：完整阅读概览与文稿，核对上次文稿以来的变化，修订内容与文稿，处理来源变化后的语义维护、复核整理与关联，并可发布到知识中枢。
-requires_tools: [memory_inspect, memory_document, memory_timeline, memory_contract, memory_commit, memory_summary_materials, memory_summary_save, review_queue, review_history, review_submit, provenance_impact, provenance_lineage, relations_associations, relations_similar, relations_decide, maintenance_plan, maintenance_review, maintenance_apply, maintenance_status, monitor_candidates, hub_plan, hub_status]
+requires_tools: [memory_inspect, memory_document, memory_timeline, memory_contract, memory_commit, memory_summary_materials, memory_summary_save, memory_owner_create, review_queue, review_history, review_submit, provenance_impact, provenance_lineage, relations_associations, relations_similar, relations_candidates, relations_decide, index_gaps, config_get, config_update, maintenance_plan, maintenance_review, maintenance_apply, maintenance_status, monitor_candidates, hub_plan, hub_status]
 ---
 # 整理成果
 
@@ -48,12 +48,16 @@ requires_tools: [memory_inspect, memory_document, memory_timeline, memory_contra
 5. **复核与溯源**：
    - 用 `review_queue(owner_id=…)` 列出未复核、已失效、有争议、依据受阻的结论，写进待复核清单并说明理由。
    - 复核本身由用户在工作台完成。只有符合 RULES 第 4 节的情况才由 AI 代为 `review_submit`。
+   - **评估成熟度**：按 RULES 第 4 节的阶梯给结论登记 `maturity`（设想 / 初步 / 重复验证），写明理由和依据；认为证据已足以"已确立"时只提交 `requested_maturity=established`，由用户在复核队列确认。看 `review_queue` 里的派生统计（独立依据、未处理反例），有未处理反例的先处理反例。
    - `provenance_lineage` 查原件来源；来源数不等于独立支持数。
-6. **关联**：
-   - 用 `relations_similar` 或 `relations_associations` 查看候选，有依据的才 `relations_decide` 保存。
-   - 类比（analogous_to）必须写共享结构和迁移边界。
-   - 关联只是导航，不进入证据。
-7. **全文一致性检查**：用新的 revision 再读全文，检查：
+6. **关联与概念**：
+   - 用 `relations_candidates(owner_id=…)` 看保存后自动算出的线索（正文提到概念却没链接、向量近邻），也可以用 `relations_similar` 补充。逐条判断：该链接的改写正文加 `[[…]]`，值得放在一起看的 `relations_decide` 保存（带 certainty），不相关的保存为 rejected（以后不再出现）。
+   - 类比（analogous_to）必须写共享结构和迁移边界；"A 会影响 B"写成结论，不写成关联。关联只是导航，不进入证据。
+   - **维护概念库**（全库唯一的 knowledge 对象；配置 `graph.concept_owner_id` 为空时，先问用户后用 `memory_owner_create(owner_type="knowledge")` 建立并用 `config_update` 填入）：
+     - `index_gaps` 里的 missing_concept 是写了链接但还没有概念页的名字。只为被实质讨论过、或至少出现在两条记录中的概念建页，正文可以只是一句定义加适用领域（`domains`）。
+     - 建页前先查名称、别名和相近概念，按"相关不等于相同"判断：相同就加别名或合并（被并页 `status=merged` + `merged_into`），同名不同义用限定名（如"收敛（数值）"），一个概念其实是两个就拆分（`status=split` + `split_into`）。从不删除概念页。
+     - orphan_concept（没有任何记录链接的概念页）检查是否该合并或补链接。
+7. **两层体检与全文一致性检查**：先用 `index_gaps` 看程序能确定的缺口（缺概览、检索说明为空、块过长、结果块没声明依赖、未解析概念、未处理反例、待确认升级），逐项处理或写明暂缓理由；再用新的 revision 读全文，检查：
    - 衔接、重复、术语和单位、公式和数字、结论和限制；
    - 关键判断是否就近引用固定依据；
    - 概览、全文、工作清单、检查点里的结果和下一步是否一致。
@@ -77,8 +81,9 @@ requires_tools: [memory_inspect, memory_document, memory_timeline, memory_contra
 宿主 AI 编写 Wiki 页面：
 
 - 用 `memory_commit` 提交 `kind=wiki_page` 记录，字段用 `memory_contract("wiki_page")` 查：
-  - slug 写成 `<类型>/<名称>`（小写字母、数字、连字符），类型取 summary/entity/concept/synthesis/comparison/index；
-  - aliases 写常见别名；
+  - 概念页（page_type=concept/entity）写在概念库对象里，见第 6 步；
+  - slug 可省略；要发布到外部中枢时写成 `<类型>/<名称>`（小写字母、数字、连字符），类型取 summary/entity/concept/synthesis/comparison/index；
+  - aliases 写常见别名（也参与 `[[概念]]` 链接匹配和检索的术语扩展）；
   - source_refs 写固定引用。
 - 随第 9 步发布。外部被人改过的页面不会被覆盖。
 
@@ -93,5 +98,7 @@ requires_tools: [memory_inspect, memory_document, memory_timeline, memory_contra
 ## 程序已保证
 
 - 内容变化后复核自动失效；formal 用途只输出已复核的结论。
+- AI 不能登记"已确立"；重复验证要求至少两份独立依据。
+- 概念库里有效概念的名称和别名不能重复。
 - 维护计划提交时核对依据版本。
 - 发布前 plan_hash 必须一致；外部 Wiki 漂移时不覆盖。

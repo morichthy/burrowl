@@ -8,11 +8,21 @@
 5. 外部已存在同一 local_key（409 或映射丢失）时认领已有条目，而不是重复创建。
 本地记忆是唯一权威；外部只是派生副本，所以任何失败都只影响中枢，不回写本地。
 """
+import dataclasses
 from collections.abc import Callable
 from typing import Any
 
 from ..connectors import registry
-from ..connectors.spi import Collection, ConnectorError, ExternalRef, PublishItem, SupportsWiki, WikiPage
+from ..connectors.mdvault import MarkdownVault
+from ..connectors.spi import (
+    Collection,
+    ConnectorError,
+    ExternalRef,
+    PublishItem,
+    SupportsCandidates,
+    SupportsWiki,
+    WikiPage,
+)
 from ..core.config import BurrowlConfig, ConnectorConfig
 from ..core.errors import BurrowlError
 from ..core.hashing import canonical_hash
@@ -23,6 +33,7 @@ from .memory.claims import ClaimGraph
 from .memory.context import Storage
 from .memory.documents import build_document
 from .query.assemble import record_text
+from .render import Page
 
 RECORD_KINDS = {"narrative", "experience", "overview", "detail", "checkpoint", "route", "goal", "question"}
 CLASS_FILTERS = {"all": None, "reviewed_only": {"accepted"}, "unreviewed_only": {"none", "unreviewed"},
@@ -37,6 +48,15 @@ WIKI_PREFIX = "burrowl-"  # 宿主 AI 编写的页面统一放在 <type>/burrowl
 
 def ref_uri(record: dict) -> str:
     return f"burrowl://{record['owner_id']}/{record['record_id']}@{record['revision']}#{record['record_hash'][:12]}"
+
+
+def wiki_slug(record: dict) -> str:
+    """slug 可省略（R12 §4.6）：没有时按 <页面类型>/c-<记录 ID 前 8 位十六进制> 生成，只用于外部中枢。"""
+    payload = record["payload"]
+    if payload.get("slug"):
+        return payload["slug"]
+    digits = "".join(ch for ch in record["record_id"][4:] if ch in "0123456789abcdef")[:8]
+    return f"{payload['page_type']}/c-{digits}"
 
 
 def external_slug(slug: str) -> str:
@@ -118,6 +138,7 @@ class HubService:
         excluded = set(policy.exclude_sensitivity) | {"restricted"}
         wiki = cfg.wiki.mode in {"authored", "both"}
         out: dict[str, tuple[str, PublishItem]] = {}
+        chosen: dict[str, dict] = {}  # local_key → 记录（交换格式渲染用）
         for owner in index.readable():
             if not owner.persisted or (policy.owner_types and owner.owner_type not in policy.owner_types) \
                     or (policy.owner_ids and owner.owner_id not in policy.owner_ids):
@@ -129,16 +150,45 @@ class HubService:
                     continue
                 if record["kind"] == "wiki_page" and wiki:
                     out[f"wiki:{record['record_id']}"] = ("wiki", self._wiki_item(record))
+                    chosen[f"wiki:{record['record_id']}"] = record
                 elif record["kind"] == "document" and policy.include_documents:
                     item = self._document_item(owner.owner_id, record)
                     if item:
                         out[item.local_key] = ("item", item)
+                        chosen[item.local_key] = record
                 elif record["kind"] in RECORD_KINDS and record["level"] in policy.levels:
                     badges = [graph.badge(c["claim_id"]) for c in record["payload"].get("claims", [])]
                     klass = review_class(badges)
                     if allowed is None or klass in allowed:
                         item = self._record_item(record, badges, klass)
                         out[item.local_key] = ("item", item)
+                        chosen[item.local_key] = record
+        if cfg.type == MarkdownVault.type:
+            out = self._as_exchange(out, chosen)
+        return out
+
+    def _as_exchange(self, items: dict[str, tuple[str, PublishItem]],
+                     chosen: dict[str, dict]) -> dict[str, tuple[str, PublishItem]]:
+        """Markdown 库按交换格式发布（R12 T-P3.3）：同一个渲染器，链接只指向本次一起发布的页面。"""
+        wiki_paths = {r["record_id"]: MarkdownVault.wiki_stem(external_slug(wiki_slug(r)))
+                      for key, r in chosen.items() if key.startswith("wiki:")}
+        concept_owner = self.config().graph.concept_owner_id
+        page = Page.build(self.storage, list(chosen.values()), concept_owner=concept_owner,
+                          path_for=lambda record: wiki_paths.get(record["record_id"]))
+        out = {}
+        for key, (channel, item) in items.items():
+            record = chosen[key]
+            markdown = page.content(record)
+            if channel == "wiki":
+                out[key] = (channel, dataclasses.replace(
+                    item, markdown=markdown, content_hash=canonical_hash({"md": markdown, "title": item.title,
+                                                                          "slug": item.metadata["slug"]})))
+                continue
+            path = page.paths[record["record_id"]] + ".md"
+            front = {k: v for k, v in page.front(record).items() if k not in {"tags"}}
+            out[key] = (channel, dataclasses.replace(
+                item, markdown=markdown, path=path, front_matter=front,
+                content_hash=canonical_hash({"md": markdown, "title": item.title, "path": path, "front": front})))
         return out
 
     @staticmethod
@@ -175,9 +225,9 @@ class HubService:
         markdown = f"{record['body_markdown']}\n\n## 来源\n\n{sources}"
         return PublishItem(local_key=f"wiki:{record['record_id']}", title=record["title"], markdown=markdown,
                            content_hash=canonical_hash({"md": markdown, "title": record["title"],
-                                                        "slug": payload["slug"]}),
+                                                        "slug": wiki_slug(record)}),
                            fixed_ref=_fixed(record), ref_uri=ref_uri(record),
-                           metadata={"slug": external_slug(payload["slug"]), "page_type": payload["page_type"]})
+                           metadata={"slug": external_slug(wiki_slug(record)), "page_type": payload["page_type"]})
 
     # ---------- 预览 / 执行 ----------
     def plan(self, connector_id: str) -> dict:
@@ -344,6 +394,26 @@ class HubService:
                              "fixed_ref": local["fixed_ref"] if local else None, "review": review})
         hits.sort(key=lambda h: -h["score"])
         return {"query": query, "hits": hits[:limit], "errors": errors}
+
+    def external_candidates(self, connector_id: str, limit: int = 200) -> dict:
+        """外部工具回流的关系线索（R12 T-P4.3）：local_key 对上本地已发布条目的才保留，映射成记录 ID。
+        结果只供写入关联候选（origin=tool:<id>），由 AI 在收口时判断，从不直接写成记录。"""
+        cfg, conn = self.connector(connector_id)
+        if not isinstance(conn, SupportsCandidates):
+            return {"connector_id": connector_id, "rows": [], "unmatched": 0, "supported": False}
+        mapped = self.state.mappings(connector_id)
+        rows, unmatched = [], 0
+        for link in conn.candidates(self._collection(cfg, conn), limit):
+            ends = [mapped.get(k, {}).get("fixed_ref") for k in (link.src_local_key, link.dst_local_key)]
+            if not all(e and e.get("target_kind") == "record" for e in ends) or ends[0]["target_id"] == ends[1]["target_id"]:
+                unmatched += 1
+                continue
+            owner = next((o.owner_id for o in self.storage.owners.scan().readable() if o.persisted
+                          and ends[0]["target_id"] in self.storage.store.read_snapshot(o).records), None)
+            if owner:
+                rows.append({"owner_id": owner, "src": ends[0]["target_id"], "dst": ends[1]["target_id"],
+                             "kind": f"external:{link.kind}", "score": link.score})
+        return {"connector_id": connector_id, "rows": rows, "unmatched": unmatched, "supported": True}
 
     @staticmethod
     def _current_review(graph: ClaimGraph, local: dict | None) -> str:

@@ -25,21 +25,43 @@ LEVELS: dict[str, str | None] = {
 }
 CONTENT_KINDS = ("source", "detail", "narrative", "experience", "overview", "document", "document_section")
 # 参与 content_hash 的字段；审计字段（时间、作者、修订号）不在内。
+# links（R12 D-09）是服务端解析正文链接的结果；没有链接时省略这个键，已有记录的指纹因此不变（D-27）。
+# handle（D-28）不参与内容指纹（只进 record_hash），所以给旧记录补上 handle 不会让复核失效。
 CONTENT_FIELDS = ("owner_id", "kind", "level", "title", "keywords", "body_markdown",
-                  "payload", "sources", "provenance_gap", "discovery", "sensitivity")
+                  "payload", "sources", "provenance_gap", "discovery", "sensitivity", "links")
+OPTIONAL_CONTENT_FIELDS = {"links"}
 SERVER_FIELDS = {"record_id", "revision", "previous_revision", "record_hash", "content_hash",
-                 "created_at", "created_by", "updated_at", "updated_by"}
+                 "created_at", "created_by", "updated_at", "updated_by", "links"}
 # 内容展开边：作者显式保存的固定引用，必须指向对应角色的记录。
 LINK_ROLES = {"process_refs": "narrative", "technical_refs": "detail", "experience_refs": "experience"}
 _RECORD_ID = re.compile(r"MEM-[A-Za-z0-9][A-Za-z0-9-]*")
 _WIKI_SLUG = re.compile(r"[a-z][a-z0-9-]*/[a-z0-9][a-z0-9-]*")
+HANDLE_MAX = 64
+HANDLE_FORBIDDEN = set("/#|[]@!")  # 这些字符在链接写法里有语法含义（§4.3）
+# 结论 relation 的谓词：开放词表 + "x-" 前缀的自定义谓词（R12 §4.5）
+PREDICATES = {"improves", "degrades", "causes", "prevents", "fails_on", "applies_to", "requires", "equivalent_to",
+              "contradicts", "part_of"}
+L1_CLAIM_KINDS = {"fact", "calculation"}  # D-07：L1 只写事实与计算类结论
+_ORIGIN = re.compile(r"human|ai|unknown|tool:[A-Za-z0-9][A-Za-z0-9._-]*")
 
 Resolver = Callable[[dict], Any]
 SourceReader = Callable[[dict], str]
 
 
 def content_hash(record: dict) -> str:
-    return canonical_hash({key: record[key] for key in CONTENT_FIELDS})
+    return canonical_hash({key: record[key] for key in CONTENT_FIELDS
+                           if key not in OPTIONAL_CONTENT_FIELDS or record.get(key)})
+
+
+def handle_errors(handle: object) -> str | None:
+    """handle 的书写规则（同一对象内唯一由服务层检查）；合规返回 None。"""
+    if not isinstance(handle, str) or not handle.strip() or handle != handle.strip():
+        return "Handle must be a non-empty string without leading or trailing spaces"
+    if len(handle) > HANDLE_MAX:
+        return f"Handle must be at most {HANDLE_MAX} characters"
+    if HANDLE_FORBIDDEN & set(handle) or any(ch.isspace() for ch in handle):
+        return "Handle cannot contain spaces or any of / # | [ ] @ !"
+    return None
 
 
 def record_hash(record: dict) -> str:
@@ -161,12 +183,32 @@ def _domain_errors(record: dict, *, allow_review: bool) -> list[dict]:
         if p["state"] == "superseded" and (not p["replacement_claim_id"]
                                            or p["replacement_claim_id"] == p["target_claim_id"]):
             add("/payload/replacement_claim_id", "Superseded review needs a different replacement claim")
+    if "handle" in record and (problem := handle_errors(record["handle"])):
+        add("/handle", problem)
     if kind == "wiki_page":
-        if not _WIKI_SLUG.fullmatch(p["slug"]):
+        if "slug" in p and not _WIKI_SLUG.fullmatch(p["slug"]):  # slug 可省略（R12 §4.6），提供时才校验
             add("/payload/slug", "Wiki slug must be '<type>/<name>' in lowercase letters, digits and hyphens")
+        if len(p.get("category_path", [])) > 3:
+            add("/payload/category_path", "Category path has at most 3 levels")
+        status = p.get("status", "active")
+        if (status == "merged") != ("merged_into" in p):
+            add("/payload/merged_into", "merged_into is required exactly when status is merged")
+        if (status == "split") != ("split_into" in p):
+            add("/payload/split_into", "split_into is required exactly when status is split")
         for index, ref in enumerate(p["source_refs"]):
             if not is_sha256(ref.get("sha256")) and not (ref["target_kind"] == "record" and type(ref.get("revision")) is int):
                 add(f"/payload/source_refs/{index}", "Wiki sources must be fixed references")
+    if kind == "association" and "origin" in p and not _ORIGIN.fullmatch(p["origin"]):
+        add("/payload/origin", "Origin must be human, ai, unknown or tool:<connector id>")
+    if kind == "review":
+        maturity = p.get("maturity")
+        if maturity == "established" and (p["state"] != "accepted" or not p["evidence_refs"]
+                                          or "evidence_basis" not in p):
+            add("/payload/maturity", "Established maturity requires accepted state, evidence_basis and evidence")
+        if "evidence_basis" in p and maturity != "established":
+            add("/payload/evidence_basis", "evidence_basis only applies to established maturity")
+        if "requested_maturity" in p and (p["state"] not in {"not-reviewed", "accepted"} or maturity == "established"):
+            add("/payload/requested_maturity", "A maturity request goes with not-reviewed or accepted, below established")
     if kind == "association" and p["relation"] == "analogous_to":
         if not p["shared_structure"]:
             add("/payload/shared_structure", "Analogy requires a shared problem structure")
@@ -185,9 +227,17 @@ def _domain_errors(record: dict, *, allow_review: bool) -> list[dict]:
             if decision["action"] == "defer" and canonical_hash(decision["target"]) not in remaining:
                 add(f"/payload/decisions/{index}", "Deferred target must remain in remaining_refs")
     claims = p.get("claims", [])
+    block_ids = {b["block_id"] for b in p.get("blocks", [])} if kind == "detail" else set()
     for index, claim in enumerate(claims):
         if not claim["claim_id"].startswith("CLM-") or len(claim["claim_id"]) == 4:
             add(f"/payload/claims/{index}/claim_id", "Claim ID must use CLM- prefix")
+        if kind == "detail" and claim["kind"] not in L1_CLAIM_KINDS:
+            add(f"/payload/claims/{index}/kind", "L1 claims must be fact or calculation")
+        if "block_id" in claim and (kind != "detail" or claim["block_id"] not in block_ids):
+            add(f"/payload/claims/{index}/block_id", "block_id must name a block of this technical unit")
+        predicate = claim.get("relation", {}).get("predicate")
+        if predicate is not None and predicate not in PREDICATES and not re.fullmatch(r"x-[a-z0-9_-]+", predicate):
+            add(f"/payload/claims/{index}/relation/predicate", "Unknown predicate; use the vocabulary or an x- prefix")
     if len({c["claim_id"] for c in claims}) != len(claims):
         add("/payload/claims", "Duplicate claim identity")
     if "revision" in record:

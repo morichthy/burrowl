@@ -386,16 +386,27 @@ def models_status() -> None:
 
 
 @models_cli.command("install")
-def models_install(embedding: bool = typer.Option(True, help="下载嵌入模型（约 220 MB，需要联网）"),
+def models_install(embedding: bool = typer.Option(True, help="下载嵌入模型（需要联网）"),
+                   embedding_model: str = typer.Option("minilm", help="嵌入模型：minilm（默认，约 220 MB）"
+                                                       " 或 qwen3-0.6b-q（长上下文，约 1.1 GB）"),
                    reranker: bool = typer.Option(True, help="安装重排模型"),
                    reranker_from: Path | None = typer.Option(None, help="从本机已有的重排模型目录复制（含清单校验）")) -> None:
-    """安装模型到本机模型目录（BURROWL_MODELS_DIR 或 %LOCALAPPDATA%/burrowl/models）。已安装的跳过。"""
+    """安装模型到本机模型目录（BURROWL_MODELS_DIR 或 %LOCALAPPDATA%/burrowl/models）。已安装的跳过。
+    换用非默认嵌入模型后，还要在配置里改 index.embedding 的 model、dim、query_prefix（见输出提示）。"""
     models = model_store.default_models_dir()
     current = model_store.status(models)
     try:
-        if embedding and not current["embedding"]["installed"]:
-            typer.echo("下载嵌入模型…")
-            model_store.install_embedding(models)
+        spec = model_store.EMBEDDING_MODELS.get(embedding_model)
+        if spec is None:
+            raise BurrowlError("INVALID_ARGUMENT", "未知的嵌入模型",
+                               {"model": embedding_model, "known": sorted(model_store.EMBEDDING_MODELS)})
+        if embedding and not current["embedding_models"][embedding_model]["installed"]:
+            typer.echo(f"下载嵌入模型 {embedding_model}（{spec['size']}）…")
+            model_store.install_embedding(models, embedding_model)
+            if embedding_model != "minilm":
+                typer.echo("启用方法：config_update index.embedding = " + json.dumps(
+                    {"model": spec["model"], "dim": spec["dim"], "query_prefix": spec["query_prefix"]},
+                    ensure_ascii=False) + "，然后 burrowl call index.reconcile")
         if reranker and not current["reranker"]["installed"]:
             typer.echo("安装重排模型…")
             model_store.install_reranker(models, reranker_from)

@@ -101,6 +101,11 @@ class Embedding(_Model):
     model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     path: str | None = Field(None, description="本地模型目录；相对路径相对数据目录。为空时使用安装包自带模型")
     dim: int = Field(384, ge=1, le=4096)
+    max_tokens: int | None = Field(None, ge=16, le=131072,
+                                   description="模型输入上限（token）；为空时读取模型自带值。只能调小，不能超过模型真实上限")
+    query_prefix: str | None = Field(None, max_length=500,
+                                     description="查询指令前缀（如 Qwen3 的 Instruct…Query:）；fastembed 不会自动添加")
+    passage_prefix: str | None = Field(None, max_length=500, description="文档指令前缀；多数模型不需要")
 
 
 class VectorBackend(_Model):
@@ -113,12 +118,45 @@ class RerankerModel(_Model):
     path: str | None = Field(None, description="ONNX Cross-encoder 模型目录；为空时使用安装包自带模型")
 
 
+class CategoryWeights(_Model):
+    """图路线中各类边的权重（R12 §4.4）。关联边按确定度取三档之一。"""
+    structure: float = Field(0.3, ge=0, le=1)
+    evidence: float = Field(1.0, ge=0, le=1)
+    reference: float = Field(0.6, ge=0, le=1)
+    navigation_supported: float = Field(0.7, ge=0, le=1)
+    navigation_plausible: float = Field(0.4, ge=0, le=1)
+    navigation_speculative: float = Field(0.2, ge=0, le=1)
+    concept: float = Field(0.5, ge=0, le=1)
+    claim_relation: float = Field(0.6, ge=0, le=1, description="再乘结论的成熟度系数")
+
+
+class GraphRoute(_Model):
+    """图路线（R12 §4.11）：从关键词与向量融合后的前几名出发沿图扩展，作为 RRF 中的一路。只是导航。"""
+    enabled: bool = Field(False, description="默认关闭；评估显示收益后再由用户决定是否打开（D-24）")
+    hops: int = Field(1, ge=1, le=2)
+    seeds: int = Field(20, ge=1, le=100)
+    fanout: int = Field(20, ge=1, le=200, description="每个节点最多扩展的边数")
+    weight: float = Field(0.5, ge=0, le=2, description="在 RRF 融合中的路线权重")
+    category_weights: CategoryWeights = Field(default_factory=CategoryWeights)
+    algorithm: Literal["hops"] = "hops"
+
+
+class HubRoute(_Model):
+    """中枢路线（R12 §4.11、D-23）：外部检索作为 RRF 中的一路。命中必须对上本地记录、回到固定版本核验。"""
+    connectors: list[str] = Field(default_factory=list, description="参与的连接器 id；为空表示关闭")
+    weight: float = Field(0.5, ge=0, le=2)
+    timeout_s: float = Field(10.0, gt=0, le=120, description="单次外部检索的超时；超时按不可用处理并报告缺口")
+    limit: int = Field(20, ge=1, le=100)
+
+
 class IndexConfig(_Model):
     path: str = Field(".burrowl/index/index.sqlite3", description="检索索引文件；可放到其他磁盘，删除后可重建")
     embedding: Embedding = Field(default_factory=Embedding)
     vector: VectorBackend = Field(default_factory=VectorBackend)
     reranker: RerankerModel = Field(default_factory=RerankerModel)
     ocr_enabled: bool = True
+    graph_route: GraphRoute = Field(default_factory=GraphRoute)
+    hub_route: HubRoute = Field(default_factory=HubRoute)
 
 
 class ServerConfig(_Model):
@@ -126,7 +164,7 @@ class ServerConfig(_Model):
     port: int = Field(0, ge=0, le=65535, description="0 表示随机端口")
 
 
-DEFAULT_TOOLSETS = ["memory", "review", "query", "reading", "provenance", "relations", "maintenance", "monitor",
+DEFAULT_TOOLSETS = ["memory", "review", "query", "reading", "provenance", "relations", "maintenance", "monitor", "exchange",
                     "runs", "sources", "index", "hub", "wiki", "config", "system"]
 
 
@@ -168,6 +206,11 @@ class ConnectorConfig(_Model):
     wiki: WikiSettings = Field(default_factory=WikiSettings)
 
 
+class GraphSettings(_Model):
+    concept_owner_id: str | None = Field(
+        None, description="概念库对象（owner_type=knowledge）的 owner_id；为空时 [[概念]] 链接都记为未解析，不阻塞提交")
+
+
 class BurrowlConfig(_Model):
     schema_version: Literal[1] = 1
     collaboration: Collaboration = Field(default_factory=Collaboration)
@@ -177,6 +220,7 @@ class BurrowlConfig(_Model):
     server: ServerConfig = Field(default_factory=ServerConfig)
     mcp: McpConfig = Field(default_factory=McpConfig)
     connectors: list[ConnectorConfig] = Field(default_factory=list)
+    graph: GraphSettings = Field(default_factory=GraphSettings)
 
     @model_validator(mode="after")
     def _unique_connectors(self):

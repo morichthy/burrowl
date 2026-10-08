@@ -1,7 +1,8 @@
-"""材料关系图（工作台"材料关系"页）：对象、记录、来源三类节点，以及作者保存的类型化边。
+"""材料关系图（工作台"材料关系"页）：读取索引中的图投影（R12 T-P2.8，抽边规则见 index/graph.py）。
 
-边来自：记录归属（belongs_to）、记录的固定引用（关系名即作者所写）、Run 归属（produces）、
-关联记录（accepted 为实线；candidate 标记为候选）。图只是导航视图，不改变任何事实记录。
+节点：对象、记录、L1 块、结论、概念、来源；边按 category 分为 structure / evidence / reference /
+navigation / concept / claim_relation，关联边带 certainty，候选关联标记为 candidate。
+图只是导航视图，不改变任何事实记录；投影不新鲜时先补齐（不调用嵌入模型）。
 视图布局、分组名、桥接问题等是本机偏好（.burrowl/workbench/），不是业务数据。
 """
 from collections import deque
@@ -12,7 +13,6 @@ from ..core.clock import utc_now
 from ..core.errors import BurrowlError
 from .indexing import IndexService
 from .memory import associations
-from .memory.claims import iter_refs
 from .memory.context import Storage
 
 VIEW_FILE = "workbench/view.json"
@@ -20,57 +20,44 @@ NOTES_FILE = "workbench/notes.json"
 NOTE_KINDS = {"cluster-name", "bridge-question", "relation-idea"}
 
 
-def build_graph(storage: Storage) -> dict:
-    index = storage.owners.scan()
-    nodes: dict[str, dict] = {}
-    edges: list[dict] = []
-    for owner in index.readable():
-        nodes[owner.owner_id] = {"id": owner.owner_id, "type": "owner", "kind": owner.owner_type, "title": owner.title,
-                                 "level": None, "owner_id": owner.owner_id, "fingerprint": owner.fingerprint}
-        if owner.owner_type == "run" and owner.native.get("owner_id"):
-            edges.append({"source": owner.native["owner_id"], "target": owner.owner_id, "type": "produces",
-                          "origin": "run.json"})
-        if not owner.persisted:
-            continue
-        for record in storage.store.read_snapshot(owner).records.values():
-            if record["sensitivity"] == "restricted" or record["kind"] in {"review", "policy", "feedback"}:
-                continue
-            rid = record["record_id"]
-            if record["kind"] == "association":
-                payload = record["payload"]
-                if payload["status"] in {"accepted", "candidate"}:
-                    edges.append({"source": payload["from"]["target_id"], "target": payload["to"]["target_id"],
-                                  "type": payload["relation"], "origin": rid,
-                                  "candidate": payload["status"] == "candidate"})
-                continue
-            nodes[rid] = {"id": rid, "type": "record", "kind": record["kind"], "title": record["title"],
-                          "level": record["level"], "owner_id": owner.owner_id, "fingerprint": record["record_hash"],
-                          "keywords": record["keywords"], "claims": len(record["payload"].get("claims", []))}
-            edges.append({"source": rid, "target": owner.owner_id, "type": "belongs_to", "origin": "memory"})
-            for ref in iter_refs({"sources": record["sources"], "payload": record["payload"]}):
-                if ref["target_kind"] == "file" and ref["target_id"] not in nodes:
-                    nodes[ref["target_id"]] = {"id": ref["target_id"], "type": "source", "kind": "file",
-                                               "title": ref["target_id"], "level": "L0", "owner_id": None,
-                                               "fingerprint": ref.get("sha256")}
-                if ref["target_id"] != rid:
-                    edges.append({"source": rid, "target": ref["target_id"], "type": ref["relation"],
-                                  "origin": rid})
-    known = set(nodes)
-    edges = [e for e in edges if e["source"] in known and e["target"] in known]
-    unique = {(e["source"], e["target"], e["type"]): e for e in edges}
-    return {"nodes": list(nodes.values()), "edges": list(unique.values()),
-            "note": "边是作者保存的导航关系；可达不代表科学支持"}
+def build_graph(storage: Storage, index: IndexService) -> dict:
+    index.ensure_graph()
+    nodes = {}
+    for n in index.db.graph_nodes():
+        nodes[n["node_id"]] = {
+            "id": n["node_id"], "type": n["node_type"], "kind": n["kind"], "title": n["title"], "level": n["level"],
+            "owner_id": None if n["node_type"] == "source" else n["owner_id"],
+            "record_id": n["record_id"], "block_id": n["block_id"], "domains": n["domains"],
+            "review": n["review"], "maturity": n["maturity"], "ref": n["ref"]}
+    edges = [{"source": e["src"], "target": e["dst"], "type": e["type"], "category": e["category"],
+              "certainty": e["certainty"], "state": e["state"], "origin": e["declared_by"],
+              "derived": e["derived"], "candidate": e["state"] == "candidate"}
+             for e in index.db.graph_all_edges() if e["src"] in nodes and e["dst"] in nodes]
+    return {"nodes": list(nodes.values()), "edges": edges,
+            "note": "边是作者保存的关系与程序推出的快捷边；可达不代表科学支持"}
 
 
 def subgraph(graph: dict, *, center: str | None = None, hops: int = 2, kinds: list[str] | None = None,
              levels: list[str] | None = None, excluded: list[str] | None = None, query: str = "",
-             limit: int = 400) -> dict:
-    """按中心节点 + 跳数、类型/层级、关键词筛选子图；排除的节点不能成为通往其他节点的桥。"""
+             limit: int = 400, categories: list[str] | None = None, domains: list[str] | None = None,
+             excluded_domains: list[str] | None = None, node_types: list[str] | None = None) -> dict:
+    """按中心节点 + 跳数、类型/层级、关键词、边类别、领域筛选子图；排除的节点不能成为通往其他节点的桥。
+
+    domains / excluded_domains 只作用于带领域的节点（概念页）：没有领域的节点不受影响（D-12：全库一个概念库，
+    按领域筛选或屏蔽）。node_types 为空时显示全部节点类型。"""
     blocked = set(excluded or [])
+    wanted, masked = set(domains or []), set(excluded_domains or [])
+
+    def domain_ok(n: dict) -> bool:
+        values = set(n.get("domains") or [])
+        return not values or ((not wanted or values & wanted) and not (masked and values <= masked))
+
     nodes = {n["id"]: n for n in graph["nodes"] if n["id"] not in blocked
-             and (kinds is None or n["kind"] in kinds or n["type"] == "owner")
-             and (levels is None or n["level"] in levels or n["type"] != "record")}
-    edges = [e for e in graph["edges"] if e["source"] in nodes and e["target"] in nodes]
+             and (kinds is None or n["kind"] in kinds or n["type"] in {"owner", "block", "claim", "concept", "source"})
+             and (levels is None or n["level"] in levels or n["type"] not in {"record", "block"})
+             and (node_types is None or n["type"] in node_types) and domain_ok(n)}
+    edges = [e for e in graph["edges"] if e["source"] in nodes and e["target"] in nodes
+             and (categories is None or e.get("category") in categories)]
     if query:
         needle = query.casefold()
         hits = {i for i, n in nodes.items() if needle in (n["title"] or "").casefold()
@@ -122,6 +109,20 @@ def similar(storage: Storage, index: IndexService, seeds: list[str], *, method: 
                                    "score": round(item["channel_scores"].get("dense") or 0, 4), "method": "semantic"})
     candidates.sort(key=lambda c: -c["score"])
     return {"candidates": candidates[:limit], "missing": sorted(set(seeds) - set(entries))}
+
+
+def candidates(storage: Storage, index: IndexService, *, record_id: str | None = None, owner_id: str | None = None,
+               kinds: list[str] | None = None, limit: int = 50) -> dict:
+    """保存后自动算出的候选（R12 T-P2.10）：提到概念却没链接、向量近邻、外部工具回流。
+    已经判断过的端点对（任何状态的关联）不再出现；候选只是线索，判断后用 relations.decide 或改写正文链接。"""
+    judged = {frozenset((a["from"]["target_id"], a["to"]["target_id"]))
+              for a in associations.list_associations(storage)}
+    rows = [r for r in index.db.candidates(record_ids=[record_id] if record_id else None, owner_id=owner_id)
+            if frozenset((r["src"], r["dst"])) not in judged and (kinds is None or r["kind"] in kinds)]
+    titles = {n["node_id"]: n["title"] for n in index.db.graph_nodes(sorted({x for r in rows for x in (r["src"], r["dst"])}))}
+    items = [{**r, "src_title": titles.get(r["src"]), "dst_title": titles.get(r["dst"])} for r in rows[:limit]]
+    return {"candidates": items, "total": len(rows),
+            "note": "concept_mention：正文提到了概念却没写 [[链接]]；similar：向量近邻；tool:*：外部工具回流。都需要判断"}
 
 
 def _owner_of(storage: Storage, record_id: str) -> str | None:

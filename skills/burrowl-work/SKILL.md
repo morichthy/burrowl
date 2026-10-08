@@ -1,7 +1,7 @@
 ---
 name: burrowl-work
 description: 在研发工作区开展需要归属、留痕、复用或续接的工作时使用：选对象、续接上下文、导入已有资料、执行 Run、按 L0–L4 保存成果与交接。简单的源码/配置/状态检查不要使用。
-requires_tools: [memory_owners, memory_owner_create, memory_owner_adopt, memory_resume, memory_inspect, memory_records, memory_contract, memory_commit, runs_create, runs_execute, runs_register, runs_update, sources_register, sources_register_many, sources_add_root, sources_list, index_status, index_reconcile]
+requires_tools: [memory_owners, memory_owner_create, memory_owner_adopt, memory_resume, memory_inspect, memory_records, memory_contract, memory_commit, runs_create, runs_execute, runs_register, runs_update, sources_register, sources_register_many, sources_add_root, sources_list, index_status, index_reconcile, relations_decide]
 ---
 # 工作与记录
 
@@ -58,6 +58,7 @@ requires_tools: [memory_owners, memory_owner_create, memory_owner_adopt, memory_
 
 - 除了主体目标，顺手检查过程中出现的可迁移方法、失败与反例、参数或工况边界、偶然发现。能独立复用的写 L3，技术细节写 L1。
 - 中间成果有用就直接保存，不必等用户逐次要求；未复核的认识保持未复核。用户明确说只暂存或限定范围时照办。
+- **随手连起来**：正文里提到概念库已有的概念就写成 `[[概念]]`，提到本对象或其他对象的记录、块、结论就写 `[[@handle]]`、`[[@handle#块]]`、`[[!结论短名]]`（写法见 RECORDING 第 6 节）。发现两条材料"值得放在一起看"，用 `relations_decide` 快速添加（只给 from、to、explanation，自动记为 related_to + 推测）。"A 会影响 B"写成结论，不写成关联。概念库里还没有的概念照样写链接，收口时再统一建页或合并。
 - 已有依据足够就推进，不要为每条消息重新检索。
 - 依据不足时判断：读深已有材料、换问法检索、扩大授权范围，还是先做实验。把理由记进清单。不按次数强制停下来问用户。
 
@@ -69,4 +70,5 @@ requires_tools: [memory_owners, memory_owner_create, memory_owner_adopt, memory_
 - 固定引用核对、受限来源不被引用；
 - 索引在提交后自动更新；
 - Run 输入指纹固定；
-- 受限对象的材料不能登记进 Run。
+- 受限对象的材料不能登记进 Run；
+- 正文链接在提交时解析并固定版本；记录、块、结论链接解析不了会给出候选，概念未建页不阻塞提交。

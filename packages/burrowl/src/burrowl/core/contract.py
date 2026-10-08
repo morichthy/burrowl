@@ -17,12 +17,16 @@ INTERNAL_KINDS = {"review": "review.submit / review.batch", "policy": "memory.co
                   "representation": "（保留类型，当前检索不使用）"}
 # 系统自动维护、草案里不要填写的字段
 SYSTEM_FIELDS = {"record_id", "created_at", "created_by", "revision", "previous_revision", "updated_at",
-                 "updated_by", "change_reason", "record_hash", "content_hash", "level", "schema_version"}
+                 "updated_by", "change_reason", "record_hash", "content_hash", "level", "schema_version", "links"}
 COMMON_NOTES = {
     "owner_id": "必须与提交请求的 owner_id 相同（一次提交只写一个对象）",
     "title": "能单独看懂的标题",
     "keywords": "检索关键词；技术名词同时给中文和英文，型号和数值原样保留",
-    "body_markdown": "正文（Markdown，可用 $...$ 公式）。L1 detail、document、document_section 必须为空字符串",
+    "body_markdown": "正文（Markdown，可用 $...$ 公式）。L1 detail、document、document_section 必须为空字符串。"
+                     "可写链接：[[概念]]、[[@记录handle]]、[[@对象短名/handle]]、[[@handle#块]]、[[!结论短名]]，"
+                     "提交时由服务解析并固定版本（见 docs/GLOSSARY 的“链接”）",
+    "handle": "可选。记录在本对象内的可读短名，供 [[@handle]] 链接使用；不填时按标题自动生成，创建后不可修改。"
+              "不能含空格和 / # | [ ] @ !",
     "record_reason": "为什么保存这一条",
     "sensitivity": "public / internal（默认）/ confidential / restricted；restricted 不进索引、不发布、不被引用",
     "sources": "本条依据的固定引用列表（见 Ref）；正文里的编号或 ID 要与这里对应",

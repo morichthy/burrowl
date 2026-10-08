@@ -21,7 +21,7 @@ from ..core.errors import BurrowlError
 from ..core.hashing import canonical_hash
 from ..core.ids import new_id, safe_segment
 from ..core.pathsafe import ReadScope, safe_path
-from ..core.records import CONTENT_FIELDS, content_hash, record_hash
+from ..core.records import CONTENT_FIELDS, OPTIONAL_CONTENT_FIELDS, content_hash, record_hash
 from .owners import Owner
 
 MANIFEST_FIELDS = {"schema_version", "commit_id", "generation", "owner_id", "record_heads", "request_ledger",
@@ -105,7 +105,7 @@ class MemoryStore:
         if entry["path"] != expected:
             raise BurrowlError("INTEGRITY_ERROR", "记录定位与身份不一致", {"record_id": rid})
         value = read_json(self.path(owner, expected, scope))
-        if (not isinstance(value, dict) or not set(CONTENT_FIELDS) <= value.keys()
+        if (not isinstance(value, dict) or not set(CONTENT_FIELDS) - OPTIONAL_CONTENT_FIELDS <= value.keys()
                 or value.get("record_id") != rid or value.get("owner_id") != owner.owner_id
                 or value.get("revision") != entry["revision"] or value.get("record_hash") != entry["record_hash"]
                 or record_hash(value) != entry["record_hash"] or content_hash(value) != value.get("content_hash")):

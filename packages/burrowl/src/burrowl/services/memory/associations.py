@@ -2,6 +2,10 @@
 
 关联只是导航关系，不能是 supports/input；采纳导航不等于科学支持。
 同一对端点+关系只有一条规范记录：修改判断即产生它的新修订。
+
+R12 D-14：关联带 certainty（speculative / plausible / supported）、origin、observed_in。
+快速添加只需两端和一句说明，自动设为 related_to + speculative + accepted，origin 按执行者填写。
+"A 会影响 B"这类可以验证的判断写成结论（kind=inference），不写成关联。
 """
 import uuid
 from copy import deepcopy
@@ -13,7 +17,16 @@ from .context import Storage
 from .reader import fixed_ref
 from .service import MemoryService
 
-SYMMETRIC = {"analogous_to", "same_problem", "same_failure_mode"}
+SYMMETRIC = {"analogous_to", "same_problem", "same_failure_mode", "related_to"}
+QUICK_FIELDS = {"from", "to", "explanation", "observed_in", "certainty"}
+
+
+def quick_payload(payload: dict, actor: dict) -> dict:
+    """快速添加：只给了两端和说明时补齐其余字段（只用于新判断，不改写已有记录）。"""
+    filled = {"relation": "related_to", "certainty": "speculative", "status": "accepted", "shared_structure": None,
+              "transfer_limits": [], "differences": [], "basis_refs": [], "missing_refs": [],
+              "origin": actor.get("kind") if actor.get("kind") in {"human", "ai"} else "unknown"}
+    return filled | payload
 SKIP_KINDS = {"association", "review", "policy", "consolidation", "feedback"}
 
 
@@ -60,7 +73,10 @@ def list_associations(storage: Storage, *, status: str | None = None, record_id:
             continue
         out.append({"record_id": record["record_id"], "revision": record["revision"], "owner_id": record["owner_id"],
                     **{k: payload[k] for k in ("from", "to", "relation", "status", "explanation",
-                                               "shared_structure", "transfer_limits")}})
+                                               "shared_structure", "transfer_limits")},
+                    # 缺省时按旧语义解释为 plausible / unknown（读取时的解释，不写回记录）
+                    "certainty": payload.get("certainty") or "plausible", "origin": payload.get("origin") or "unknown",
+                    "observed_in": payload.get("observed_in")})
     return out
 
 
@@ -71,8 +87,13 @@ def _identity(payload: dict) -> tuple:
 
 def decide(memory: MemoryService, owner_id: str, payload: dict, *, actor: dict, reason: str, title: str = "关联判断",
            request_id: str | None = None, dry_run: bool = False) -> dict:
-    """保存一条关联判断（candidate / accepted / rejected / withdrawn）。"""
+    """保存一条关联判断（candidate / accepted / rejected / withdrawn）。payload 只含 from/to/explanation
+    （可选 observed_in、certainty）时按快速添加处理。"""
     payload = deepcopy(payload)
+    if set(payload) <= QUICK_FIELDS:
+        payload = quick_payload(payload, actor)
+    if "origin" not in payload and actor.get("kind") in {"human", "ai"}:
+        payload["origin"] = actor["kind"]
     if payload.get("relation") in {"supports", "input"}:
         raise BurrowlError("INVALID_ARGUMENT", "关联只保存导航关系；科学依据请写在记录的 sources/evidence_refs 中")
     graph = ClaimGraph(memory.storage)

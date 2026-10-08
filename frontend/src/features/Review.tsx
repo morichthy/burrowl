@@ -1,7 +1,8 @@
 // 知识复核：待复核队列 + 一键复核 + 批量 + 历史。复核结果立即影响检索的复核过滤与中枢发布。
+// 成熟度（设想 → 初步 → 重复验证 → 已确立）随复核一起登记；"已确立"只能由人在这里确认（AI 只能提出升级）。
 import { useState } from "react";
 import { useAction, useOp } from "../api";
-import { label, KINDS, REVIEW_BADGES } from "../labels";
+import { EVIDENCE_BASIS, label, KINDS, MATURITY, REVIEW_BADGES } from "../labels";
 import { Empty, ErrorBox, href, Loading, Panel, ReviewBadge, Time } from "../ui";
 
 interface FixedRef {
@@ -23,8 +24,19 @@ export interface QueueItem {
   record_title: string;
   record_kind: string;
   evidence_refs: FixedRef[];
-  review: { state: string; reason: string; scope: string | null; updated_at: string; revision: number } | null;
+  review: {
+    state: string;
+    reason: string;
+    scope: string | null;
+    updated_at: string;
+    revision: number;
+    evidence_refs?: FixedRef[];
+  } | null;
   problems: { code: string; message: string; target_id: string }[];
+  maturity?: string | null;
+  stale_maturity?: string | null;
+  requested_maturity?: string | null;
+  stats?: { supports: number; contradicts: number; open_counterexamples: number; cited_by: number; run_inputs: number };
 }
 
 interface Queue {
@@ -46,8 +58,8 @@ const TEMPLATES: Record<Action, string[]> = {
   retracted: ["依据有误，结论不成立", "数据或计算错误"],
   superseded: ["已有更准确的替代结论"],
 };
-const QUEUE_STATES = ["not-reviewed", "stale", "disputed", "upstream-blocked", "accepted", "retracted", "superseded"];
-const DEFAULT_STATES = ["not-reviewed", "stale", "disputed", "upstream-blocked"];
+const QUEUE_STATES = ["not-reviewed", "stale", "disputed", "upstream-blocked", "maturity-requested", "accepted", "retracted", "superseded"];
+const DEFAULT_STATES = ["not-reviewed", "stale", "disputed", "upstream-blocked", "maturity-requested"];
 
 interface Draft {
   item: QueueItem;
@@ -55,6 +67,8 @@ interface Draft {
   reason: string;
   scope: string;
   replacement: string;
+  maturity: string;
+  basis: string;
   preview?: unknown;
 }
 
@@ -78,8 +92,21 @@ export function Review() {
   const toggle = (state: string) =>
     setStates((current) => (current.includes(state) ? current.filter((s) => s !== state) : [...current, state]));
 
-  const open = async (item: QueueItem, state: Action) => {
-    const next: Draft = { item, state, reason: TEMPLATES[state][0], scope: item.scope, replacement: "" };
+  const open = async (item: QueueItem, state: Action, maturity = "") => {
+    const next: Draft = {
+      item,
+      state,
+      reason: maturity === "established" ? "用户确认：证据充分，升级为已确立" : TEMPLATES[state][0],
+      scope: item.scope,
+      replacement: "",
+      maturity: maturity || item.maturity || "",
+      basis: "",
+    };
+    if (maturity === "established") {
+      setDraft(next);
+      submit.clear();
+      return; // 已确立必须先选证据类型，不自动预检
+    }
     setDraft(next);
     submit.clear();
     if (state === "accepted") {
@@ -183,6 +210,13 @@ export function Review() {
                   适用范围：{item.scope} · 来自{label(KINDS, item.record_kind)}「
                   <a href={href("memory", item.owner_id, item.record_id)}>{item.record_title}</a>」 · <code>{item.claim_id}</code>
                 </div>
+                <div className="hint">
+                  成熟度：{item.maturity ? MATURITY[item.maturity] ?? item.maturity : item.stale_maturity ? `失效（原为${MATURITY[item.stale_maturity] ?? item.stale_maturity}）` : "未登记"}
+                  {item.requested_maturity ? ` · 提议升级为${MATURITY[item.requested_maturity] ?? item.requested_maturity}` : ""}
+                  {item.stats
+                    ? ` · 独立依据 ${item.stats.supports} · 反例 ${item.stats.contradicts}（未处理 ${item.stats.open_counterexamples}） · 被引用 ${item.stats.cited_by}`
+                    : ""}
+                </div>
                 {item.review ? (
                   <div className="hint">
                     上次复核：{REVIEW_BADGES[item.review.state]?.label ?? item.review.state}（{item.review.reason}）
@@ -205,6 +239,11 @@ export function Review() {
                     {a.label}
                   </button>
                 ))}
+                {item.requested_maturity === "established" ? (
+                  <button type="button" className="small primary" onClick={() => open(item, "accepted", "established")}>
+                    确认升级为已确立
+                  </button>
+                ) : null}
                 <button type="button" className="small" onClick={() => setHistoryOf(item.claim_id)}>
                   历史
                 </button>
@@ -228,14 +267,23 @@ export function Review() {
   );
 }
 
+function evidenceOf(item: QueueItem): FixedRef[] {
+  // 结论自身的依据 + 上次复核补充的依据（去重）
+  const all = [...item.evidence_refs, ...(item.review?.evidence_refs ?? [])];
+  return all.filter((r, i) => all.findIndex((x) => JSON.stringify(x) === JSON.stringify(r)) === i);
+}
+
 function argsOf(draft: Draft, dryRun: boolean) {
+  const established = draft.maturity === "established";
   return {
     target_claim_id: draft.item.claim_id,
     state: draft.state,
     reason: draft.reason,
     scope: draft.state === "accepted" ? draft.scope : null,
-    evidence_refs: draft.state === "accepted" ? draft.item.evidence_refs : null,
+    evidence_refs: draft.state === "accepted" ? evidenceOf(draft.item) : null,
     replacement_claim_id: draft.state === "superseded" ? draft.replacement || null : null,
+    maturity: draft.maturity || null,
+    evidence_basis: established ? draft.basis || null : null,
     dry_run: dryRun,
   };
 }
@@ -282,6 +330,30 @@ function ReviewDialog(props: {
                 ))}
               </ul>
             </div>
+            <label>
+              成熟度（可选）
+              <select value={draft.maturity} onChange={(e) => setDraft({ ...draft, maturity: e.target.value, preview: undefined })}>
+                <option value="">不登记</option>
+                {Object.entries(MATURITY).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {draft.maturity === "established" ? (
+              <label>
+                证据类型（已确立必须选择）
+                <select value={draft.basis} onChange={(e) => setDraft({ ...draft, basis: e.target.value })}>
+                  <option value="">请选择…</option>
+                  {Object.entries(EVIDENCE_BASIS).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
             {draft.preview ? <div className="notice">预检通过，可以提交。</div> : null}
           </>
         ) : null}
@@ -293,7 +365,12 @@ function ReviewDialog(props: {
         ) : null}
         <ErrorBox error={props.error} />
         <div className="actions">
-          <button type="button" className={action.tone || "primary"} disabled={props.busy || !draft.reason.trim()} onClick={props.onConfirm}>
+          <button
+            type="button"
+            className={action.tone || "primary"}
+            disabled={props.busy || !draft.reason.trim() || (draft.maturity === "established" && !draft.basis)}
+            onClick={props.onConfirm}
+          >
             提交{action.label}
           </button>
           <button type="button" onClick={props.onCancel}>

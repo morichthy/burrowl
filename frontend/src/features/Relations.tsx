@@ -1,5 +1,6 @@
-// 关系图：对象、记录、来源与作者保存的类型化关系。
-// 点击节点查看详情、以它为中心展开、查看关联候选（虚线）并判断；视图与随手笔记保存在本机。
+// 关系图：对象、记录、块、结论、概念、来源，以及按类别区分的关系（来自索引中的图投影，R12 T-P2.8）。
+// 颜色区分边的类别，线型区分关联的确定度（实线=有依据，虚线=可能，点线=推测）。
+// 点击节点查看详情、以它为中心展开、查看关联候选并判断，或从一个节点到另一个节点快速添加关联。
 // 关联只是导航，不是证据：采纳一条关联不会让任何结论变成"已确认"。
 import cytoscape from "cytoscape";
 import Graph from "graphology";
@@ -16,10 +17,26 @@ interface GraphNode {
   title: string;
   level: string | null;
   owner_id: string | null;
+  record_id?: string | null;
+  ref?: FixedRef | null;
+  domains?: string[];
+  review?: string | null;
+  maturity?: string | null;
+}
+interface GraphEdge {
+  source: string;
+  target: string;
+  type: string;
+  origin: string;
+  category?: string;
+  certainty?: string | null;
+  derived?: boolean;
+  state?: string | null;
+  candidate?: boolean;
 }
 interface GraphData {
   nodes: GraphNode[];
-  edges: { source: string; target: string; type: string; origin: string }[];
+  edges: GraphEdge[];
   truncated: boolean;
 }
 interface FixedRef {
@@ -47,7 +64,24 @@ interface Note {
   created_at: string;
 }
 
-const TYPE_COLORS: Record<string, string> = { owner: "#3b6ea5", record: "#6a9955", source: "#b5852b", claim: "#a05195" };
+const TYPE_COLORS: Record<string, string> = {
+  owner: "#3b6ea5",
+  record: "#6a9955",
+  source: "#b5852b",
+  claim: "#a05195",
+  concept: "#d0573a",
+  block: "#9aa7b0",
+};
+const CATEGORIES: { value: string; label: string; color: string }[] = [
+  { value: "structure", label: "结构", color: "#c8c8c8" },
+  { value: "evidence", label: "证据", color: "#3d8b5a" },
+  { value: "reference", label: "引用", color: "#7a8ca8" },
+  { value: "navigation", label: "关联", color: "#d08a2c" },
+  { value: "concept", label: "概念", color: "#d0573a" },
+  { value: "claim_relation", label: "结论关系", color: "#a05195" },
+];
+const LINE_STYLE: Record<string, string> = { supported: "solid", plausible: "dashed", speculative: "dotted" };
+const NODE_TYPES = ["owner", "record", "claim", "concept", "source"];
 const PALETTE = ["#4e79a7", "#f28e2b", "#e15759", "#76b7b2", "#59a14f", "#edc948", "#b07aa1", "#ff9da7", "#9c755f", "#bab0ac"];
 const KIND_FILTERS = ["overview", "experience", "narrative", "detail", "source", "document", "document_section"];
 const LEVEL_FILTERS = ["L0", "L1", "L2", "L3", "L4"];
@@ -67,6 +101,8 @@ interface View {
   levels?: string[];
   excluded?: string[];
   communities?: boolean;
+  categories?: string[];
+  showBlocks?: boolean;
 }
 
 export function Relations() {
@@ -74,6 +110,7 @@ export function Relations() {
   const [view, setView] = useState<View>({ hops: 2, query: "", kinds: [], levels: [], excluded: [], communities: false });
   const [history, setHistory] = useState<string[]>([]);
   const [focus, setFocus] = useState<GraphNode>();
+  const [linkFrom, setLinkFrom] = useState<GraphNode>();
   const [loadedSaved, setLoadedSaved] = useState(false);
   useEffect(() => {
     if (saved.data && !loadedSaved) {
@@ -89,6 +126,8 @@ export function Relations() {
     kinds: view.kinds?.length ? view.kinds : null,
     levels: view.levels?.length ? view.levels : null,
     excluded: view.excluded?.length ? view.excluded : null,
+    categories: view.categories?.length ? view.categories : null,
+    node_types: view.showBlocks ? null : NODE_TYPES,
     limit: 400,
   });
   const candidates = useOp<{ candidates: CandidateLink[] }>(
@@ -103,7 +142,7 @@ export function Relations() {
     if (view.center) setHistory((h) => [...h, view.center!]);
     setView({ ...view, center: id });
   };
-  const toggle = (key: "kinds" | "levels", value: string) => {
+  const toggle = (key: "kinds" | "levels" | "categories", value: string) => {
     const current = view[key] ?? [];
     setView({ ...view, [key]: current.includes(value) ? current.filter((v) => v !== value) : [...current, value] });
   };
@@ -136,6 +175,10 @@ export function Relations() {
             <input type="checkbox" checked={!!view.communities} onChange={(e) => setView({ ...view, communities: e.target.checked })} />
             按社区着色
           </label>
+          <label className="check">
+            <input type="checkbox" checked={!!view.showBlocks} onChange={(e) => setView({ ...view, showBlocks: e.target.checked })} />
+            显示 L1 块
+          </label>
           {view.center ? (
             <>
               <button
@@ -167,6 +210,14 @@ export function Relations() {
             </label>
           ))}
         </div>
+        <div className="chips" aria-label="边的类别">
+          {CATEGORIES.map((c) => (
+            <label key={c.value} className={view.categories?.includes(c.value) ? "on" : ""}>
+              <input type="checkbox" checked={!!view.categories?.includes(c.value)} onChange={() => toggle("categories", c.value)} />
+              <span style={{ color: c.color }}>■</span> {c.label}
+            </label>
+          ))}
+        </div>
         {view.excluded?.length ? (
           <p className="hint">
             已隐藏：{view.excluded.join("、")}{" "}
@@ -181,7 +232,7 @@ export function Relations() {
         <GraphCanvas data={graph.data} communities={communities} links={candidates.data?.candidates ?? []} onSelect={setFocus} />
         <p className="hint">
           {graph.data?.nodes.length ?? 0} 个节点、{graph.data?.edges.length ?? 0} 条关系
-          {communities ? `，${new Set(Object.values(communities)).size} 个社区` : ""}。实线是作者保存的关系，虚线是待判断的候选。
+          {communities ? `，${new Set(Object.values(communities)).size} 个社区` : ""}。颜色是关系类别；关联的实线、虚线、点线分别表示有依据、可能、推测；浅色是待判断的候选。
         </p>
       </Panel>
       <aside>
@@ -191,6 +242,9 @@ export function Relations() {
           onCenter={(id) => setCenter(id)}
           onHide={(id) => setView({ ...view, excluded: [...(view.excluded ?? []), id] })}
           reloadCandidates={candidates.reload}
+          linkFrom={linkFrom}
+          setLinkFrom={setLinkFrom}
+          reloadGraph={graph.reload}
         />
         <Notes focus={focus} />
       </aside>
@@ -234,14 +288,35 @@ function GraphCanvas(props: {
             color: communities ? PALETTE[(communities[n.id] ?? 0) % PALETTE.length] : (TYPE_COLORS[n.type] ?? "#888"),
           },
         })),
-        ...data.edges.map((e, i) => ({ data: { id: `e${i}`, source: e.source, target: e.target } })),
+        ...data.edges.map((e, i) => ({
+          data: {
+            id: `e${i}`,
+            source: e.source,
+            target: e.target,
+            color: CATEGORIES.find((c) => c.value === e.category)?.color ?? "#bbb",
+            line: e.category === "navigation" ? LINE_STYLE[e.certainty ?? "plausible"] ?? "solid" : "solid",
+          },
+          classes: [e.candidate ? "candidate" : "", e.state === "invalid" ? "invalid" : ""].filter(Boolean).join(" "),
+        })),
         ...links
           .filter((l) => known.has(l.from.target_id) && known.has(l.to.target_id))
           .map((l, i) => ({ data: { id: `c${i}`, source: l.from.target_id, target: l.to.target_id }, classes: "candidate" })),
       ],
       style: [
         { selector: "node", style: { label: "data(label)", "font-size": 9, "min-zoomed-font-size": 7, "background-color": "data(color)", width: 14, height: 14 } },
-        { selector: "edge", style: { width: 1, "line-color": "#bbb", "curve-style": "bezier", "target-arrow-shape": "triangle", "arrow-scale": 0.6 } },
+        {
+          selector: "edge",
+          style: {
+            width: 1,
+            "line-color": "data(color)",
+            "line-style": "data(line)" as never,
+            "curve-style": "bezier",
+            "target-arrow-shape": "triangle",
+            "target-arrow-color": "data(color)",
+            "arrow-scale": 0.6,
+          },
+        },
+        { selector: "edge.invalid", style: { "line-color": "#ddd", "target-arrow-color": "#ddd" } },
         { selector: "edge.candidate", style: { "line-style": "dashed", "line-color": "#d08a2c", width: 1.5, "target-arrow-shape": "none" } },
         { selector: "node:selected", style: { "border-width": 3, "border-color": "#d08a2c" } },
       ],
@@ -259,9 +334,21 @@ function Focus(props: {
   onCenter: (id: string) => void;
   onHide: (id: string) => void;
   reloadCandidates: () => void;
+  linkFrom: GraphNode | undefined;
+  setLinkFrom: (node: GraphNode | undefined) => void;
+  reloadGraph: () => void;
 }) {
-  const { node, candidates } = props;
+  const { node, candidates, linkFrom } = props;
   const decide = useAction("relations.decide");
+  const quickAdd = async (from: GraphNode, to: GraphNode) => {
+    // 快速添加：只给两端和一句说明，服务端自动设为 related_to + 推测（speculative）+ 已采纳
+    const explanation = window.prompt(`为什么把「${from.title.slice(0, 20)}」和「${to.title.slice(0, 20)}」放在一起看？`, "");
+    if (!explanation || !from.ref || !to.ref || !from.owner_id) return;
+    if (await decide.run({ owner_id: from.owner_id, payload: { from: from.ref, to: to.ref, explanation }, reason: explanation })) {
+      props.setLinkFrom(undefined);
+      props.reloadGraph();
+    }
+  };
   const [relation, setRelation] = useState("same_problem");
   if (!node) return <Panel title="节点">{<p className="hint">点击图中的节点查看详情和关联候选。</p>}</Panel>;
   const judge = async (link: CandidateLink, status: "accepted" | "rejected") => {
@@ -300,9 +387,32 @@ function Focus(props: {
           隐藏
         </button>
         {node.owner_id ? (
-          <a href={node.type === "owner" ? href("memory", node.id) : href("memory", node.owner_id, node.id)}>打开</a>
+          <a href={node.type === "owner" ? href("memory", node.id) : href("memory", node.owner_id, node.record_id ?? node.id)}>打开</a>
         ) : null}
       </div>
+      {node.maturity || node.review ? (
+        <p className="hint">
+          {node.review ? `复核：${node.review}` : ""} {node.maturity ? `成熟度：${node.maturity}` : ""}
+        </p>
+      ) : null}
+      {node.domains?.length ? <p className="hint">领域：{node.domains.join("、")}</p> : null}
+      <div className="actions">
+        {linkFrom && linkFrom.id !== node.id ? (
+          <>
+            <button type="button" className="small primary" disabled={!node.ref || decide.busy} onClick={() => quickAdd(linkFrom, node)}>
+              与「{linkFrom.title.slice(0, 12)}」建立关联
+            </button>
+            <button type="button" className="small" onClick={() => props.setLinkFrom(undefined)}>
+              取消
+            </button>
+          </>
+        ) : (
+          <button type="button" className="small" disabled={!node.ref || !node.owner_id} onClick={() => props.setLinkFrom(node)}>
+            {linkFrom?.id === node.id ? "已选为关联起点（再点另一个节点）" : "从这里添加关联"}
+          </button>
+        )}
+      </div>
+      <ErrorBox error={decide.error} />
       {node.type === "record" ? (
         <>
           <h4>关联候选（关键词重合）</h4>

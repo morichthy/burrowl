@@ -28,6 +28,7 @@ from ...index import conditions as field_conditions
 from ...index import query_plan
 from ...storage import terms as term_store
 from ..indexing import IndexService
+from ..memory import concepts
 from ..memory.context import Storage
 from . import notes, screening, text
 from .session import STRATEGIES, VERDICTS, SessionStore, new_session
@@ -101,6 +102,14 @@ class ReadingService:
     def _plan(self, question: str, **options: Any) -> dict:
         raw, digest = term_store.load(self.storage.ws)
         entries = query_plan.validate_terms(raw) if raw else []
+        # R12 D-26：概念库中的概念名与别名参与术语扩展；两份来源的指纹一起进入计划
+        library = self.storage.owners.scan().find(self.config().graph.concept_owner_id or "")
+        if library is not None and library.readable and library.persisted:
+            records = list(self.storage.store.read_snapshot(library).records.values())
+            extra, extra_digest = concepts.term_entries(records, question)
+            if extra:
+                entries = [*entries, *extra]
+                digest = canonical_hash({"terms": digest, "concepts": extra_digest})
         return query_plan.build(question, terms=entries, terms_sha256=digest, **options)
 
     def _head(self, owner_id: str) -> str | None:
@@ -129,7 +138,8 @@ class ReadingService:
         started = time.monotonic()
         owner_scope = session.get("scope_owner_ids")
         owners, gaps = screening.recall(self.index, plan, corpus=corpus, owner_ids=owner_scope,
-                                        review_filter=session["review_filter"], exclude=set(session["owners"]))
+                                        review_filter=session["review_filter"], exclude=set(session["owners"]),
+                                        graph_route=self.config().index.graph_route)
         cfg = session["screening"]
         packets, diagnostics = screening.packets(self.index, plan, owners, regular=cfg["regular_windows"],
                                                  maximum=cfg["max_windows"], reranking=session["reranking"],

@@ -10,14 +10,18 @@ from ....services.memory import associations, provenance
 from ..registry import Ctx, op
 
 ReviewState = Literal["accepted", "disputed", "retracted", "superseded", "not-reviewed"]
-QueueState = Literal["not-reviewed", "stale", "disputed", "upstream-blocked", "accepted", "retracted", "superseded"]
+QueueState = Literal["not-reviewed", "stale", "disputed", "upstream-blocked", "maturity-requested", "accepted",
+                     "retracted", "superseded"]
+Maturity = Literal["conjecture", "preliminary", "replicated", "established"]
+EvidenceBasis = Literal["engineering_case", "proof", "authoritative_source", "replication"]
 
 
 # ---------- 复核 ----------
 @op("review.queue")
 def review_queue(ctx: Ctx, states: list[QueueState] | None = None, owner_id: str | None = None, query: str = "",
                  limit: int = 50, offset: int = 0) -> dict:
-    """待复核队列：默认列出未复核、已失效、有争议、被上游阻断的结论。"""
+    """待复核队列：默认列出未复核、已失效、有争议、被上游阻断、有升级提议的结论；
+    每项带有效成熟度与派生统计（支持数按原始来源去重，"用得多"不等于"对"）。"""
     return ctx.app.review.queue(states=states, owner_id=owner_id, query=query, limit=limit, offset=offset)
 
 
@@ -25,12 +29,20 @@ def review_queue(ctx: Ctx, states: list[QueueState] | None = None, owner_id: str
 def review_submit(ctx: Ctx, target_claim_id: str, state: ReviewState,
                   reason: Annotated[str, Field(min_length=1)], scope: str | None = None,
                   evidence_refs: list[dict] | None = None, replacement_claim_id: str | None = None,
+                  maturity: Annotated[Maturity | None, Field(description=(
+                      "成熟度：conjecture 有推理无数据；preliminary 至少一次 Run 或小样本支持；replicated 多份独立依据都成立；"
+                      "established 只能由人或授权流程登记（AI 改用 requested_maturity）"))] = None,
+                  evidence_basis: Annotated[EvidenceBasis | None, Field(description="established 的证据类型")] = None,
+                  requested_maturity: Annotated[Literal["established"] | None, Field(description=(
+                      "AI 提议升级为已确立，由用户在复核队列中确认"))] = None,
                   dry_run: bool = False) -> dict:
-    """复核一条结论。accepted 需要适用范围与支持性证据；superseded 需要替代结论。dry_run 只预检。"""
+    """复核一条结论。accepted 需要适用范围与支持性证据；superseded 需要替代结论。dry_run 只预检。
+    成熟度与复核状态分开：可以在 not-reviewed 时登记 conjecture/preliminary；established 必须 accepted。"""
     return ctx.app.review.submit({"target_claim_id": target_claim_id, "state": state, "reason": reason,
                                   "scope": scope, "evidence_refs": evidence_refs or [],
                                   "replacement_claim_id": replacement_claim_id, "actor": ctx.actor,
-                                  "dry_run": dry_run})
+                                  "maturity": maturity, "evidence_basis": evidence_basis,
+                                  "requested_maturity": requested_maturity, "dry_run": dry_run})
 
 
 @op("review.batch", effect="write")
@@ -71,12 +83,21 @@ def formal(ctx: Ctx, target_ids: list[str], scope: Annotated[str, Field(min_leng
 
 
 # ---------- 关联与关系图 ----------
+GraphCategory = Literal["structure", "evidence", "reference", "navigation", "concept", "claim_relation"]
+NodeType = Literal["owner", "record", "block", "claim", "concept", "source"]
+
+
 @op("relations.graph")
 def graph(ctx: Ctx, center: str | None = None, hops: int = 2, query: str = "", kinds: list[str] | None = None,
-          levels: list[str] | None = None, excluded: list[str] | None = None, limit: int = 400) -> dict:
-    """材料关系图（子图）：对象、记录、来源与作者保存的类型化关系。"""
-    return relations.subgraph(relations.build_graph(ctx.app.storage), center=center, hops=hops, query=query,
-                              kinds=kinds, levels=levels, excluded=excluded, limit=limit)
+          levels: list[str] | None = None, excluded: list[str] | None = None, limit: int = 400,
+          categories: list[GraphCategory] | None = None, domains: list[str] | None = None,
+          excluded_domains: list[str] | None = None, node_types: list[NodeType] | None = None) -> dict:
+    """材料关系图（子图）：对象、记录、块、结论、概念、来源，以及按类别区分的边（来自图投影）。
+    categories 只看某几类边；domains / excluded_domains 按领域筛选或屏蔽概念。"""
+    return relations.subgraph(relations.build_graph(ctx.app.storage, ctx.app.index), center=center, hops=hops,
+                              query=query, kinds=kinds, levels=levels, excluded=excluded, limit=limit,
+                              categories=categories, domains=domains, excluded_domains=excluded_domains,
+                              node_types=node_types)
 
 
 @op("relations.similar")
@@ -94,10 +115,22 @@ def association_list(ctx: Ctx, status: Literal["candidate", "accepted", "rejecte
 
 @op("relations.decide", effect="write")
 def association_decide(ctx: Ctx, owner_id: str, payload: Annotated[dict, Field(description=(
-        "{from, to, relation, explanation, shared_structure, transfer_limits[], basis_refs[], status}"))],
+        "{from, to, relation, explanation, shared_structure, transfer_limits[], basis_refs[], status, "
+        "certainty?(speculative|plausible|supported), origin?, observed_in?}；"
+        "快速添加只给 {from, to, explanation}：自动设为 related_to + speculative + accepted"))],
         reason: str, dry_run: bool = False) -> dict:
-    """保存关联判断（candidate/accepted/rejected/withdrawn）；只能是导航关系。"""
+    """保存关联判断（candidate/accepted/rejected/withdrawn）；只能是导航关系。
+    "A 会影响 B"这类可以验证的判断写成结论（inference），不要写成关联。"""
     return associations.decide(ctx.app.memory, owner_id, payload, actor=ctx.actor, reason=reason, dry_run=dry_run)
+
+
+@op("relations.candidates")
+def association_candidates(ctx: Ctx, record_id: str | None = None, owner_id: str | None = None,
+                           kinds: list[str] | None = None, limit: int = 50) -> dict:
+    """待判断的线索：正文提到概念却没链接（concept_mention）、向量近邻（similar）、外部工具回流（external:*）。
+    已判断过的端点对会被过滤。只读。"""
+    return relations.candidates(ctx.app.storage, ctx.app.index, record_id=record_id, owner_id=owner_id,
+                                kinds=kinds, limit=limit)
 
 
 @op("relations.view")

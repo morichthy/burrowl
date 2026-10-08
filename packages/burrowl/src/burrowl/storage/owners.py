@@ -7,6 +7,7 @@ Owner 是记忆的归属单位：Research、Project、核心算法、Run、数�
     projects/<slug>/project.json     → PRJ-…
     core-algorithms/<slug>/module.json → ALG-…
     …/run.json                        → RUN-…
+    knowledge/<slug>/knowledge.json  → KNW-…   概念库等知识对象（R12 D-12）
     knowledge/x.md（adopt 后）        → OBJ-…   记忆在 knowledge/x.md.memory/
 
 首次提交记忆时才写入 <memory_home>/owner.json；扫描只解析业务卡，不读其他 JSON。
@@ -32,7 +33,7 @@ from .layout import CONTENT_ROOTS, Workspace
 CARDS = {"research.json": ("research", "research_id", "RES"), "project.json": ("project", "project_id", "PRJ"),
          "module.json": ("core-algorithm", "module_id", "ALG"), "run.json": ("run", "run_id", "RUN"),
          "dataset.json": ("data", "dataset_id", "DAT"), "tool.json": ("tool", "tool_id", "TOOL"),
-         "report.json": ("report", "report_id", "RPT")}
+         "report.json": ("report", "report_id", "RPT"), "knowledge.json": ("knowledge", "knowledge_id", "KNW")}
 CARD_BY_TYPE = {kind: name for name, (kind, _key, _prefix) in CARDS.items()}
 EXCLUDED_DIRS = {".git", ".burrowl", ".run-captures", "node_modules", "__pycache__", "_template", "templates",
                  ".venv", "venv", ".pytest_cache", ".cache"}
@@ -108,7 +109,8 @@ def _memory_home(native_path: str, is_card: bool) -> str:
     return (path.parent / "memory").as_posix() if is_card else native_path + ".memory"
 
 
-CARD_FIELDS = {"description", "keywords", "question", "source_document", "sensitivity"}
+# short_name：对象的可读短名，供 [[@短名/handle]] 链接使用（R12 D-28）
+CARD_FIELDS = {"description", "keywords", "question", "source_document", "sensitivity", "short_name"}
 
 
 class OwnerIndex:

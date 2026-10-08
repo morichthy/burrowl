@@ -152,3 +152,41 @@ def test_unknown_or_disabled_connector(setup):
     assert caught.value.code == "CAPABILITY_UNAVAILABLE"
     with pytest.raises(BurrowlError):
         hub.plan("other")
+
+
+def test_hub_route_and_external_candidates(setup):
+    """R12 T-P4.2 / T-P4.3：外部命中作为一路参与融合并回到本地；外部不可用时退回本地并报告缺口；
+    外部工具发现的关系只进入关联候选。"""
+    from burrowl.core.config import IndexConfig  # noqa: PLC0415
+    from burrowl.services.indexing import IndexService  # noqa: PLC0415
+    from burrowl.services.query.models import QueryRequest, Scope  # noqa: PLC0415
+    from burrowl.services.query.service import QueryService  # noqa: PLC0415
+
+    storage, _memory, review, owner_id, result, evidence = setup
+    _accept(review, evidence)
+    hubs: dict = {}
+    connector = {"id": "hub", "type": "fake", "publish": POLICY}
+    hub = _hub(storage, connector, hubs)
+    hub.apply("hub", hub.plan("hub")["plan_hash"])
+    index = IndexService.open(storage, IndexConfig(), fake_vectors=True)
+    index.reconcile()
+    cfg = BurrowlConfig.model_validate({"connectors": [connector], "index": {"hub_route": {"connectors": ["hub"]}}})
+    query = QueryService(storage, index, lambda: cfg, hub=hub)
+    page = query.search(QueryRequest(question="顺序实验经过", scope=Scope(owner_ids=[owner_id]), content_source="process"))
+    assert any(i.record_id == result["record_id"] for i in page.items)
+    assert not [g for g in page.gaps if g.get("channel") == "hub"]
+    from burrowl.index import query_plan  # noqa: PLC0415
+    plan = query_plan.build("完全不相关的问题")
+    routed = index.search_plan(plan, owner_ids=[owner_id], hub_hits=[{"record_id": result["record_id"]}])
+    assert {"id": "hub", "hits": 1} in routed["routes"] and routed["items"][0]["record_id"] == result["record_id"]
+    filtered = index.search_plan(plan, owner_ids=[owner_id], levels=["L4"], hub_hits=[{"record_id": result["record_id"]}])
+    assert not filtered["items"]          # 外部命中同样受层级等过滤约束
+
+    hubs["hub"].fail_on.add("search")      # 外部不可用：结果仍来自本地，缺口如实报告
+    page = query.search(QueryRequest(question="顺序实验经过", scope=Scope(owner_ids=[owner_id]), content_source="process"))
+    assert page.items and {"channel": "hub", "reason": "unavailable", "connector_id": "hub"} in page.gaps
+
+    local_key = f"rec:{owner_id}/{result['record_id']}"
+    hubs["hub"].state["candidates"] = [[local_key, local_key, "same", 0.9], [local_key, "rec:x/y", "related", 0.5]]
+    pulled = hub.external_candidates("hub")
+    assert pulled["supported"] and pulled["rows"] == [] and pulled["unmatched"] == 2   # 自环与对不上本地的都丢弃

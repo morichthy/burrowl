@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .spi import (
+    CandidateLink,
     Capabilities,
     Collection,
     ConnectorError,
@@ -31,6 +32,10 @@ class FakeHub:
         self.fail_on = set(str(options.get("fail_on", "")).split(",")) - {""}  # 例如 "upsert,delete"
         self.state = (json.loads(self.path.read_text(encoding="utf-8")) if self.path and self.path.exists()
                       else {"collections": {}, "docs": {}, "wiki": {}})
+
+    def candidates(self, collection: Collection, limit: int = 200) -> list[CandidateLink]:
+        """测试用：返回 state["candidates"] 中预置的线索（[[src_local_key, dst_local_key, kind, score], …]）。"""
+        return [CandidateLink(*row) for row in self.state.get("candidates", [])][:limit]
 
     def _save(self) -> None:
         if self.path:
@@ -90,6 +95,7 @@ class FakeHub:
                 if d["collection"] == collection.id]
 
     def search(self, collections: list[Collection], query: str, limit: int) -> list[Hit]:
+        self._maybe_fail("search")
         ids = {c.id for c in collections}
         terms = [t for t in query.casefold().split() if t]
         hits = []

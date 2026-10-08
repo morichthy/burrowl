@@ -244,13 +244,133 @@
   }
  },
  {
+  "name": "hub.candidates_pull",
+  "group": "hub",
+  "effect": "write",
+  "summary": "把外部工具发现的关系线索拉回为关联候选（origin=tool:<连接器>，只写派生的候选表，不写记录）。 之后用 relations.candidates 查看并判断。",
+  "input": {
+   "additionalProperties": false,
+   "description": "把外部工具发现的关系线索拉回为关联候选（origin=tool:<连接器>，只写派生的候选表，不写记录）。\n之后用 relations.candidates 查看并判断。",
+   "properties": {
+    "connector_id": {
+     "title": "Connector Id",
+     "type": "string"
+    },
+    "limit": {
+     "default": 200,
+     "title": "Limit",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "connector_id"
+   ],
+   "title": "hub_candidates_pull_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "exchange.export",
+  "group": "exchange",
+  "effect": "write",
+  "summary": "把记录导出为交换包（Markdown 库 + 图 JSONL + manifest）到数据目录的 exports/<名称>/。 派生数据，可删除重建；增量写入，内容没变的文件不改写。可以用 Obsidian 直接打开其中的 vault 目录。",
+  "input": {
+   "additionalProperties": false,
+   "description": "把记录导出为交换包（Markdown 库 + 图 JSONL + manifest）到数据目录的 exports/<名称>/。\n派生数据，可删除重建；增量写入，内容没变的文件不改写。可以用 Obsidian 直接打开其中的 vault 目录。",
+   "properties": {
+    "name": {
+     "description": "导出名称：字母、数字、点、下划线、连字符",
+     "title": "Name",
+     "type": "string"
+    },
+    "owner_ids": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Owner Ids"
+    },
+    "owner_types": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Owner Types"
+    },
+    "exclude_sensitivity": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "不导出的敏感级别；默认 [confidential]，restricted 永远不导出",
+     "title": "Exclude Sensitivity"
+    }
+   },
+   "required": [
+    "name"
+   ],
+   "title": "exchange_export_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "memory.render",
+  "group": "memory",
+  "effect": "read",
+  "summary": "按交换格式把一条记录渲染为 Markdown（YAML 头 + 正文 + 自动生成的反链与关联）。只读。",
+  "input": {
+   "additionalProperties": false,
+   "description": "按交换格式把一条记录渲染为 Markdown（YAML 头 + 正文 + 自动生成的反链与关联）。只读。",
+   "properties": {
+    "owner_id": {
+     "title": "Owner Id",
+     "type": "string"
+    },
+    "record_id": {
+     "title": "Record Id",
+     "type": "string"
+    }
+   },
+   "required": [
+    "owner_id",
+    "record_id"
+   ],
+   "title": "memory_render_input",
+   "type": "object"
+  }
+ },
+ {
   "name": "review.queue",
   "group": "review",
   "effect": "read",
-  "summary": "待复核队列：默认列出未复核、已失效、有争议、被上游阻断的结论。",
+  "summary": "待复核队列：默认列出未复核、已失效、有争议、被上游阻断、有升级提议的结论； 每项带有效成熟度与派生统计（支持数按原始来源去重，\"用得多\"不等于\"对\"）。",
   "input": {
    "additionalProperties": false,
-   "description": "待复核队列：默认列出未复核、已失效、有争议、被上游阻断的结论。",
+   "description": "待复核队列：默认列出未复核、已失效、有争议、被上游阻断、有升级提议的结论；\n每项带有效成熟度与派生统计（支持数按原始来源去重，\"用得多\"不等于\"对\"）。",
    "properties": {
     "states": {
      "anyOf": [
@@ -261,6 +381,7 @@
          "stale",
          "disputed",
          "upstream-blocked",
+         "maturity-requested",
          "accepted",
          "retracted",
          "superseded"
@@ -312,10 +433,10 @@
   "name": "review.submit",
   "group": "review",
   "effect": "write",
-  "summary": "复核一条结论。accepted 需要适用范围与支持性证据；superseded 需要替代结论。dry_run 只预检。",
+  "summary": "复核一条结论。accepted 需要适用范围与支持性证据；superseded 需要替代结论。dry_run 只预检。 成熟度与复核状态分开：可以在 not-reviewed 时登记 conjecture/preliminary；established 必须 accepted。",
   "input": {
    "additionalProperties": false,
-   "description": "复核一条结论。accepted 需要适用范围与支持性证据；superseded 需要替代结论。dry_run 只预检。",
+   "description": "复核一条结论。accepted 需要适用范围与支持性证据；superseded 需要替代结论。dry_run 只预检。\n成熟度与复核状态分开：可以在 not-reviewed 时登记 conjecture/preliminary；established 必须 accepted。",
    "properties": {
     "target_claim_id": {
      "title": "Target Claim Id",
@@ -376,6 +497,58 @@
      ],
      "default": null,
      "title": "Replacement Claim Id"
+    },
+    "maturity": {
+     "anyOf": [
+      {
+       "enum": [
+        "conjecture",
+        "preliminary",
+        "replicated",
+        "established"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "成熟度：conjecture 有推理无数据；preliminary 至少一次 Run 或小样本支持；replicated 多份独立依据都成立；established 只能由人或授权流程登记（AI 改用 requested_maturity）",
+     "title": "Maturity"
+    },
+    "evidence_basis": {
+     "anyOf": [
+      {
+       "enum": [
+        "engineering_case",
+        "proof",
+        "authoritative_source",
+        "replication"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "established 的证据类型",
+     "title": "Evidence Basis"
+    },
+    "requested_maturity": {
+     "anyOf": [
+      {
+       "const": "established",
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "AI 提议升级为已确立，由用户在复核队列中确认",
+     "title": "Requested Maturity"
     },
     "dry_run": {
      "default": false,
@@ -558,10 +731,10 @@
   "name": "relations.graph",
   "group": "relations",
   "effect": "read",
-  "summary": "材料关系图（子图）：对象、记录、来源与作者保存的类型化关系。",
+  "summary": "材料关系图（子图）：对象、记录、块、结论、概念、来源，以及按类别区分的边（来自图投影）。 categories 只看某几类边；domains / excluded_domains 按领域筛选或屏蔽概念。",
   "input": {
    "additionalProperties": false,
-   "description": "材料关系图（子图）：对象、记录、来源与作者保存的类型化关系。",
+   "description": "材料关系图（子图）：对象、记录、块、结论、概念、来源，以及按类别区分的边（来自图投影）。\ncategories 只看某几类边；domains / excluded_domains 按领域筛选或屏蔽概念。",
    "properties": {
     "center": {
      "anyOf": [
@@ -634,6 +807,82 @@
      "default": 400,
      "title": "Limit",
      "type": "integer"
+    },
+    "categories": {
+     "anyOf": [
+      {
+       "items": {
+        "enum": [
+         "structure",
+         "evidence",
+         "reference",
+         "navigation",
+         "concept",
+         "claim_relation"
+        ],
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Categories"
+    },
+    "domains": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Domains"
+    },
+    "excluded_domains": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Excluded Domains"
+    },
+    "node_types": {
+     "anyOf": [
+      {
+       "items": {
+        "enum": [
+         "owner",
+         "record",
+         "block",
+         "claim",
+         "concept",
+         "source"
+        ],
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Node Types"
     }
    },
    "title": "relations_graph_input",
@@ -726,10 +975,10 @@
   "name": "relations.decide",
   "group": "relations",
   "effect": "write",
-  "summary": "保存关联判断（candidate/accepted/rejected/withdrawn）；只能是导航关系。",
+  "summary": "保存关联判断（candidate/accepted/rejected/withdrawn）；只能是导航关系。 \"A 会影响 B\"这类可以验证的判断写成结论（inference），不要写成关联。",
   "input": {
    "additionalProperties": false,
-   "description": "保存关联判断（candidate/accepted/rejected/withdrawn）；只能是导航关系。",
+   "description": "保存关联判断（candidate/accepted/rejected/withdrawn）；只能是导航关系。\n\"A 会影响 B\"这类可以验证的判断写成结论（inference），不要写成关联。",
    "properties": {
     "owner_id": {
      "title": "Owner Id",
@@ -737,7 +986,7 @@
     },
     "payload": {
      "additionalProperties": true,
-     "description": "{from, to, relation, explanation, shared_structure, transfer_limits[], basis_refs[], status}",
+     "description": "{from, to, relation, explanation, shared_structure, transfer_limits[], basis_refs[], status, certainty?(speculative|plausible|supported), origin?, observed_in?}；快速添加只给 {from, to, explanation}：自动设为 related_to + speculative + accepted",
      "title": "Payload",
      "type": "object"
     },
@@ -757,6 +1006,64 @@
     "reason"
    ],
    "title": "relations_decide_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "relations.candidates",
+  "group": "relations",
+  "effect": "read",
+  "summary": "待判断的线索：正文提到概念却没链接（concept_mention）、向量近邻（similar）、外部工具回流（external:*）。 已判断过的端点对会被过滤。只读。",
+  "input": {
+   "additionalProperties": false,
+   "description": "待判断的线索：正文提到概念却没链接（concept_mention）、向量近邻（similar）、外部工具回流（external:*）。\n已判断过的端点对会被过滤。只读。",
+   "properties": {
+    "record_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Record Id"
+    },
+    "owner_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Owner Id"
+    },
+    "kinds": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Kinds"
+    },
+    "limit": {
+     "default": 50,
+     "title": "Limit",
+     "type": "integer"
+    }
+   },
+   "title": "relations_candidates_input",
    "type": "object"
   }
  },
@@ -1662,7 +1969,7 @@
   "name": "memory.owner_create",
   "group": "memory",
   "effect": "write",
-  "summary": "新建对象（写入业务卡；首次提交记忆时才建立记忆目录）。Run 用 runs.create 建立。 先用 memory.owners 查找：同一目标的继续或子任务沿用已有对象；主题相似只引用；独立交付目标才新建。 core-algorithm 只用于公司文档定义的关键算法，普通脚本/模块/工具不要建算法卡。",
+  "summary": "新建对象（写入业务卡；首次提交记忆时才建立记忆目录）。Run 用 runs.create 建立。 先用 memory.owners 查找：同一目标的继续或子任务沿用已有对象；主题相似只引用；独立交付目标才新建。 core-algorithm 只用于公司文档定义的关键算法，普通脚本/模块/工具不要建算法卡。 knowledge 用于全库唯一的概念库（建好后把 owner_id 填进配置 graph.concept_owner_id）。",
   "input": {
    "additionalProperties": false,
    "description": "新建对象（写入业务卡；首次提交记忆时才建立记忆目录）。Run 用 runs.create 建立。",
@@ -1674,7 +1981,8 @@
       "core-algorithm",
       "data",
       "tool",
-      "report"
+      "report",
+      "knowledge"
      ],
      "title": "Owner Type",
      "type": "string"
@@ -1720,6 +2028,19 @@
      "default": null,
      "description": "core-algorithm 必填：定义该算法的公司算法/模块文档（路径或文档编号）",
      "title": "Source Document"
+    },
+    "short_name": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "可选的可读短名，供 [[@短名/handle]] 链接其他对象的记录",
+     "title": "Short Name"
     },
     "sensitivity": {
      "default": "internal",
@@ -4158,10 +4479,10 @@
   "name": "index.gaps",
   "group": "index",
   "effect": "read",
-  "summary": "发现层的确定性缺口（缺 L4 概览、技术单元缺检索说明）；内容是否充分仍需阅读判断。",
+  "summary": "确定性缺口：缺 L4 概览、技术单元缺检索说明、L1 块过长、结果块没声明依赖、未解析的概念链接、 没有入边的概念页、有未处理反例的结论、待确认的成熟度升级。内容是否充分仍需阅读判断。",
   "input": {
    "additionalProperties": false,
-   "description": "发现层的确定性缺口（缺 L4 概览、技术单元缺检索说明）；内容是否充分仍需阅读判断。",
+   "description": "确定性缺口：缺 L4 概览、技术单元缺检索说明、L1 块过长、结果块没声明依赖、未解析的概念链接、\n没有入边的概念页、有未处理反例的结论、待确认的成熟度升级。内容是否充分仍需阅读判断。",
    "properties": {},
    "title": "index_gaps_input",
    "type": "object"

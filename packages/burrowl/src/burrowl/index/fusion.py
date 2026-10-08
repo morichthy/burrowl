@@ -40,6 +40,8 @@ def fuse_routes(batches: list[tuple[dict, list[dict]]], key: Callable[[dict], st
             group = key(row)
             item = merged.setdefault(group, dict(row, score=0.0, query_sources=[], matched_blocks=[], hits=[]))
             item["query_sources"].append({"route": route["id"], "rank": rank, "channel": route["channel"]})
+            if row.get("via") and "via" not in item:  # 图路线命中附带经过的边（R12 §4.11）
+                item["via"] = row["via"]
             if len(item["hits"]) < 8:
                 item["hits"].append({"entry_id": row["entry_id"], "record_id": row["record_id"],
                                      "block_id": row.get("block_id"), "route": route["id"]})

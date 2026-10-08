@@ -94,6 +94,14 @@ class RefResolver:
             return {"sha256": owner.fingerprint, "owner_type": owner.owner_type, "native": owner.native,
                     "sensitivity": owner.sensitivity}
         if kind == "claim":
+            for record in self.pending.values():  # 同批记录里的结论（链接可以指向同批新写的结论）
+                for claim in (record.get("payload") or {}).get("claims", []) or []:
+                    if claim.get("claim_id") == target:
+                        digest = canonical_hash(claim)
+                        if digest != ref["sha256"]:
+                            raise BurrowlError("STALE_BASIS", "结论内容已变化", {"target_id": target})
+                        return {"sha256": digest, "claim": deepcopy(claim), "record": record,
+                                "owner_id": record.get("owner_id"), "sensitivity": record.get("sensitivity")}
             if self.claim_lookup is None:
                 raise BurrowlError("UNRESOLVED_REFERENCE", "当前操作不支持结论引用", {"target_id": target})
             value = self.claim_lookup(target)

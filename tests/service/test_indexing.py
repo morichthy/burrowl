@@ -89,3 +89,35 @@ def test_stale_owner_reported_as_gap(sample_workspace, tmp_path):
     other = storage.owners.create("research", "new-topic", "新课题")
     hits = index.search("浮点", channels=("lexical",))
     assert any(g["owner_id"] == other.owner_id and g["reason"] == "not_indexed" for g in hits["gaps"])
+
+
+def test_model_change_makes_vectors_stale_and_reconcile_rebuilds(sample_workspace):
+    """R12 T-P0.1：换模型或切窗规则（指纹变化）后，旧向量水位不能冒充就绪；reconcile 补建并清掉旧窗口。"""
+    from burrowl.index.embed import FakeEmbedder  # noqa: PLC0415
+
+    storage = Storage.open(sample_workspace)
+    open_index(storage).reconcile()
+    changed = FakeEmbedder()
+    changed.fingerprint += "-rules-v2"
+    index = IndexService.open(storage, IndexConfig(), embedder=changed)
+    assert index.status(OWNER)["details"]["fulltext.vector"] == "stale"
+    stale = index.search("补偿求和的误差界", channels=("dense",))
+    assert not stale["items"] and any(g.get("owner_id") == OWNER for g in stale["gaps"])
+    assert {r["owner_id"] for r in index.reconcile()["synced"]} >= {OWNER}
+    assert index.search("补偿求和的误差界", channels=("dense",))["items"]
+    with index.db.connect() as db:
+        fps = {r[0] for r in db.execute("SELECT DISTINCT model_fp FROM vectors WHERE owner_id=?", (OWNER,))}
+    assert fps == {changed.fingerprint}
+
+
+def test_query_over_model_limit_reports_gap(sample_workspace):
+    from burrowl.index.embed import FakeEmbedder  # noqa: PLC0415
+
+    storage = Storage.open(sample_workspace)
+    small = FakeEmbedder()
+    small.max_tokens = 8
+    index = IndexService.open(storage, IndexConfig(), embedder=small)
+    index.reconcile()
+    hits = index.search("浮点求和在大数抵消时为什么会丢失小量", channels=("dense",))
+    assert {"channel": "dense", "reason": "query_truncated"} in hits["gaps"]
+    assert hits["items"]

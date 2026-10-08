@@ -46,6 +46,9 @@ class PublishItem:
     ref_uri: str                   # burrowl://owner/record@rev#sha（写入外部元数据，便于人工回溯）
     tags: tuple[str, ...] = ()
     metadata: dict[str, str] = field(default_factory=dict)
+    # 交换格式（R12 T-P3.3）：渲染好的库内相对路径与 YAML 头字段。只有写 Markdown 库的连接器使用，其他连接器忽略。
+    path: str | None = None
+    front_matter: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -108,6 +111,20 @@ class SupportsWiki(Protocol):
     def wiki_write(self, collection: Collection, page: WikiPage) -> WikiPage: ...
     def wiki_delete(self, collection: Collection, slug: str) -> None: ...
     def wiki_configure(self, collection: Collection, *, auto: bool, synthesis_model_id: str | None) -> dict: ...
+
+
+@dataclass(frozen=True)
+class CandidateLink:
+    """外部工具发现的关系线索（R12 T-P4.3）：两端是已发布条目的 local_key。只进入候选，从不直接写成记录。"""
+    src_local_key: str
+    dst_local_key: str
+    kind: str = "related"          # 外部工具自己的关系名或类别
+    score: float = 0.0
+
+
+@runtime_checkable
+class SupportsCandidates(Protocol):
+    def candidates(self, collection: Collection, limit: int = 200) -> list[CandidateLink]: ...
 
 
 class ConnectorError(Exception):

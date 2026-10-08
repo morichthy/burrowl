@@ -3,6 +3,7 @@
 复核只有一套存储：每条结论至多一条当前 review 记录，修改复核即产生它的新修订。
 "accepted" 需要明确的适用范围和支持性证据，并检查整条依赖链；
 其余状态（质疑、撤回、替代、改回未复核）只需理由。
+成熟度（R12 §4.8）随复核一起登记；AI 不能登记 established，只能提出升级（maturity-requested），由人确认。
 """
 import uuid
 from typing import Any
@@ -14,8 +15,9 @@ from .memory.claims import ClaimGraph
 from .memory.context import Storage
 from .memory.service import MemoryService
 
-QUEUE_STATES = ("not-reviewed", "stale", "disputed", "upstream-blocked", "accepted", "retracted", "superseded")
-DEFAULT_QUEUE = ("not-reviewed", "stale", "disputed", "upstream-blocked")
+QUEUE_STATES = ("not-reviewed", "stale", "disputed", "upstream-blocked", "maturity-requested", "accepted", "retracted",
+                "superseded")
+DEFAULT_QUEUE = ("not-reviewed", "stale", "disputed", "upstream-blocked", "maturity-requested")
 
 
 def claim_lookup_factory(storage: Storage):
@@ -52,9 +54,10 @@ class ReviewService:
             if owner_id and record["owner_id"] != owner_id or record["sensitivity"] == "restricted":
                 continue
             state = graph.claim_state(cid)
+            maturity = graph.maturity(cid)
             status = ("stale" if state["stale"] else
                       "upstream-blocked" if state["review_state"] == "accepted" and state["upstream_blocked"]
-                      else state["review_state"])
+                      else "maturity-requested" if maturity["requested_maturity"] else state["review_state"])
             counts[status] += 1
             text = f"{claim['statement']} {record['title']}".casefold()
             if status not in wanted or (query and query.casefold() not in text):
@@ -64,7 +67,7 @@ class ReviewService:
                           "owner_id": record["owner_id"], "record_id": record["record_id"],
                           "record_title": record["title"], "record_kind": record["kind"],
                           "content_hash": record["content_hash"], "claim_sha256": state["sha256"],
-                          "evidence_refs": claim["evidence_refs"],
+                          "evidence_refs": claim["evidence_refs"], **maturity, "stats": graph.stats(cid),
                           "review": review["payload"] | {"revision": review["revision"],
                                                          "updated_at": review["updated_at"]} if review else None,
                           # "尚未复核"本身已由 status 表达，problems 只列其他原因（失效、上游阻断等）。

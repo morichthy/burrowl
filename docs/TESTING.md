@@ -52,12 +52,19 @@
 - 工作根：工作目录内的来源自动归根；整体搬家必须指纹一致；备份带外部原件，恢复按映射/原位/默认目录重定向，冲突时不写任何文件（`tests/service/test_work_roots.py`）。
 - 来源内容变化后，引用它的结论显示依据失效。
 
+**记录契约与链接**
+
+- 契约只做增量：浮点样例全部记录的 content_hash、record_hash、结论指纹不变（`tests/service/test_links.py`）。
+- handle 唯一、不可修改；链接的每种写法能解析，歧义和找不到时报错带候选，未解析的概念不阻塞；修订时未改动的链接保持原固定版本，repin 才更新。
+- 概念库内有效概念的名称与别名唯一；合并后新链接转向保留页。
+
 **复核**
 
 - 内容变化后复核失效。
 - accepted 必须有范围与证据。
 - 正式用途只输出范围内已确认的结论。
 - 复核过滤在检索中生效。
+- 成熟度：执行者为 ai 时不能登记 established（PERMISSION_DENIED）；replicated 需要两份独立依据；established 需要证据类型；升级提议出现在队列中，由人确认后消失。
 
 **阅读会话**（程序替 AI 守的规则，每条都要有测试）
 
@@ -89,7 +96,20 @@
 **检索、表示或语义变化**
 
 - 范围与排除、固定引用、正式准入、预算、复核过滤。
-- 涉及效果的改动，要比较准确度、召回、错误关联、延迟和上下文成本（评估集暂缺，见 [ARCHITECTURE 已知差距](../ARCHITECTURE.md#已知差距)）。
+- 涉及效果的改动，要比较准确度、召回、错误关联、延迟和上下文成本，方案见 [R12 设计稿 §7](design/R12_KNOWLEDGE_GRAPH_RETRIEVAL.md#7-评估方案)。改动前后各跑一次、只改一个变量：
+
+  ```
+  uv run python tools/eval_retrieval.py --data-dir tests/fixtures/workspace --set tests/fixtures/eval/floating-point.jsonl --scratch --label <名称>
+  ```
+
+  样例题集只有 13 题，只看相对变化；真实数据目录的题集放在 `<数据目录>/eval/`（去掉 `--scratch`）。`--channels dense` 单看向量通道。
+- 改了嵌入模型或分窗：必须用真实模型（`real_model`）验证窗口不超过模型的真实输入上限。假向量测试发现不了截断问题（E6）。换模型或切窗规则后，旧向量水位必须显示为 stale 并在 reconcile 时重建。
+- 图投影与图路线（`tests/service/test_graph.py`）：
+  - 关闭时检索结果与没有图路线时完全一致；
+  - 只返回当前投影、通过同样过滤（层级、类型、复核、敏感级别、owner_only）的条目；
+  - rejected / withdrawn 关联和失效结论的快捷边不参与扩展；
+  - 预算上限生效并报告缺口；
+  - 打开图路线前后，按题型比较评估结果（尤其是 multihop 与 fact 类的副作用）。
 
 ## 结果怎样记录
 

@@ -54,7 +54,9 @@ EXAMPLES = {
               [FILE_R01], "登记第一轮原始结果，供技术单元固定引用", ["浮点求和", "原始结果"])),
     "detail": (
         "L1 技术单元：完整正文只放 payload.blocks，body_markdown 必须为空字符串；retrieval_description 是检索用摘要，"
-        "不是正文。unit_type=experiment 时 run_ref 必须是真实 Run；结果块用 requires_block_ids 声明依赖的定义块。",
+        "不是正文。unit_type=experiment 时 run_ref 必须是真实 Run；结果块用 requires_block_ids 声明依赖的定义块。"
+        "L1 可以写 fact / calculation 类结论并用 block_id 指向结果块；块正文里用 [[概念]] 链接概念库中的概念，"
+        "handle 是给 [[@handle]] 链接用的可读短名（不填按标题生成，创建后不能改）。",
         draft("detail", "顺序求和误差的精确基准计算方法", "",
               {"unit_type": "method", "run_ref": None, "evidence_refs": [rel(FILE_R01, "supports")], "figures": [],
                "missing_refs": [],
@@ -71,9 +73,12 @@ EXAMPLES = {
                                 "精确参考 $S_{\\mathrm{ref}}=\\sum_i \\operatorname{Fraction}(x_i)$，"
                                 "绝对误差 $e=|\\operatorname{Fraction}(\\widehat S)-S_{\\mathrm{ref}}|$，均无量纲。"},
                    {"block_id": "method", "role": "methods", "requires_block_ids": ["definitions"],
-                    "markdown": "## 方法\n\n逐项读取输入，分别用顺序求和与 Kahan 补偿求和得到 $\\widehat S$，"
-                                "再与 $S_{\\mathrm{ref}}$ 比较。依据：第一轮原始结果 [SRC-SUMMATION-R01]。"}]},
-              [FILE_R01], "保存可复用的基准计算方法", ["浮点求和", "精确基准"])),
+                    "markdown": "## 方法\n\n逐项读取输入，分别用顺序求和与 [[补偿求和]] 得到 $\\widehat S$，"
+                                "再与 $S_{\\mathrm{ref}}$ 比较。依据：第一轮原始结果 [SRC-SUMMATION-R01]。"}],
+               "claims": [claim("CLM-FP-精确基准分离误差", "用有理数精确基准可以把求和误差与输入表示误差分开",
+                                "有限 binary64 输入、无量纲数列", [rel(FILE_R01, "supports")], kind="calculation")
+                          | {"block_id": "method"}]},
+              [FILE_R01], "保存可复用的基准计算方法", ["浮点求和", "精确基准"]) | {"handle": "精确基准计算方法"}),
     "narrative": (
         "L2 经过：body_markdown 写 背景 → 实际尝试、选择理由、观察与转折 → 简单结论和未决问题；"
         "stages 至少一段（situation/action/reason/outcome/evidence_refs）。需要复核的结论写进 claims。",
@@ -171,20 +176,26 @@ EXAMPLES = {
               [GOAL, NARR, DETAIL], "保存交接检查点")),
     "association": (
         "关联（level=null）：相似、对照、依赖等导航关系，不是证据。analogous_to 必须写 shared_structure 与 "
-        "transfer_limits。通常先由 relations.associations 产生候选，再用 relations.decide 处理；手写时 status=candidate。",
+        "transfer_limits。certainty 写确定度（speculative / plausible / supported），origin 写提出者（human / ai）。"
+        "通常先由 relations.candidates 产生候选，再用 relations.decide 处理；快速添加只给 from/to/explanation，"
+        "自动设为 related_to + speculative。\"A 会影响 B\"这类可验证的判断写成结论，不写成关联。",
         draft("association", "补偿经验与第三轮经过的同一失败模式", "",
               {"from": rel(EXP, "same_failure_mode"), "to": rel(NARR, "same_failure_mode"),
                "relation": "same_failure_mode", "explanation": "两者都记录了补偿项被抵消吞没的失败",
                "shared_structure": None, "transfer_limits": [], "differences": [], "basis_refs": [EXP, NARR],
-               "status": "candidate", "missing_refs": []},
+               "status": "candidate", "missing_refs": [], "certainty": "plausible", "origin": "ai"},
               [EXP, NARR], "登记导航关联")),
     "wiki_page": (
-        "Wiki 页面（level=null）：宿主 AI 编写、经 hub.plan/hub.apply 发布到知识中枢；slug 为 <类型>/<名称>，"
+        "Wiki 页面（level=null）。概念页（page_type=concept/entity）写在全库唯一的概念库对象里（配置 "
+        "graph.concept_owner_id）：标题和别名就是概念的身份，同名不同义用限定名（如\u201c收敛（数值）\u201d）；"
+        "只为被实质讨论过、或至少出现在两条记录中的概念建页，正文可以只是一句短定义。合并用 status=merged + "
+        "merged_into，拆分用 status=split + split_into，从不删除。slug 可省略（只给外部中枢用，格式 <类型>/<名称>）；"
         "source_refs 必须是固定引用。",
         draft("wiki_page", "补偿求和",
               "补偿求和（Kahan 求和）在每一步保存舍入误差并在下一步补回，能减小一般输入的舍入误差；"
-              "在大数抵消输入上仍可能丢失小量，需要用精确基准核对。",
-              {"slug": "concept/compensated-summation", "page_type": "concept", "aliases": ["Kahan 求和"],
+              "在 [[大数抵消]] 输入上仍可能丢失小量，需要用精确基准核对。",
+              {"page_type": "concept", "aliases": ["Kahan 求和", "compensated summation"],
+               "concept_kind": "method", "domains": ["数值计算"], "category_path": ["算法", "求和"],
                "source_refs": [EXP, DETAIL], "missing_refs": []},
               [EXP, DETAIL], "整理概念页")),
 }

@@ -44,10 +44,10 @@
   - `burrowl call`：命令行调用任意操作。
 - **存储**：
   - 规范记忆是 Owner 内的不可变文件提交（JSON）。
-  - 检索用一个 SQLite 文件：FTS5 全文，加 sqlite-vec 向量（按模型指纹分表）。
+  - 检索用一个 SQLite 文件：FTS5 全文，加 sqlite-vec 向量（按模型指纹隔离），以及图投影（节点、边）和关联候选。
   - 阅读会话用"不可变修订 + CAS"文档存储。
 - **模型**：
-  - 嵌入：fastembed 的多语言 MiniLM-384（ONNX，离线）。
+  - 嵌入：fastembed 的多语言 MiniLM-384（ONNX，离线，输入上限 128 token）。可选 Qwen3-Embedding-0.6B-Q（`burrowl models install --embedding-model qwen3-0.6b-q`，32k 上限，CPU 上明显更慢、更占内存；实测见 R12 设计稿 §10）。
   - 重排：可选的 ONNX Cross-encoder。
   - 模型统一放在 `%LOCALAPPDATA%\burrowl\models`，所有数据目录共用。
 - **前端**：React + Vite，构建产物随发行包分发，使用端不需要 Node。
@@ -69,15 +69,15 @@ core         记录模型与校验、契约说明、哈希、原子写与锁、�
 
 | 模块 | 职责与代码入口 | 变化时检查的关联 |
 |---|---|---|
-| CORE 记录契约 | `core/records.py`（校验与领域规则）、`core/schema/`（memory.schema.json 与草案示例）、`core/contract.py`（给 AI 的契约说明） | 所有读写记录的服务、`memory.contract`、草案示例测试、前端类型、Skill 与 RECORDING |
+| CORE 记录契约 | `core/records.py`（校验与领域规则）、`core/schema/`（memory.schema.json 与草案示例）、`core/contract.py`（给 AI 的契约说明）、`core/links.py`（链接语法与 handle 生成） | 所有读写记录的服务、`memory.contract`、草案示例测试、前端类型、Skill 与 RECORDING；契约只做增量，已有指纹必须不变（`tests/service/test_links.py`） |
 | STORE 规范存储 | `storage/memory_store.py`（提交、CAS、幂等、暂存回读、恢复）、`storage/owners.py`（对象发现、业务卡、核心算法准入）、`storage/sources.py`（来源登记）、`core/atomic.py`（锁） | 所有服务；备份恢复；validate |
-| MEM 记忆服务 | `services/memory/`：service（提交与读取过滤）、claims（结论与复核图）、documents（文稿）、history、raw_materials、provenance（影响与血缘）、associations、consolidation、export | REVIEW、QUERY、READ、HUB 的读取者；工作台记忆页；work 与 consolidate Skill |
+| MEM 记忆服务 | `services/memory/`：service（提交与读取过滤、handle）、links（链接解析与重新固定）、concepts（概念库约束与术语扩展）、claims（结论、复核图、成熟度与派生统计）、documents（文稿）、history、raw_materials、provenance（影响与血缘）、associations、consolidation、export | REVIEW、QUERY、READ、HUB 的读取者；工作台记忆页；work 与 consolidate Skill |
 | REVIEW 复核 | `services/review.py`、`services/memory/claims.py` | 检索的复核类别、正式用途、中枢发布策略、复核页 |
-| IDX 检索 | `index/`（db、projections、fusion、query_plan、rerank、conditions、extract、embed、model_store）、`services/indexing.py` | QUERY、READ 的召回；模型安装；索引重建；发现可见性语义 |
+| IDX 检索 | `index/`（db、projections（含上下文信封）、graph（图投影）、fusion、query_plan、rerank、conditions、extract、embed、model_store）、`services/indexing.py`（同步、图路线、关联候选、缺口） | QUERY、READ 的召回；关系图页；模型安装；索引重建；发现可见性语义；评估脚本 `tools/eval_retrieval.py` |
 | QUERY 材料查询 | `services/query/`（search、page、assemble、expand、deepen、documents，以及预算） | 检索页；read Skill 的片段模式；context_reach 语义 |
 | READ 阅读会话 | `services/reading/`（service、screening、notes、text、session） | 阅读会话页（SSE）；read Skill；配置中的阅读默认值与预算 |
 | HUB 知识中枢 | `services/hub.py`、`storage/hub_state.py`、`connectors/`（spi、registry、fake、mdvault），以及独立包 `burrowl-connector-weknora` | 发布策略与复核类别；中枢页；wiki_page 记录；合约测试 |
-| MAINT 维护与监测 | `services/maintenance.py`、`services/monitor.py`、`services/relations.py` | 维护页、关系图页；consolidate Skill |
+| MAINT 维护与监测 | `services/maintenance.py`、`services/monitor.py`、`services/relations.py`（读取图投影、关联候选） | 维护页、关系图页；consolidate Skill |
 | CFG 配置 | `core/config.py`（BurrowlConfig）、`services/config.py`（CAS 与影响提示）、`storage/config_store.py`、`storage/secrets.py` | 所有读取默认值的服务；设置页；MCP 工具组 |
 | PORT 可移植包 | `portable/bundle.py`（burrowl-bundle 备份、校验、恢复） | 数据目录布局变化；排除规则 |
 | APP 入口 | `interfaces/`（ops 注册表、api、mcp、cli）、`app.py`、`frontend/` | 同一操作在 HTTP/MCP/CLI/前端的一致性；生成类型；effect 分类 |
@@ -92,12 +92,15 @@ core         记录模型与校验、契约说明、哈希、原子写与锁、�
 | 规范内容与历史 | Owner 的 `memory_home`：commits、HEAD.json、请求回执；由 MemoryStore 管理 | 单 Owner 提交可见；旧修订不改写；没有跨 Owner 事务 |
 | 来源授权 | `.burrowl/sources.json`（工作根 roots + 来源 sources；工作目录里的来源记为"根 + 相对路径"） | 搬家只改位置且必须指纹一致；登记不能被 agent 改写，只有用户能停用或降低敏感级别。文件内容变化后，引用它的结论显示依据失效 |
 | 复核 | 各 Owner 中的 review 记录 | 绑定内容指纹；内容变化即失效 |
-| 检索投影 | `.burrowl/index/index.sqlite3`：每个 (Owner, 投影, 通道) 的水位绑定 HEAD、投影版本和模型指纹 | 可删除重建；pending/stale 的投影如实报告 |
+| 检索投影 | `.burrowl/index/index.sqlite3`：每个 (Owner, 投影, 通道) 的水位绑定 HEAD、投影版本和模型指纹；图投影（corpus=graph）与关联候选也在这里 | 可删除重建；结构版本不符时整库清空重建；pending/stale 的投影如实报告。边由声明它的对象负责，另一端缺失时查询排除并计入悬空数 |
+| 概念库 | 全库唯一的 knowledge 对象（`knowledge/<slug>/knowledge.json`），由配置 `graph.concept_owner_id` 指定 | 概念页是普通 wiki_page 记录；名称唯一性只在概念库内检查；未配置时概念链接都记为未解析 |
+| 成熟度 | review 记录的 `maturity` 等字段 | 不写进结论或记录正文；随复核失效；派生统计不持久化 |
 | 配置 | `.burrowl/config.json`（revision = 内容指纹，CAS 写入） | 密钥只存引用，明文在 Windows 凭据管理器 |
 | 阅读会话 | `.burrowl/sessions/reading/RS-*/`（HEAD + 不可变修订） | 用户工作数据，不是缓存；笔记固定写作时的对象 HEAD |
 | 维护计划 | `.burrowl/plans/MP-*/`（不可变计划修订） | 与规范提交分开；可能逐对象部分完成 |
 | 监测 | `.burrowl/monitor/`：基线、观察记录、候选状态 | 只是观察，不改证据；扫描不完整时不更新基线 |
 | 中枢映射 | `.burrowl/hub/state.sqlite3` | 派生状态，丢失后按外部元数据中的 local_key 认领 |
+| 交换包 | 数据目录的 `exports/<名称>/`（manifest、vault、graph），由 `exchange.export` 生成 | 派生数据，可以删除重建；不进备份包；在其中的修改不会回到 burrowl |
 | 外部中枢内容 | WeKnora 等 | 派生副本，可以由本地重新发布 |
 | 工作台偏好 | `.burrowl/workbench/`（关系图视图、随手笔记） | 本机偏好，不是研究记录 |
 | 当前任务上下文 | 任务的 Markdown 工作清单，由 AI 编辑 | 不是后台同步的状态；检查点保存交接时点 |
@@ -112,7 +115,9 @@ core         记录模型与校验、契约说明、哈希、原子写与锁、�
 1. 校验、解析引用，核对固定字节与授权；
 2. 锁内暂存并回读；
 3. 原子切换 HEAD；
-4. 同步更新该 Owner 的检索投影。
+4. 同步更新该 Owner 的检索投影、图投影，并为变化的记录计算关联候选。
+
+handle 分配和正文链接解析发生在第 1 步（`MemoryService.prepare`）。
 
 索引失败时，内容仍然已保存（回执显示 pending），由 `index.reconcile` 补偿，不重复提交。
 
@@ -138,6 +143,8 @@ core         记录模型与校验、契约说明、哈希、原子写与锁、�
 - 融合用 RRF，排序不代表科学可信度。
 - 查询有累计预算（时间、读取、输出、候选）；阅读会话的召回轮次也受预算约束。
 - 嵌入模型或重排模型缺失时：关键词检索照常，向量通道报告未就绪，重排报告不可用。重排设为 `required` 时，模型缺失直接报错。
+- 图路线默认关闭（`index.graph_route.enabled`）。打开后在材料查询和阅读会话的召回中作为一路参与 RRF，按查询预算的 graph_nodes / graph_edges 限制扩展，超出时报告缺口。
+- 中枢路线默认关闭（`index.hub_route.connectors` 为空）。打开后材料查询并行调用外部检索，命中映射回本地并经同样过滤后参与 RRF；外部超时或出错时只报告缺口，结果仍来自本地。
 
 ### 知识中枢
 
@@ -160,7 +167,10 @@ core         记录模型与校验、契约说明、哈希、原子写与锁、�
 ### 已知差距
 
 - Qdrant 服务器适配器未实现：sqlite-vec 是暴力检索，约 10 万向量以上需要它。
-- 检索质量评估集未建立。
+- 检索评估只有浮点样例的小题集（13 题，`tools/eval_retrieval.py`），只能看相对变化；基于真实数据目录的 40–60 题评估集待用户抽查后建立（R12 的 T-P0.2）。样例只有一个对象、没有链接和结论，图路线在上面没有可测的收益。
+- 默认 MiniLM 的输入上限只有 128 token，长记录被切成很多小窗口；Qwen3 长上下文模型已可选安装，是否改为默认待用户根据实测决定（R12 §10）。
+- 交换包尚未在 Obsidian 中人工验收（R12 AC-P3）。
+- LightRAG 连接器暂停：自定义图导入不能按文档删除，方案待用户选择（R12 设计稿 §10）。中枢路线（`index.hub_route`）已实现，默认关闭。
 - WeKnora 连接器只用模拟接口测试，尚未连真实服务实测。
 - 宿主 token 用量不由本项目保证。
 - 第二台物理机安装与真实业务验收尚未进行。

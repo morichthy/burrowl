@@ -18,6 +18,14 @@
 - [DEVELOPMENT_HISTORY](DEVELOPMENT_HISTORY.md)：选择理由、删除的功能、历史错误和未决讨论。讨论全局方案前完整阅读。
 - [GLOSSARY](GLOSSARY.md)：术语的权威定义。
 
+## 进行中的设计稿（design/）
+
+设计稿是可直接指导代码变更的计划，带稳定的决定编号和任务编号，以及进度记录。实现完成后，稳定的说明迁移到 CORE / ARCHITECTURE，设计稿保留为历史。
+
+| 设计稿 | 内容 | 状态 |
+|---|---|---|
+| [R12 知识图谱与检索升级](design/R12_KNOWLEDGE_GRAPH_RETRIEVAL.md) | 修复向量截断与建立评估集、长上下文嵌入与上下文信封、整理图（概念、结论关系、关联、成熟度）、图投影与图路线、交换格式、外部连接器 | 已定方案，未实施 |
+
 ## 面向 AI 的方法源（skills/）
 
 | 文件 | 内容 |
@@ -33,6 +41,7 @@
 | 某个工具有哪些参数 | [reference/ops.md](reference/ops.md)（自动生成） |
 | 某类记录的字段和示例 | 调用 `memory.contract(kind)`；示例文件在 `packages/burrowl/src/burrowl/core/schema/examples/` |
 | 配置项与默认值 | [reference/config.md](reference/config.md)（自动生成） |
+| 交换包（Markdown 库 + 图 JSONL）的格式与兼容规则 | [reference/exchange-format.md](reference/exchange-format.md) |
 | 部署 WeKnora | [deploy/weknora/README.md](../deploy/weknora/README.md) |
 | 打包与离线安装 | [packaging/build.py](../packaging/build.py) 的说明、README 的"安装"一节 |
 | 源项目的功能在新项目中的对应情况 | [MIGRATION_AUDIT](MIGRATION_AUDIT.md) |

@@ -157,6 +157,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -195,7 +206,8 @@
       "prerequisite",
       "analogous_to",
       "used_in",
-      "references"
+      "references",
+      "related_to"
      ]
     },
     "explanation": {
@@ -249,6 +261,20 @@
       "$ref": "#/$defs/UnresolvedRef"
      },
      "minItems": 0
+    },
+    "certainty": {
+     "enum": [
+      "speculative",
+      "plausible",
+      "supported"
+     ]
+    },
+    "origin": {
+     "type": "string",
+     "minLength": 1
+    },
+    "observed_in": {
+     "$ref": "#/$defs/Ref"
     }
    },
    "required": [
@@ -375,6 +401,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -516,6 +553,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -720,6 +768,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -778,6 +837,33 @@
       "$ref": "#/$defs/SourceRef"
      },
      "minItems": 0
+    },
+    "block_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "relation": {
+     "type": "object",
+     "properties": {
+      "subject": {
+       "type": "string",
+       "minLength": 1
+      },
+      "predicate": {
+       "type": "string",
+       "minLength": 1
+      },
+      "object": {
+       "type": "string",
+       "minLength": 1
+      }
+     },
+     "required": [
+      "subject",
+      "predicate",
+      "object"
+     ],
+     "additionalProperties": false
     }
    },
    "required": [
@@ -1087,6 +1173,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -1267,6 +1364,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -1408,6 +1516,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -1553,6 +1672,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -1694,6 +1824,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -1887,6 +2028,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -2028,6 +2180,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -2219,6 +2382,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -2361,6 +2535,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -2593,6 +2778,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -2945,6 +3141,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -3124,6 +3331,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -3265,6 +3483,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -3447,6 +3676,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -3743,6 +3983,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -4020,6 +4271,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -4107,6 +4369,9 @@
     },
     "draft": {
      "$ref": "#/$defs/RequestDraft"
+    },
+    "repin": {
+     "type": "boolean"
     }
    },
    "required": [
@@ -4228,6 +4493,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -4441,6 +4717,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -4674,6 +4961,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -4865,6 +5163,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -5006,6 +5315,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -5209,6 +5529,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -5341,7 +5672,10 @@
       "contains",
       "precedes",
       "member_of",
-      "similar_structure"
+      "similar_structure",
+      "related_to",
+      "subject_of",
+      "object_of"
      ]
     }
    },
@@ -5491,6 +5825,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -5662,6 +6007,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -5862,6 +6218,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -5940,6 +6307,27 @@
       "$ref": "#/$defs/UnresolvedRef"
      },
      "minItems": 0
+    },
+    "maturity": {
+     "enum": [
+      "conjecture",
+      "preliminary",
+      "replicated",
+      "established"
+     ]
+    },
+    "evidence_basis": {
+     "enum": [
+      "engineering_case",
+      "proof",
+      "authoritative_source",
+      "replication"
+     ]
+    },
+    "requested_maturity": {
+     "enum": [
+      "established"
+     ]
     }
    },
    "required": [
@@ -6066,6 +6454,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -6233,6 +6632,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -6436,6 +6846,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -6601,6 +7022,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -6776,6 +7208,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -6903,6 +7346,13 @@
       "$ref": "#/$defs/UnresolvedRef"
      },
      "minItems": 0
+    },
+    "claims": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Claim"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -6976,7 +7426,6 @@
   "WikiPagePayload": {
    "type": "object",
    "required": [
-    "slug",
     "page_type",
     "aliases",
     "source_refs"
@@ -7016,6 +7465,51 @@
      "items": {
       "$ref": "#/$defs/UnresolvedRef"
      }
+    },
+    "concept_kind": {
+     "enum": [
+      "method",
+      "phenomenon",
+      "failure_mode",
+      "tool",
+      "dataset",
+      "material",
+      "metric",
+      "other"
+     ]
+    },
+    "domains": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "category_path": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "status": {
+     "enum": [
+      "active",
+      "merged",
+      "split"
+     ]
+    },
+    "merged_into": {
+     "$ref": "#/$defs/Ref"
+    },
+    "split_into": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     },
+     "minItems": 1
     }
    }
   },
@@ -7132,6 +7626,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -7261,6 +7766,17 @@
     "content_hash": {
      "type": "string",
      "minLength": 1
+    },
+    "handle": {
+     "type": "string",
+     "minLength": 1
+    },
+    "links": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Link"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -7405,6 +7921,37 @@
      "$ref": "#/$defs/WikiPageRecordV1"
     }
    ]
+  },
+  "Link": {
+   "type": "object",
+   "properties": {
+    "text": {
+     "type": "string",
+     "minLength": 1
+    },
+    "ref": {
+     "oneOf": [
+      {
+       "$ref": "#/$defs/Ref"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "status": {
+     "enum": [
+      "resolved",
+      "unresolved_concept"
+     ]
+    }
+   },
+   "required": [
+    "text",
+    "ref",
+    "status"
+   ],
+   "additionalProperties": false
   }
  }
 }
