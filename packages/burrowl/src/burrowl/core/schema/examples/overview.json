@@ -1,0 +1,95 @@
+{
+  "kind": "overview",
+  "note": "L4 概览：对象的发现入口，不读下层也能知道 用途与范围 → 主要方法 → 当前结果/状态 → 限制与未决。长期复用的 Owner 至少维护一条；短经验可以只有一条自足的 L4。",
+  "operation": {
+    "op": "put_record",
+    "client_key": "new-overview",
+    "draft": {
+      "owner_id": "RES-FLOATING-POINT-SUMMATION",
+      "kind": "overview",
+      "title": "浮点求和数值稳定性研究概览",
+      "keywords": [
+        "浮点求和",
+        "概览"
+      ],
+      "body_markdown": "## 用途与范围\n\n研究有限 binary64 数列求和时顺序与补偿对误差的影响，重点是大数抵消场景。\n\n## 当前结果\n\n顺序与 Kahan 补偿在构造的抵消输入上都可能丢失小量；以有理数精确基准为判断依据。\n\n## 限制与未决\n\n只覆盖构造输入；随机输入与成对求和尚未研究。",
+      "record_reason": "维护对象的顶层发现入口",
+      "sensitivity": "internal",
+      "sources": [
+        {
+          "target_kind": "record",
+          "target_id": "MEM-58fd845a-05a5-516c-8bbe-c88d887cbb91",
+          "revision": 6,
+          "sha256": "e5fc7cb2327f0b0412166c545c6ae9e862dad0692c0038775dcb4deb0766e3c2",
+          "locator": "record",
+          "relation": "references"
+        },
+        {
+          "target_kind": "record",
+          "target_id": "MEM-77b35d77-f6c1-5d05-80a1-7c3b9d5e9d09",
+          "revision": 4,
+          "sha256": "9918032b4a47d068d2056472853db83cee83c46cbb13501bac91b32458d203ed",
+          "locator": "record",
+          "relation": "references"
+        },
+        {
+          "target_kind": "record",
+          "target_id": "MEM-4acc73bb-59c7-560d-9415-fd42e9dcaa2d",
+          "revision": 1,
+          "sha256": "ba12342c6ca8afa0a1760dc517fd7bff2d1b60c7f082ee9113e419572834df51",
+          "locator": "record",
+          "relation": "references"
+        }
+      ],
+      "provenance_gap": null,
+      "payload": {
+        "question": "求和顺序与补偿如何影响抵消场景的误差",
+        "methods": [
+          "有理数精确基准",
+          "顺序与补偿对照"
+        ],
+        "results": [
+          "抵消输入上补偿仍可能丢失小量"
+        ],
+        "current_stage": "三轮实验已完成，扩展研究未开始",
+        "limitations": [
+          "仅构造输入"
+        ],
+        "open_questions": [
+          "成对求和是否更稳健"
+        ],
+        "claims": [],
+        "experience_refs": [
+          {
+            "target_kind": "record",
+            "target_id": "MEM-58fd845a-05a5-516c-8bbe-c88d887cbb91",
+            "revision": 6,
+            "sha256": "e5fc7cb2327f0b0412166c545c6ae9e862dad0692c0038775dcb4deb0766e3c2",
+            "locator": "record",
+            "relation": "references"
+          }
+        ],
+        "process_refs": [
+          {
+            "target_kind": "record",
+            "target_id": "MEM-77b35d77-f6c1-5d05-80a1-7c3b9d5e9d09",
+            "revision": 4,
+            "sha256": "9918032b4a47d068d2056472853db83cee83c46cbb13501bac91b32458d203ed",
+            "locator": "record",
+            "relation": "references"
+          }
+        ],
+        "technical_refs": [
+          {
+            "target_kind": "record",
+            "target_id": "MEM-4acc73bb-59c7-560d-9415-fd42e9dcaa2d",
+            "revision": 1,
+            "sha256": "ba12342c6ca8afa0a1760dc517fd7bff2d1b60c7f082ee9113e419572834df51",
+            "locator": "record",
+            "relation": "references"
+          }
+        ]
+      }
+    }
+  }
+}

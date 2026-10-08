@@ -1,0 +1,47 @@
+{
+  "kind": "goal",
+  "note": "目标（level=null）：持续工作的目标、约束与成功标准；修改目标时引用上一目标并写 change_impact。",
+  "operation": {
+    "op": "put_record",
+    "client_key": "new-goal",
+    "draft": {
+      "owner_id": "RES-FLOATING-POINT-SUMMATION",
+      "kind": "goal",
+      "title": "扩展到随机输入的求和误差研究",
+      "keywords": [],
+      "body_markdown": "",
+      "record_reason": "登记扩展研究目标",
+      "sensitivity": "internal",
+      "sources": [
+        {
+          "target_kind": "record",
+          "target_id": "MEM-3090dc56-e320-5db7-8489-e0bff4d9a153",
+          "revision": 1,
+          "sha256": "942b428430701fe15176250bd73d682b6c10379ba2ae1ef07afc5d8e0410c4f7",
+          "locator": "record",
+          "relation": "references"
+        }
+      ],
+      "provenance_gap": null,
+      "payload": {
+        "objective": "在随机抵消输入上比较顺序、补偿与成对求和",
+        "constraints": [
+          "只用有限 binary64 输入"
+        ],
+        "success_criteria": [
+          "每种方法给出误差分布与反例"
+        ],
+        "previous_goal_ref": {
+          "target_kind": "record",
+          "target_id": "MEM-3090dc56-e320-5db7-8489-e0bff4d9a153",
+          "revision": 1,
+          "sha256": "942b428430701fe15176250bd73d682b6c10379ba2ae1ef07afc5d8e0410c4f7",
+          "locator": "record",
+          "relation": "references"
+        },
+        "change_impact": "在原目标基础上扩大输入范围",
+        "missing_refs": []
+      }
+    }
+  }
+}

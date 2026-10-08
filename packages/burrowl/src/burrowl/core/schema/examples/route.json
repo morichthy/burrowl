@@ -1,0 +1,46 @@
+{
+  "kind": "route",
+  "note": "路线（level=null）：为某个目标采取的一条假设与做法；受阻时写 blocker 与 reopen_condition。",
+  "operation": {
+    "op": "put_record",
+    "client_key": "new-route",
+    "draft": {
+      "owner_id": "RES-FLOATING-POINT-SUMMATION",
+      "kind": "route",
+      "title": "用成对求和作为新对照",
+      "keywords": [],
+      "body_markdown": "",
+      "record_reason": "规划研究路线",
+      "sensitivity": "internal",
+      "sources": [
+        {
+          "target_kind": "record",
+          "target_id": "MEM-3090dc56-e320-5db7-8489-e0bff4d9a153",
+          "revision": 1,
+          "sha256": "942b428430701fe15176250bd73d682b6c10379ba2ae1ef07afc5d8e0410c4f7",
+          "locator": "record",
+          "relation": "references"
+        }
+      ],
+      "provenance_gap": null,
+      "payload": {
+        "goal_ref": {
+          "target_kind": "record",
+          "target_id": "MEM-3090dc56-e320-5db7-8489-e0bff4d9a153",
+          "revision": 1,
+          "sha256": "942b428430701fe15176250bd73d682b6c10379ba2ae1ef07afc5d8e0410c4f7",
+          "locator": "record",
+          "relation": "references"
+        },
+        "hypothesis": "成对求和能减少抵消场景的小量丢失",
+        "status": "planned",
+        "attempt_refs": [],
+        "blocker": null,
+        "next_step": "实现成对求和并复用精确基准",
+        "reopen_condition": "无",
+        "replacement_ref": null,
+        "missing_refs": []
+      }
+    }
+  }
+}

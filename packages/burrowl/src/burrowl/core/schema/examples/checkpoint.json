@@ -1,0 +1,85 @@
+{
+  "kind": "checkpoint",
+  "note": "检查点（level=null）：交接时点的状态：已完成什么、下一步、前提与停止原因。续接时 memory.resume 会读它。",
+  "operation": {
+    "op": "put_record",
+    "client_key": "new-checkpoint",
+    "draft": {
+      "owner_id": "RES-FLOATING-POINT-SUMMATION",
+      "kind": "checkpoint",
+      "title": "三轮实验完成，扩展研究待开始",
+      "keywords": [],
+      "body_markdown": "",
+      "record_reason": "保存交接检查点",
+      "sensitivity": "internal",
+      "sources": [
+        {
+          "target_kind": "record",
+          "target_id": "MEM-3090dc56-e320-5db7-8489-e0bff4d9a153",
+          "revision": 1,
+          "sha256": "942b428430701fe15176250bd73d682b6c10379ba2ae1ef07afc5d8e0410c4f7",
+          "locator": "record",
+          "relation": "references"
+        },
+        {
+          "target_kind": "record",
+          "target_id": "MEM-77b35d77-f6c1-5d05-80a1-7c3b9d5e9d09",
+          "revision": 4,
+          "sha256": "9918032b4a47d068d2056472853db83cee83c46cbb13501bac91b32458d203ed",
+          "locator": "record",
+          "relation": "references"
+        },
+        {
+          "target_kind": "record",
+          "target_id": "MEM-4acc73bb-59c7-560d-9415-fd42e9dcaa2d",
+          "revision": 1,
+          "sha256": "ba12342c6ca8afa0a1760dc517fd7bff2d1b60c7f082ee9113e419572834df51",
+          "locator": "record",
+          "relation": "references"
+        }
+      ],
+      "provenance_gap": null,
+      "payload": {
+        "goal_ref": {
+          "target_kind": "record",
+          "target_id": "MEM-3090dc56-e320-5db7-8489-e0bff4d9a153",
+          "revision": 1,
+          "sha256": "942b428430701fe15176250bd73d682b6c10379ba2ae1ef07afc5d8e0410c4f7",
+          "locator": "record",
+          "relation": "references"
+        },
+        "route_refs": [],
+        "completed_refs": [
+          {
+            "target_kind": "record",
+            "target_id": "MEM-77b35d77-f6c1-5d05-80a1-7c3b9d5e9d09",
+            "revision": 4,
+            "sha256": "9918032b4a47d068d2056472853db83cee83c46cbb13501bac91b32458d203ed",
+            "locator": "record",
+            "relation": "references"
+          },
+          {
+            "target_kind": "record",
+            "target_id": "MEM-4acc73bb-59c7-560d-9415-fd42e9dcaa2d",
+            "revision": 1,
+            "sha256": "ba12342c6ca8afa0a1760dc517fd7bff2d1b60c7f082ee9113e419572834df51",
+            "locator": "record",
+            "relation": "references"
+          }
+        ],
+        "question_refs": [],
+        "next_step": "设计随机抵消输入的生成方法",
+        "prerequisites": [
+          "确认随机种子与样本量"
+        ],
+        "stop_reason": "阶段收口",
+        "budget_remaining": {
+          "value": null,
+          "reason": "not_applicable",
+          "note": "无预算约束"
+        },
+        "missing_refs": []
+      }
+    }
+  }
+}

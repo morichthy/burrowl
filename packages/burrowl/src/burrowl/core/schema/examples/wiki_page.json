@@ -1,0 +1,62 @@
+{
+  "kind": "wiki_page",
+  "note": "Wiki 页面（level=null）：宿主 AI 编写、经 hub.plan/hub.apply 发布到知识中枢；slug 为 <类型>/<名称>，source_refs 必须是固定引用。",
+  "operation": {
+    "op": "put_record",
+    "client_key": "new-wiki_page",
+    "draft": {
+      "owner_id": "RES-FLOATING-POINT-SUMMATION",
+      "kind": "wiki_page",
+      "title": "补偿求和",
+      "keywords": [],
+      "body_markdown": "补偿求和（Kahan 求和）在每一步保存舍入误差并在下一步补回，能减小一般输入的舍入误差；在大数抵消输入上仍可能丢失小量，需要用精确基准核对。",
+      "record_reason": "整理概念页",
+      "sensitivity": "internal",
+      "sources": [
+        {
+          "target_kind": "record",
+          "target_id": "MEM-58fd845a-05a5-516c-8bbe-c88d887cbb91",
+          "revision": 6,
+          "sha256": "e5fc7cb2327f0b0412166c545c6ae9e862dad0692c0038775dcb4deb0766e3c2",
+          "locator": "record",
+          "relation": "references"
+        },
+        {
+          "target_kind": "record",
+          "target_id": "MEM-4acc73bb-59c7-560d-9415-fd42e9dcaa2d",
+          "revision": 1,
+          "sha256": "ba12342c6ca8afa0a1760dc517fd7bff2d1b60c7f082ee9113e419572834df51",
+          "locator": "record",
+          "relation": "references"
+        }
+      ],
+      "provenance_gap": null,
+      "payload": {
+        "slug": "concept/compensated-summation",
+        "page_type": "concept",
+        "aliases": [
+          "Kahan 求和"
+        ],
+        "source_refs": [
+          {
+            "target_kind": "record",
+            "target_id": "MEM-58fd845a-05a5-516c-8bbe-c88d887cbb91",
+            "revision": 6,
+            "sha256": "e5fc7cb2327f0b0412166c545c6ae9e862dad0692c0038775dcb4deb0766e3c2",
+            "locator": "record",
+            "relation": "references"
+          },
+          {
+            "target_kind": "record",
+            "target_id": "MEM-4acc73bb-59c7-560d-9415-fd42e9dcaa2d",
+            "revision": 1,
+            "sha256": "ba12342c6ca8afa0a1760dc517fd7bff2d1b60c7f082ee9113e419572834df51",
+            "locator": "record",
+            "relation": "references"
+          }
+        ],
+        "missing_refs": []
+      }
+    }
+  }
+}

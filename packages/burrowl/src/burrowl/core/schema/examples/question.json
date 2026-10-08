@@ -1,0 +1,40 @@
+{
+  "kind": "question",
+  "note": "问题（level=null）：未决问题、它影响的决策和缺失证据；解决时 status=resolved 并给出 resolution_refs。",
+  "operation": {
+    "op": "put_record",
+    "client_key": "new-question",
+    "draft": {
+      "owner_id": "RES-FLOATING-POINT-SUMMATION",
+      "kind": "question",
+      "title": "成对求和在抵消输入上是否更稳健",
+      "keywords": [],
+      "body_markdown": "",
+      "record_reason": "记录未决问题",
+      "sensitivity": "internal",
+      "sources": [
+        {
+          "target_kind": "record",
+          "target_id": "MEM-58fd845a-05a5-516c-8bbe-c88d887cbb91",
+          "revision": 6,
+          "sha256": "e5fc7cb2327f0b0412166c545c6ae9e862dad0692c0038775dcb4deb0766e3c2",
+          "locator": "record",
+          "relation": "references"
+        }
+      ],
+      "provenance_gap": null,
+      "payload": {
+        "question": "成对求和在抵消输入上的误差是否显著小于顺序与补偿",
+        "status": "open",
+        "decision_affected": "扩展研究选用哪种求和作对照",
+        "missing_evidence": [
+          "成对求和实验结果"
+        ],
+        "resolution_refs": [],
+        "replacement_ref": null,
+        "reopen_reason": null,
+        "missing_refs": []
+      }
+    }
+  }
+}

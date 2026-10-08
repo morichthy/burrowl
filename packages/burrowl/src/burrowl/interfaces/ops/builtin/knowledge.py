@@ -1,0 +1,312 @@
+"""复核、溯源、关联与关系图、语义维护、监测、Run、来源登记。"""
+from pathlib import PurePosixPath
+from typing import Annotated, Literal
+
+from pydantic import Field
+
+from ....core.errors import BurrowlError
+from ....services import relations
+from ....services.memory import associations, provenance
+from ..registry import Ctx, op
+
+ReviewState = Literal["accepted", "disputed", "retracted", "superseded", "not-reviewed"]
+QueueState = Literal["not-reviewed", "stale", "disputed", "upstream-blocked", "accepted", "retracted", "superseded"]
+
+
+# ---------- 复核 ----------
+@op("review.queue")
+def review_queue(ctx: Ctx, states: list[QueueState] | None = None, owner_id: str | None = None, query: str = "",
+                 limit: int = 50, offset: int = 0) -> dict:
+    """待复核队列：默认列出未复核、已失效、有争议、被上游阻断的结论。"""
+    return ctx.app.review.queue(states=states, owner_id=owner_id, query=query, limit=limit, offset=offset)
+
+
+@op("review.submit", effect="write")
+def review_submit(ctx: Ctx, target_claim_id: str, state: ReviewState,
+                  reason: Annotated[str, Field(min_length=1)], scope: str | None = None,
+                  evidence_refs: list[dict] | None = None, replacement_claim_id: str | None = None,
+                  dry_run: bool = False) -> dict:
+    """复核一条结论。accepted 需要适用范围与支持性证据；superseded 需要替代结论。dry_run 只预检。"""
+    return ctx.app.review.submit({"target_claim_id": target_claim_id, "state": state, "reason": reason,
+                                  "scope": scope, "evidence_refs": evidence_refs or [],
+                                  "replacement_claim_id": replacement_claim_id, "actor": ctx.actor,
+                                  "dry_run": dry_run})
+
+
+@op("review.batch", effect="write")
+def review_batch(ctx: Ctx, items: list[dict], dry_run: bool = False) -> dict:
+    """批量复核（逐条串行；单条失败不影响其他）。每项字段同 review.submit。"""
+    return ctx.app.review.batch(items, actor=ctx.actor, dry_run=dry_run)
+
+
+@op("review.history")
+def review_history(ctx: Ctx, claim_id: str) -> dict:
+    """一条结论的复核历史。"""
+    return ctx.app.review.history(claim_id)
+
+
+# ---------- 溯源 ----------
+@op("provenance.impact")
+def impact(ctx: Ctx, changed_ids: list[str]) -> dict:
+    """这些内容变化后，哪些下游需要重新审阅（导航边只提示，supports/input 才是正式依赖）。"""
+    return provenance.impact(ctx.app.storage, changed_ids)
+
+
+@op("provenance.lineage")
+def lineage(ctx: Ctx, target_ids: list[str]) -> dict:
+    """沿依据追到可访问的原件身份（来源数不等于独立支持数）。"""
+    return provenance.lineage(ctx.app.storage, target_ids)
+
+
+@op("provenance.question_validity")
+def question_validity(ctx: Ctx, question_id: str, scope: str | None = None) -> dict:
+    """已解决问题的答案依据现在是否仍成立。"""
+    return provenance.question_validity(ctx.app.storage, question_id, scope=scope)
+
+
+@op("provenance.formal")
+def formal(ctx: Ctx, target_ids: list[str], scope: Annotated[str, Field(min_length=1)]) -> dict:
+    """正式使用：只返回在该范围内已接受、有效、来源可见的结论原文，其余列出原因。"""
+    return ctx.app.review.graph().formal_projection(target_ids, scope)
+
+
+# ---------- 关联与关系图 ----------
+@op("relations.graph")
+def graph(ctx: Ctx, center: str | None = None, hops: int = 2, query: str = "", kinds: list[str] | None = None,
+          levels: list[str] | None = None, excluded: list[str] | None = None, limit: int = 400) -> dict:
+    """材料关系图（子图）：对象、记录、来源与作者保存的类型化关系。"""
+    return relations.subgraph(relations.build_graph(ctx.app.storage), center=center, hops=hops, query=query,
+                              kinds=kinds, levels=levels, excluded=excluded, limit=limit)
+
+
+@op("relations.similar")
+def similar(ctx: Ctx, seeds: list[str], method: Literal["keyword", "semantic"] = "keyword", limit: int = 30) -> dict:
+    """为种子记录找关联候选（关键词重合 / 语义近邻）；只是待判断的线索。"""
+    return relations.similar(ctx.app.storage, ctx.app.index, seeds, method=method, limit=limit)
+
+
+@op("relations.associations")
+def association_list(ctx: Ctx, status: Literal["candidate", "accepted", "rejected", "withdrawn"] | None = None,
+                     record_id: str | None = None) -> list:
+    """已保存的关联记录。"""
+    return associations.list_associations(ctx.app.storage, status=status, record_id=record_id)
+
+
+@op("relations.decide", effect="write")
+def association_decide(ctx: Ctx, owner_id: str, payload: Annotated[dict, Field(description=(
+        "{from, to, relation, explanation, shared_structure, transfer_limits[], basis_refs[], status}"))],
+        reason: str, dry_run: bool = False) -> dict:
+    """保存关联判断（candidate/accepted/rejected/withdrawn）；只能是导航关系。"""
+    return associations.decide(ctx.app.memory, owner_id, payload, actor=ctx.actor, reason=reason, dry_run=dry_run)
+
+
+@op("relations.view")
+def view_get(ctx: Ctx) -> dict:
+    """工作台关系图的本机视图偏好。"""
+    return ctx.app.prefs.view()
+
+
+@op("relations.view_save", effect="user")
+def view_save(ctx: Ctx, view: dict) -> dict:
+    """保存关系图视图偏好（布局、分组、中心、排除项）。"""
+    return ctx.app.prefs.save_view(view)
+
+
+@op("relations.notes")
+def notes(ctx: Ctx) -> list:
+    """关系图上的随手笔记（分组名、桥接问题、关系设想）。"""
+    return ctx.app.prefs.notes()
+
+
+@op("relations.note_add", effect="user")
+def note_add(ctx: Ctx, kind: Literal["cluster-name", "bridge-question", "relation-idea"], title: str, text: str = "",
+             refs: list[str] | None = None) -> dict:
+    """添加关系图笔记。"""
+    return ctx.app.prefs.add_note(kind, title, text, refs or [])
+
+
+@op("relations.note_resolve", effect="user")
+def note_resolve(ctx: Ctx, note_id: str, status: Literal["open", "done", "dismissed"]) -> dict:
+    """更新关系图笔记状态。"""
+    return ctx.app.prefs.resolve_note(note_id, status)
+
+
+# ---------- 语义维护 ----------
+@op("maintenance.plan", effect="write")
+def maintenance_plan(ctx: Ctx, changed_ids: list[str], note: str = "") -> dict:
+    """来源变化或新反证后：列出受影响记录及其完整正文，生成维护计划。"""
+    return ctx.app.maintenance.plan(changed_ids, actor=ctx.actor, note=note)
+
+
+@op("maintenance.review", effect="write")
+def maintenance_review(ctx: Ctx, plan_id: str, decisions: Annotated[list[dict], Field(description=(
+        "[{target_id, action: retain|revise|resynthesize|retract|defer, reason, draft?}]"))],
+        expected_revision: int | None = None) -> dict:
+    """记录逐项处置与修订草案，并逐对象预检（不写记忆）。"""
+    return ctx.app.maintenance.review(plan_id, decisions, expected_revision=expected_revision)
+
+
+@op("maintenance.apply", effect="write")
+def maintenance_apply(ctx: Ctx, plan_id: str, expected_revision: int) -> dict:
+    """按对象逐个提交计划中的修订与撤回；可重试，部分完成会如实报告。"""
+    return ctx.app.maintenance.apply(plan_id, actor=ctx.actor, expected_revision=expected_revision)
+
+
+@op("maintenance.status")
+def maintenance_status(ctx: Ctx, plan_id: str) -> dict:
+    """维护计划的当前状态。"""
+    return ctx.app.maintenance.status(plan_id)
+
+
+# ---------- 监测 ----------
+@op("monitor.run", effect="write")
+def monitor_run(ctx: Ctx, dry_run: Annotated[bool, Field(description="只比较，不写观察记录、不更新基线")] = False) -> dict:
+    """扫描一次：对象 HEAD 与来源文件指纹的变化，并给出维护候选（观察不改变任何证据或复核状态）。"""
+    return ctx.app.monitor.run(dry_run=dry_run)
+
+
+@op("monitor.candidates")
+def monitor_candidates(ctx: Ctx, status: Literal["open", "planned", "dismissed"] | None = "open") -> list:
+    """来源变化影响到的维护候选；用 maintenance_plan 把它们纳入语义维护。"""
+    return ctx.app.monitor.candidates(status)
+
+
+@op("monitor.resolve", effect="user")
+def monitor_resolve(ctx: Ctx, target_id: str, status: Literal["open", "planned", "dismissed"], note: str = "") -> dict:
+    """（仅用户）处置维护候选。"""
+    return ctx.app.monitor.resolve(target_id, status, note)
+
+
+@op("monitor.observations")
+def monitor_observations(ctx: Ctx, limit: int = 50) -> list:
+    """最近的监测观察记录。"""
+    return ctx.app.monitor.observations(limit)
+
+
+# ---------- Run ----------
+@op("runs.create", effect="write")
+def run_create(ctx: Ctx, title: str, owner_id: str | None = None, question: str = "",
+               keywords: list[str] | None = None) -> dict:
+    """新建 Run（一次实际分析/执行的记录容器），默认放在所属对象目录下。"""
+    return ctx.app.runs.create(title, owner_id=owner_id, question=question, keywords=keywords)
+
+
+@op("runs.register", effect="write")
+def run_register(ctx: Ctx, run_id: str, inputs: list[str] | None = None, artifacts: list[str] | None = None,
+                 preview: bool = False) -> dict:
+    """登记已有文件为 Run 的输入/产物（固定字节指纹，可回滚）。"""
+    return ctx.app.runs.register(run_id, inputs=inputs or [], artifacts=artifacts or [], preview=preview)
+
+
+@op("runs.execute", effect="write")
+def run_execute(ctx: Ctx, run_id: str, script: str, inputs: list[str] | None = None, args: list[str] | None = None,
+                timeout_seconds: float = 3600, preview: bool = False) -> dict:
+    """前台运行 Python 脚本并登记输入、输出与日志（失败也登记）。参数可用 {input0}、{output_dir} 占位。"""
+    return ctx.app.runs.execute(run_id, script=script, inputs=inputs or [], args=args or [],
+                                timeout_seconds=timeout_seconds, preview=preview)
+
+
+@op("runs.update", effect="write")
+def run_update(ctx: Ctx, run_id: str, fields: Annotated[dict, Field(description=(
+        "可改：title, question, conclusion, limitations, parameters, status, keywords, parent_run_ids"))],
+               expected_sha256: Annotated[str | None, Field(description=(
+                   "读取时 run.json 的指纹（上次修改返回的 sha256）；不一致说明别人改过，拒绝覆盖"))] = None) -> dict:
+    """修改 Run 的结论、限制、状态等（不改输入/产物登记）。"""
+    return ctx.app.runs.update(run_id, fields, expected_sha256=expected_sha256)
+
+
+@op("runs.rollback", effect="write")
+def run_rollback(ctx: Ctx, receipt: str, preview: bool = False) -> dict:
+    """按登记回执恢复 run.json（不删除任何文件）。"""
+    return ctx.app.runs.rollback(receipt, preview=preview)
+
+
+@op("runs.search")
+def run_search(ctx: Ctx, query: str = "", owner_id: str | None = None, limit: int = 50) -> list:
+    """按标题/问题/关键词查找 Run。"""
+    return ctx.app.runs.search(query=query, owner_id=owner_id, limit=limit)
+
+
+# ---------- 来源登记 ----------
+@op("sources.list")
+def sources_list(ctx: Ctx) -> list:
+    """已登记的来源文件（file 引用的唯一授权入口），附当前解析出的位置 location。"""
+    return ctx.app.storage.sources.describe()
+
+
+@op("sources.roots")
+def sources_roots(ctx: Ctx) -> dict:
+    """已登记的工作根（工作目录）与本次会话的工作目录。工作根下的来源记为"根 + 相对路径"，目录搬家只改根。"""
+    return {"roots": ctx.app.storage.sources.roots(),
+            "work_dir": str(ctx.app.work_dir) if ctx.app.work_dir else None}
+
+
+@op("sources.add_root", effect="write")
+def sources_add_root(ctx: Ctx, path: Annotated[str, Field(description="工作目录的绝对路径（不能在数据目录内）")],
+                     title: str = "") -> dict:
+    """登记一个工作根。通常不必手动调用：登记本次工作目录里的文件时会自动建根。"""
+    return ctx.app.storage.sources.add_root(path, title=title)
+
+
+@op("sources.relocate_root", effect="write")
+def sources_relocate_root(ctx: Ctx, root_id: str, new_path: str, allow_missing: bool = False) -> dict:
+    """工作目录整体搬家：逐个核对新位置下已登记文件的指纹，全部一致才改根的位置；已有固定引用不变。"""
+    return ctx.app.storage.sources.relocate_root(root_id, new_path, allow_missing=allow_missing)
+
+
+Sensitivity = Literal["public", "internal", "confidential", "restricted"]
+
+
+def _check_owner_access(ctx: Ctx, path: str) -> str:
+    """数据目录内的文件若属于受限对象，不能被登记成可读来源。返回规范化后的路径。"""
+    normalized = ctx.app.storage.sources.normalize(path)
+    relative = PurePosixPath(normalized)
+    if relative.parts and not relative.is_absolute() and ":" not in relative.parts[0]:
+        ctx.app.storage.owners.scan().require_path_readable(relative.as_posix())
+    return normalized  # 数据目录外的原件不属于任何对象
+
+
+@op("sources.register", effect="write")
+def sources_register(ctx: Ctx, source_id: Annotated[str, Field(pattern=r"^SRC-")],
+                     path: Annotated[str, Field(description="工作目录等外部位置用绝对路径；数据目录内可用相对路径")],
+                     title: str = "", sensitivity: Sensitivity = "internal") -> dict:
+    """登记一个来源文件并记录当前字节指纹：L0 原件的唯一授权入口。原件留在原处，不复制、不修改。
+    工作目录里的文件自动记为"工作根 + 相对路径"，迁移时随根重定向。
+    同一 ID 重复登记同一文件是幂等的；内容变了请用新 ID；文件搬家用 sources.relocate / sources.relocate_root。"""
+    path = _check_owner_access(ctx, path)
+    return ctx.app.storage.sources.register(source_id, path, title=title, sensitivity=sensitivity,
+                                            work_dir=ctx.app.work_dir)
+
+
+@op("sources.register_many", effect="write")
+def sources_register_many(ctx: Ctx, items: Annotated[list[dict], Field(description=(
+        "[{source_id, path, title?, sensitivity?}]，逐条登记；单条失败不影响其他"))]) -> dict:
+    """批量登记来源（导入已有资料时使用）。"""
+    results = []
+    for item in items:
+        try:
+            path = _check_owner_access(ctx, item["path"])
+            entry = ctx.app.storage.sources.register(item["source_id"], path, title=item.get("title", ""),
+                                                     sensitivity=item.get("sensitivity", "internal"),
+                                                     work_dir=ctx.app.work_dir)
+            results.append({"source_id": item["source_id"], "ok": True, "sha256": entry["sha256"]})
+        except (BurrowlError, KeyError, OSError) as exc:
+            results.append({"source_id": item.get("source_id"), "ok": False,
+                            "error": exc.problem() if isinstance(exc, BurrowlError) else str(exc)})
+    return {"succeeded": sum(r["ok"] for r in results), "failed": sum(not r["ok"] for r in results),
+            "results": results}
+
+
+@op("sources.relocate", effect="write")
+def sources_relocate(ctx: Ctx, source_id: str, new_path: str) -> dict:
+    """原件搬家：新位置的字节必须与登记时一致，旧路径记入 relocated_from，已有固定引用继续有效。"""
+    new_path = _check_owner_access(ctx, new_path)
+    return ctx.app.storage.sources.relocate(source_id, new_path, work_dir=ctx.app.work_dir)
+
+
+@op("sources.update", effect="user")
+def sources_update(ctx: Ctx, source_id: str, enabled: bool | None = None, sensitivity: Sensitivity | None = None) -> dict:
+    """（仅用户）启用/停用来源或调整敏感级别。停用后引用它的记录会在读取时被隐去。"""
+    return ctx.app.storage.sources.update(source_id, enabled=enabled, sensitivity=sensitivity)
+
+

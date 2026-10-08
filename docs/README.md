@@ -1,0 +1,46 @@
+# 文档索引
+
+必读文档只读本页，不自动展开全部链接；按问题查找对应的细节入口。
+
+## 六份必读文档
+
+| 文档 | 承载什么 | 何时读取或维护 |
+|---|---|---|
+| [README](../README.md) | 用途、概念、安装、日常用法、导入已有资料、目录维护 | 用户可见的概念、功能、入口或目录变化 |
+| [ARCHITECTURE](../ARCHITECTURE.md) | 评价标准、稳定设计约束、模块影响表、状态归属、数据流与已知差距 | 职责、依赖、状态、数据流变化；全局唯一的架构入口 |
+| [CORE](CORE.md) | 功能块定义、交接、核心流程伪代码 | 功能定义、关键行为或调用方式变化 |
+| [docs/README](README.md)（本页） | 细节入口与分类 | 新增或移动文档 |
+| [DOCUMENTATION_MAINTENANCE](DOCUMENTATION_MAINTENANCE.md) | 文档职责、术语规则、维护闭环 | 规则、Skill 或文档职责调整；全面一致性审查 |
+| [TESTING](TESTING.md) | 按风险选择验证、测试分层、不能省略的检查 | 选择测试或维护测试 |
+
+另外两份是按需阅读的支撑文档：
+
+- [DEVELOPMENT_HISTORY](DEVELOPMENT_HISTORY.md)：选择理由、删除的功能、历史错误和未决讨论。讨论全局方案前完整阅读。
+- [GLOSSARY](GLOSSARY.md)：术语的权威定义。
+
+## 面向 AI 的方法源（skills/）
+
+| 文件 | 内容 |
+|---|---|
+| [skills/RULES.md](../skills/RULES.md) | 公共规则：何时进入流程、归属、三种状态、谁可以复核、工作清单、语言、禁止事项 |
+| [skills/RECORDING.md](../skills/RECORDING.md) | 记录标准：L0–L4 写什么、独立可读、L1 写法、结论与范围、引用关系、保存顺序 |
+| [burrowl-work](../skills/burrowl-work/SKILL.md) · [burrowl-read](../skills/burrowl-read/SKILL.md) · [burrowl-consolidate](../skills/burrowl-consolidate/SKILL.md) · [burrowl-dev-check](../skills/burrowl-dev-check/SKILL.md) | 四个工作流 |
+
+## 按问题查
+
+| 问题 | 去哪里 |
+|---|---|
+| 某个工具有哪些参数 | [reference/ops.md](reference/ops.md)（自动生成） |
+| 某类记录的字段和示例 | 调用 `memory.contract(kind)`；示例文件在 `packages/burrowl/src/burrowl/core/schema/examples/` |
+| 配置项与默认值 | [reference/config.md](reference/config.md)（自动生成） |
+| 部署 WeKnora | [deploy/weknora/README.md](../deploy/weknora/README.md) |
+| 打包与离线安装 | [packaging/build.py](../packaging/build.py) 的说明、README 的"安装"一节 |
+| 源项目的功能在新项目中的对应情况 | [MIGRATION_AUDIT](MIGRATION_AUDIT.md) |
+
+## 精确契约与运行代码
+
+文档与代码不一致时，以代码和测试为准，并修正文档：
+
+- 记录契约：`core/schema/memory.schema.json`（由 `tools/extract_schema.py` 生成）。
+- 操作契约：各操作函数的类型签名（`interfaces/ops/builtin/`）。
+- 配置契约：`core/config.py`。

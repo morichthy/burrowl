@@ -1,0 +1,60 @@
+# uv 虚拟工作区根：本身不发行，只聚合 packages/* 与开发工具。
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+burrowl = { workspace = true }
+burrowl-connector-weknora = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "burrowl",
+    "burrowl-connector-weknora",
+    "pytest>=8.3",
+    "ruff>=0.8",
+    "import-linter>=2.1",
+    "httpx>=0.27",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q --strict-markers"
+markers = [
+    "real_model: 需要本机嵌入/重排模型",
+    "live_hub: 需要运行中的外部知识中枢（如 WeKnora）",
+    "packaging: 安装与打包检查",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+extend-exclude = ["tests/fixtures"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["burrowl", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "PLC0415"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["PLC0415"]
+"packages/burrowl/src/burrowl/interfaces/cli.py" = ["B008"]  # typer 的参数声明惯用法
+
+# 依赖方向：interfaces → app（组合根）→ services → {storage, index, connectors, portable} → core
+[tool.importlinter]
+root_package = "burrowl"
+
+[[tool.importlinter.contracts]]
+name = "分层依赖方向"
+type = "layers"
+# 括号表示该层可暂不存在（按阶段逐步建立）。
+layers = [
+    "(burrowl.interfaces)",
+    "(burrowl.app)",
+    "(burrowl.services)",
+    "(burrowl.storage) | (burrowl.index) | (burrowl.connectors) | (burrowl.portable)",
+    "burrowl.core",
+]
+exhaustive = false

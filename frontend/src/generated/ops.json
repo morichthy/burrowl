@@ -1,0 +1,4341 @@
+[
+ {
+  "name": "hub.connectors",
+  "group": "hub",
+  "effect": "read",
+  "summary": "已配置的连接器、发布策略与已发布条目数。",
+  "input": {
+   "additionalProperties": false,
+   "description": "已配置的连接器、发布策略与已发布条目数。",
+   "properties": {},
+   "title": "hub_connectors_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "hub.health",
+  "group": "hub",
+  "effect": "read",
+  "summary": "测试连接：服务版本、兼容性、能力、密钥是否已设置（不返回密钥）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "测试连接：服务版本、兼容性、能力、密钥是否已设置（不返回密钥）。",
+   "properties": {
+    "connector_id": {
+     "title": "Connector Id",
+     "type": "string"
+    }
+   },
+   "required": [
+    "connector_id"
+   ],
+   "title": "hub_health_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "hub.plan",
+  "group": "hub",
+  "effect": "read",
+  "summary": "预览发布：按策略（默认只发已复核的 L4/L3 与成稿文档）列出新增/更新/删除，返回 plan_hash。",
+  "input": {
+   "additionalProperties": false,
+   "description": "预览发布：按策略（默认只发已复核的 L4/L3 与成稿文档）列出新增/更新/删除，返回 plan_hash。",
+   "properties": {
+    "connector_id": {
+     "title": "Connector Id",
+     "type": "string"
+    }
+   },
+   "required": [
+    "connector_id"
+   ],
+   "title": "hub_plan_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "hub.apply",
+  "group": "hub",
+  "effect": "admin",
+  "summary": "执行发布。逐条记录结果，单条失败不影响其他条目。",
+  "input": {
+   "additionalProperties": false,
+   "description": "执行发布。逐条记录结果，单条失败不影响其他条目。",
+   "properties": {
+    "connector_id": {
+     "title": "Connector Id",
+     "type": "string"
+    },
+    "plan_hash": {
+     "description": "hub.plan 返回的 plan_hash；数据变化后需重新预览",
+     "title": "Plan Hash",
+     "type": "string"
+    },
+    "force_wiki": {
+     "default": false,
+     "description": "覆盖外部已被修改的 Wiki 页面",
+     "title": "Force Wiki",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "connector_id",
+    "plan_hash"
+   ],
+   "title": "hub_apply_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "hub.status",
+  "group": "hub",
+  "effect": "read",
+  "summary": "发布状态：各状态计数、失败/漂移条目、最近几次执行；refresh 时轮询外部解析进度。",
+  "input": {
+   "additionalProperties": false,
+   "description": "发布状态：各状态计数、失败/漂移条目、最近几次执行；refresh 时轮询外部解析进度。",
+   "properties": {
+    "connector_id": {
+     "title": "Connector Id",
+     "type": "string"
+    },
+    "refresh": {
+     "default": true,
+     "title": "Refresh",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "connector_id"
+   ],
+   "title": "hub_status_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "hub.search",
+  "group": "hub",
+  "effect": "read",
+  "summary": "在外部知识中枢检索；命中能对上本地条目时附 fixed_ref 与按本地当前状态计算的复核类别。",
+  "input": {
+   "additionalProperties": false,
+   "description": "在外部知识中枢检索；命中能对上本地条目时附 fixed_ref 与按本地当前状态计算的复核类别。",
+   "properties": {
+    "query": {
+     "title": "Query",
+     "type": "string"
+    },
+    "connector_ids": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Connector Ids"
+    },
+    "limit": {
+     "default": 10,
+     "title": "Limit",
+     "type": "integer"
+    },
+    "review_filter": {
+     "default": "all",
+     "enum": [
+      "all",
+      "reviewed_only",
+      "exclude_unsafe",
+      "unreviewed_only"
+     ],
+     "title": "Review Filter",
+     "type": "string"
+    }
+   },
+   "required": [
+    "query"
+   ],
+   "title": "hub_search_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "wiki.list",
+  "group": "wiki",
+  "effect": "read",
+  "summary": "列出外部 Wiki 页面（authored_here 表示由本项目发布）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "列出外部 Wiki 页面（authored_here 表示由本项目发布）。",
+   "properties": {
+    "connector_id": {
+     "title": "Connector Id",
+     "type": "string"
+    },
+    "query": {
+     "default": "",
+     "title": "Query",
+     "type": "string"
+    },
+    "limit": {
+     "default": 50,
+     "title": "Limit",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "connector_id"
+   ],
+   "title": "wiki_list_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "wiki.read",
+  "group": "wiki",
+  "effect": "read",
+  "summary": "读取一页外部 Wiki（含外部自动生成的页面）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "读取一页外部 Wiki（含外部自动生成的页面）。",
+   "properties": {
+    "connector_id": {
+     "title": "Connector Id",
+     "type": "string"
+    },
+    "slug": {
+     "title": "Slug",
+     "type": "string"
+    }
+   },
+   "required": [
+    "connector_id",
+    "slug"
+   ],
+   "title": "wiki_read_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "wiki.configure",
+  "group": "wiki",
+  "effect": "admin",
+  "summary": "按配置 wiki.mode 开启/关闭外部自动 Wiki（auto/both 开启）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "按配置 wiki.mode 开启/关闭外部自动 Wiki（auto/both 开启）。",
+   "properties": {
+    "connector_id": {
+     "title": "Connector Id",
+     "type": "string"
+    }
+   },
+   "required": [
+    "connector_id"
+   ],
+   "title": "wiki_configure_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "review.queue",
+  "group": "review",
+  "effect": "read",
+  "summary": "待复核队列：默认列出未复核、已失效、有争议、被上游阻断的结论。",
+  "input": {
+   "additionalProperties": false,
+   "description": "待复核队列：默认列出未复核、已失效、有争议、被上游阻断的结论。",
+   "properties": {
+    "states": {
+     "anyOf": [
+      {
+       "items": {
+        "enum": [
+         "not-reviewed",
+         "stale",
+         "disputed",
+         "upstream-blocked",
+         "accepted",
+         "retracted",
+         "superseded"
+        ],
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "States"
+    },
+    "owner_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Owner Id"
+    },
+    "query": {
+     "default": "",
+     "title": "Query",
+     "type": "string"
+    },
+    "limit": {
+     "default": 50,
+     "title": "Limit",
+     "type": "integer"
+    },
+    "offset": {
+     "default": 0,
+     "title": "Offset",
+     "type": "integer"
+    }
+   },
+   "title": "review_queue_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "review.submit",
+  "group": "review",
+  "effect": "write",
+  "summary": "复核一条结论。accepted 需要适用范围与支持性证据；superseded 需要替代结论。dry_run 只预检。",
+  "input": {
+   "additionalProperties": false,
+   "description": "复核一条结论。accepted 需要适用范围与支持性证据；superseded 需要替代结论。dry_run 只预检。",
+   "properties": {
+    "target_claim_id": {
+     "title": "Target Claim Id",
+     "type": "string"
+    },
+    "state": {
+     "enum": [
+      "accepted",
+      "disputed",
+      "retracted",
+      "superseded",
+      "not-reviewed"
+     ],
+     "title": "State",
+     "type": "string"
+    },
+    "reason": {
+     "minLength": 1,
+     "title": "Reason",
+     "type": "string"
+    },
+    "scope": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Scope"
+    },
+    "evidence_refs": {
+     "anyOf": [
+      {
+       "items": {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Evidence Refs"
+    },
+    "replacement_claim_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Replacement Claim Id"
+    },
+    "dry_run": {
+     "default": false,
+     "title": "Dry Run",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "target_claim_id",
+    "state",
+    "reason"
+   ],
+   "title": "review_submit_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "review.batch",
+  "group": "review",
+  "effect": "write",
+  "summary": "批量复核（逐条串行；单条失败不影响其他）。每项字段同 review.submit。",
+  "input": {
+   "additionalProperties": false,
+   "description": "批量复核（逐条串行；单条失败不影响其他）。每项字段同 review.submit。",
+   "properties": {
+    "items": {
+     "items": {
+      "additionalProperties": true,
+      "type": "object"
+     },
+     "title": "Items",
+     "type": "array"
+    },
+    "dry_run": {
+     "default": false,
+     "title": "Dry Run",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "items"
+   ],
+   "title": "review_batch_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "review.history",
+  "group": "review",
+  "effect": "read",
+  "summary": "一条结论的复核历史。",
+  "input": {
+   "additionalProperties": false,
+   "description": "一条结论的复核历史。",
+   "properties": {
+    "claim_id": {
+     "title": "Claim Id",
+     "type": "string"
+    }
+   },
+   "required": [
+    "claim_id"
+   ],
+   "title": "review_history_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "provenance.impact",
+  "group": "provenance",
+  "effect": "read",
+  "summary": "这些内容变化后，哪些下游需要重新审阅（导航边只提示，supports/input 才是正式依赖）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "这些内容变化后，哪些下游需要重新审阅（导航边只提示，supports/input 才是正式依赖）。",
+   "properties": {
+    "changed_ids": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Changed Ids",
+     "type": "array"
+    }
+   },
+   "required": [
+    "changed_ids"
+   ],
+   "title": "provenance_impact_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "provenance.lineage",
+  "group": "provenance",
+  "effect": "read",
+  "summary": "沿依据追到可访问的原件身份（来源数不等于独立支持数）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "沿依据追到可访问的原件身份（来源数不等于独立支持数）。",
+   "properties": {
+    "target_ids": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Target Ids",
+     "type": "array"
+    }
+   },
+   "required": [
+    "target_ids"
+   ],
+   "title": "provenance_lineage_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "provenance.question_validity",
+  "group": "provenance",
+  "effect": "read",
+  "summary": "已解决问题的答案依据现在是否仍成立。",
+  "input": {
+   "additionalProperties": false,
+   "description": "已解决问题的答案依据现在是否仍成立。",
+   "properties": {
+    "question_id": {
+     "title": "Question Id",
+     "type": "string"
+    },
+    "scope": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Scope"
+    }
+   },
+   "required": [
+    "question_id"
+   ],
+   "title": "provenance_question_validity_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "provenance.formal",
+  "group": "provenance",
+  "effect": "read",
+  "summary": "正式使用：只返回在该范围内已接受、有效、来源可见的结论原文，其余列出原因。",
+  "input": {
+   "additionalProperties": false,
+   "description": "正式使用：只返回在该范围内已接受、有效、来源可见的结论原文，其余列出原因。",
+   "properties": {
+    "target_ids": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Target Ids",
+     "type": "array"
+    },
+    "scope": {
+     "minLength": 1,
+     "title": "Scope",
+     "type": "string"
+    }
+   },
+   "required": [
+    "target_ids",
+    "scope"
+   ],
+   "title": "provenance_formal_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "relations.graph",
+  "group": "relations",
+  "effect": "read",
+  "summary": "材料关系图（子图）：对象、记录、来源与作者保存的类型化关系。",
+  "input": {
+   "additionalProperties": false,
+   "description": "材料关系图（子图）：对象、记录、来源与作者保存的类型化关系。",
+   "properties": {
+    "center": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Center"
+    },
+    "hops": {
+     "default": 2,
+     "title": "Hops",
+     "type": "integer"
+    },
+    "query": {
+     "default": "",
+     "title": "Query",
+     "type": "string"
+    },
+    "kinds": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Kinds"
+    },
+    "levels": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Levels"
+    },
+    "excluded": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Excluded"
+    },
+    "limit": {
+     "default": 400,
+     "title": "Limit",
+     "type": "integer"
+    }
+   },
+   "title": "relations_graph_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "relations.similar",
+  "group": "relations",
+  "effect": "read",
+  "summary": "为种子记录找关联候选（关键词重合 / 语义近邻）；只是待判断的线索。",
+  "input": {
+   "additionalProperties": false,
+   "description": "为种子记录找关联候选（关键词重合 / 语义近邻）；只是待判断的线索。",
+   "properties": {
+    "seeds": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Seeds",
+     "type": "array"
+    },
+    "method": {
+     "default": "keyword",
+     "enum": [
+      "keyword",
+      "semantic"
+     ],
+     "title": "Method",
+     "type": "string"
+    },
+    "limit": {
+     "default": 30,
+     "title": "Limit",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "seeds"
+   ],
+   "title": "relations_similar_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "relations.associations",
+  "group": "relations",
+  "effect": "read",
+  "summary": "已保存的关联记录。",
+  "input": {
+   "additionalProperties": false,
+   "description": "已保存的关联记录。",
+   "properties": {
+    "status": {
+     "anyOf": [
+      {
+       "enum": [
+        "candidate",
+        "accepted",
+        "rejected",
+        "withdrawn"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Status"
+    },
+    "record_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Record Id"
+    }
+   },
+   "title": "relations_associations_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "relations.decide",
+  "group": "relations",
+  "effect": "write",
+  "summary": "保存关联判断（candidate/accepted/rejected/withdrawn）；只能是导航关系。",
+  "input": {
+   "additionalProperties": false,
+   "description": "保存关联判断（candidate/accepted/rejected/withdrawn）；只能是导航关系。",
+   "properties": {
+    "owner_id": {
+     "title": "Owner Id",
+     "type": "string"
+    },
+    "payload": {
+     "additionalProperties": true,
+     "description": "{from, to, relation, explanation, shared_structure, transfer_limits[], basis_refs[], status}",
+     "title": "Payload",
+     "type": "object"
+    },
+    "reason": {
+     "title": "Reason",
+     "type": "string"
+    },
+    "dry_run": {
+     "default": false,
+     "title": "Dry Run",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "owner_id",
+    "payload",
+    "reason"
+   ],
+   "title": "relations_decide_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "relations.view",
+  "group": "relations",
+  "effect": "read",
+  "summary": "工作台关系图的本机视图偏好。",
+  "input": {
+   "additionalProperties": false,
+   "description": "工作台关系图的本机视图偏好。",
+   "properties": {},
+   "title": "relations_view_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "relations.view_save",
+  "group": "relations",
+  "effect": "user",
+  "summary": "保存关系图视图偏好（布局、分组、中心、排除项）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "保存关系图视图偏好（布局、分组、中心、排除项）。",
+   "properties": {
+    "view": {
+     "additionalProperties": true,
+     "title": "View",
+     "type": "object"
+    }
+   },
+   "required": [
+    "view"
+   ],
+   "title": "relations_view_save_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "relations.notes",
+  "group": "relations",
+  "effect": "read",
+  "summary": "关系图上的随手笔记（分组名、桥接问题、关系设想）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "关系图上的随手笔记（分组名、桥接问题、关系设想）。",
+   "properties": {},
+   "title": "relations_notes_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "relations.note_add",
+  "group": "relations",
+  "effect": "user",
+  "summary": "添加关系图笔记。",
+  "input": {
+   "additionalProperties": false,
+   "description": "添加关系图笔记。",
+   "properties": {
+    "kind": {
+     "enum": [
+      "cluster-name",
+      "bridge-question",
+      "relation-idea"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "title": {
+     "title": "Title",
+     "type": "string"
+    },
+    "text": {
+     "default": "",
+     "title": "Text",
+     "type": "string"
+    },
+    "refs": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Refs"
+    }
+   },
+   "required": [
+    "kind",
+    "title"
+   ],
+   "title": "relations_note_add_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "relations.note_resolve",
+  "group": "relations",
+  "effect": "user",
+  "summary": "更新关系图笔记状态。",
+  "input": {
+   "additionalProperties": false,
+   "description": "更新关系图笔记状态。",
+   "properties": {
+    "note_id": {
+     "title": "Note Id",
+     "type": "string"
+    },
+    "status": {
+     "enum": [
+      "open",
+      "done",
+      "dismissed"
+     ],
+     "title": "Status",
+     "type": "string"
+    }
+   },
+   "required": [
+    "note_id",
+    "status"
+   ],
+   "title": "relations_note_resolve_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "maintenance.plan",
+  "group": "maintenance",
+  "effect": "write",
+  "summary": "来源变化或新反证后：列出受影响记录及其完整正文，生成维护计划。",
+  "input": {
+   "additionalProperties": false,
+   "description": "来源变化或新反证后：列出受影响记录及其完整正文，生成维护计划。",
+   "properties": {
+    "changed_ids": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Changed Ids",
+     "type": "array"
+    },
+    "note": {
+     "default": "",
+     "title": "Note",
+     "type": "string"
+    }
+   },
+   "required": [
+    "changed_ids"
+   ],
+   "title": "maintenance_plan_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "maintenance.review",
+  "group": "maintenance",
+  "effect": "write",
+  "summary": "记录逐项处置与修订草案，并逐对象预检（不写记忆）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "记录逐项处置与修订草案，并逐对象预检（不写记忆）。",
+   "properties": {
+    "plan_id": {
+     "title": "Plan Id",
+     "type": "string"
+    },
+    "decisions": {
+     "description": "[{target_id, action: retain|revise|resynthesize|retract|defer, reason, draft?}]",
+     "items": {
+      "additionalProperties": true,
+      "type": "object"
+     },
+     "title": "Decisions",
+     "type": "array"
+    },
+    "expected_revision": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Expected Revision"
+    }
+   },
+   "required": [
+    "plan_id",
+    "decisions"
+   ],
+   "title": "maintenance_review_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "maintenance.apply",
+  "group": "maintenance",
+  "effect": "write",
+  "summary": "按对象逐个提交计划中的修订与撤回；可重试，部分完成会如实报告。",
+  "input": {
+   "additionalProperties": false,
+   "description": "按对象逐个提交计划中的修订与撤回；可重试，部分完成会如实报告。",
+   "properties": {
+    "plan_id": {
+     "title": "Plan Id",
+     "type": "string"
+    },
+    "expected_revision": {
+     "title": "Expected Revision",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "plan_id",
+    "expected_revision"
+   ],
+   "title": "maintenance_apply_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "maintenance.status",
+  "group": "maintenance",
+  "effect": "read",
+  "summary": "维护计划的当前状态。",
+  "input": {
+   "additionalProperties": false,
+   "description": "维护计划的当前状态。",
+   "properties": {
+    "plan_id": {
+     "title": "Plan Id",
+     "type": "string"
+    }
+   },
+   "required": [
+    "plan_id"
+   ],
+   "title": "maintenance_status_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "monitor.run",
+  "group": "monitor",
+  "effect": "write",
+  "summary": "扫描一次：对象 HEAD 与来源文件指纹的变化，并给出维护候选（观察不改变任何证据或复核状态）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "扫描一次：对象 HEAD 与来源文件指纹的变化，并给出维护候选（观察不改变任何证据或复核状态）。",
+   "properties": {
+    "dry_run": {
+     "default": false,
+     "description": "只比较，不写观察记录、不更新基线",
+     "title": "Dry Run",
+     "type": "boolean"
+    }
+   },
+   "title": "monitor_run_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "monitor.candidates",
+  "group": "monitor",
+  "effect": "read",
+  "summary": "来源变化影响到的维护候选；用 maintenance_plan 把它们纳入语义维护。",
+  "input": {
+   "additionalProperties": false,
+   "description": "来源变化影响到的维护候选；用 maintenance_plan 把它们纳入语义维护。",
+   "properties": {
+    "status": {
+     "anyOf": [
+      {
+       "enum": [
+        "open",
+        "planned",
+        "dismissed"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": "open",
+     "title": "Status"
+    }
+   },
+   "title": "monitor_candidates_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "monitor.resolve",
+  "group": "monitor",
+  "effect": "user",
+  "summary": "（仅用户）处置维护候选。",
+  "input": {
+   "additionalProperties": false,
+   "description": "（仅用户）处置维护候选。",
+   "properties": {
+    "target_id": {
+     "title": "Target Id",
+     "type": "string"
+    },
+    "status": {
+     "enum": [
+      "open",
+      "planned",
+      "dismissed"
+     ],
+     "title": "Status",
+     "type": "string"
+    },
+    "note": {
+     "default": "",
+     "title": "Note",
+     "type": "string"
+    }
+   },
+   "required": [
+    "target_id",
+    "status"
+   ],
+   "title": "monitor_resolve_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "monitor.observations",
+  "group": "monitor",
+  "effect": "read",
+  "summary": "最近的监测观察记录。",
+  "input": {
+   "additionalProperties": false,
+   "description": "最近的监测观察记录。",
+   "properties": {
+    "limit": {
+     "default": 50,
+     "title": "Limit",
+     "type": "integer"
+    }
+   },
+   "title": "monitor_observations_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "runs.create",
+  "group": "runs",
+  "effect": "write",
+  "summary": "新建 Run（一次实际分析/执行的记录容器），默认放在所属对象目录下。",
+  "input": {
+   "additionalProperties": false,
+   "description": "新建 Run（一次实际分析/执行的记录容器），默认放在所属对象目录下。",
+   "properties": {
+    "title": {
+     "title": "Title",
+     "type": "string"
+    },
+    "owner_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Owner Id"
+    },
+    "question": {
+     "default": "",
+     "title": "Question",
+     "type": "string"
+    },
+    "keywords": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Keywords"
+    }
+   },
+   "required": [
+    "title"
+   ],
+   "title": "runs_create_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "runs.register",
+  "group": "runs",
+  "effect": "write",
+  "summary": "登记已有文件为 Run 的输入/产物（固定字节指纹，可回滚）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "登记已有文件为 Run 的输入/产物（固定字节指纹，可回滚）。",
+   "properties": {
+    "run_id": {
+     "title": "Run Id",
+     "type": "string"
+    },
+    "inputs": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Inputs"
+    },
+    "artifacts": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Artifacts"
+    },
+    "preview": {
+     "default": false,
+     "title": "Preview",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "run_id"
+   ],
+   "title": "runs_register_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "runs.execute",
+  "group": "runs",
+  "effect": "write",
+  "summary": "前台运行 Python 脚本并登记输入、输出与日志（失败也登记）。参数可用 {input0}、{output_dir} 占位。",
+  "input": {
+   "additionalProperties": false,
+   "description": "前台运行 Python 脚本并登记输入、输出与日志（失败也登记）。参数可用 {input0}、{output_dir} 占位。",
+   "properties": {
+    "run_id": {
+     "title": "Run Id",
+     "type": "string"
+    },
+    "script": {
+     "title": "Script",
+     "type": "string"
+    },
+    "inputs": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Inputs"
+    },
+    "args": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Args"
+    },
+    "timeout_seconds": {
+     "default": 3600,
+     "title": "Timeout Seconds",
+     "type": "number"
+    },
+    "preview": {
+     "default": false,
+     "title": "Preview",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "run_id",
+    "script"
+   ],
+   "title": "runs_execute_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "runs.update",
+  "group": "runs",
+  "effect": "write",
+  "summary": "修改 Run 的结论、限制、状态等（不改输入/产物登记）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "修改 Run 的结论、限制、状态等（不改输入/产物登记）。",
+   "properties": {
+    "run_id": {
+     "title": "Run Id",
+     "type": "string"
+    },
+    "fields": {
+     "additionalProperties": true,
+     "description": "可改：title, question, conclusion, limitations, parameters, status, keywords, parent_run_ids",
+     "title": "Fields",
+     "type": "object"
+    },
+    "expected_sha256": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "读取时 run.json 的指纹（上次修改返回的 sha256）；不一致说明别人改过，拒绝覆盖",
+     "title": "Expected Sha256"
+    }
+   },
+   "required": [
+    "run_id",
+    "fields"
+   ],
+   "title": "runs_update_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "runs.rollback",
+  "group": "runs",
+  "effect": "write",
+  "summary": "按登记回执恢复 run.json（不删除任何文件）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "按登记回执恢复 run.json（不删除任何文件）。",
+   "properties": {
+    "receipt": {
+     "title": "Receipt",
+     "type": "string"
+    },
+    "preview": {
+     "default": false,
+     "title": "Preview",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "receipt"
+   ],
+   "title": "runs_rollback_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "runs.search",
+  "group": "runs",
+  "effect": "read",
+  "summary": "按标题/问题/关键词查找 Run。",
+  "input": {
+   "additionalProperties": false,
+   "description": "按标题/问题/关键词查找 Run。",
+   "properties": {
+    "query": {
+     "default": "",
+     "title": "Query",
+     "type": "string"
+    },
+    "owner_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Owner Id"
+    },
+    "limit": {
+     "default": 50,
+     "title": "Limit",
+     "type": "integer"
+    }
+   },
+   "title": "runs_search_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "sources.list",
+  "group": "sources",
+  "effect": "read",
+  "summary": "已登记的来源文件（file 引用的唯一授权入口），附当前解析出的位置 location。",
+  "input": {
+   "additionalProperties": false,
+   "description": "已登记的来源文件（file 引用的唯一授权入口），附当前解析出的位置 location。",
+   "properties": {},
+   "title": "sources_list_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "sources.roots",
+  "group": "sources",
+  "effect": "read",
+  "summary": "已登记的工作根（工作目录）与本次会话的工作目录。工作根下的来源记为\"根 + 相对路径\"，目录搬家只改根。",
+  "input": {
+   "additionalProperties": false,
+   "description": "已登记的工作根（工作目录）与本次会话的工作目录。工作根下的来源记为\"根 + 相对路径\"，目录搬家只改根。",
+   "properties": {},
+   "title": "sources_roots_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "sources.add_root",
+  "group": "sources",
+  "effect": "write",
+  "summary": "登记一个工作根。通常不必手动调用：登记本次工作目录里的文件时会自动建根。",
+  "input": {
+   "additionalProperties": false,
+   "description": "登记一个工作根。通常不必手动调用：登记本次工作目录里的文件时会自动建根。",
+   "properties": {
+    "path": {
+     "description": "工作目录的绝对路径（不能在数据目录内）",
+     "title": "Path",
+     "type": "string"
+    },
+    "title": {
+     "default": "",
+     "title": "Title",
+     "type": "string"
+    }
+   },
+   "required": [
+    "path"
+   ],
+   "title": "sources_add_root_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "sources.relocate_root",
+  "group": "sources",
+  "effect": "write",
+  "summary": "工作目录整体搬家：逐个核对新位置下已登记文件的指纹，全部一致才改根的位置；已有固定引用不变。",
+  "input": {
+   "additionalProperties": false,
+   "description": "工作目录整体搬家：逐个核对新位置下已登记文件的指纹，全部一致才改根的位置；已有固定引用不变。",
+   "properties": {
+    "root_id": {
+     "title": "Root Id",
+     "type": "string"
+    },
+    "new_path": {
+     "title": "New Path",
+     "type": "string"
+    },
+    "allow_missing": {
+     "default": false,
+     "title": "Allow Missing",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "root_id",
+    "new_path"
+   ],
+   "title": "sources_relocate_root_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "sources.register",
+  "group": "sources",
+  "effect": "write",
+  "summary": "登记一个来源文件并记录当前字节指纹：L0 原件的唯一授权入口。原件留在原处，不复制、不修改。 工作目录里的文件自动记为\"工作根 + 相对路径\"，迁移时随根重定向。 同一 ID 重复登记同一文件是幂等的；内容变了请用新 ID；文件搬家用 sources.relocate / sources.relocate_root。",
+  "input": {
+   "additionalProperties": false,
+   "description": "登记一个来源文件并记录当前字节指纹：L0 原件的唯一授权入口。原件留在原处，不复制、不修改。\n工作目录里的文件自动记为\"工作根 + 相对路径\"，迁移时随根重定向。\n同一 ID 重复登记同一文件是幂等的；内容变了请用新 ID；文件搬家用 sources.relocate / sources.relocate_root。",
+   "properties": {
+    "source_id": {
+     "pattern": "^SRC-",
+     "title": "Source Id",
+     "type": "string"
+    },
+    "path": {
+     "description": "工作目录等外部位置用绝对路径；数据目录内可用相对路径",
+     "title": "Path",
+     "type": "string"
+    },
+    "title": {
+     "default": "",
+     "title": "Title",
+     "type": "string"
+    },
+    "sensitivity": {
+     "default": "internal",
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ],
+     "title": "Sensitivity",
+     "type": "string"
+    }
+   },
+   "required": [
+    "source_id",
+    "path"
+   ],
+   "title": "sources_register_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "sources.register_many",
+  "group": "sources",
+  "effect": "write",
+  "summary": "批量登记来源（导入已有资料时使用）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "批量登记来源（导入已有资料时使用）。",
+   "properties": {
+    "items": {
+     "description": "[{source_id, path, title?, sensitivity?}]，逐条登记；单条失败不影响其他",
+     "items": {
+      "additionalProperties": true,
+      "type": "object"
+     },
+     "title": "Items",
+     "type": "array"
+    }
+   },
+   "required": [
+    "items"
+   ],
+   "title": "sources_register_many_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "sources.relocate",
+  "group": "sources",
+  "effect": "write",
+  "summary": "原件搬家：新位置的字节必须与登记时一致，旧路径记入 relocated_from，已有固定引用继续有效。",
+  "input": {
+   "additionalProperties": false,
+   "description": "原件搬家：新位置的字节必须与登记时一致，旧路径记入 relocated_from，已有固定引用继续有效。",
+   "properties": {
+    "source_id": {
+     "title": "Source Id",
+     "type": "string"
+    },
+    "new_path": {
+     "title": "New Path",
+     "type": "string"
+    }
+   },
+   "required": [
+    "source_id",
+    "new_path"
+   ],
+   "title": "sources_relocate_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "sources.update",
+  "group": "sources",
+  "effect": "user",
+  "summary": "（仅用户）启用/停用来源或调整敏感级别。停用后引用它的记录会在读取时被隐去。",
+  "input": {
+   "additionalProperties": false,
+   "description": "（仅用户）启用/停用来源或调整敏感级别。停用后引用它的记录会在读取时被隐去。",
+   "properties": {
+    "source_id": {
+     "title": "Source Id",
+     "type": "string"
+    },
+    "enabled": {
+     "anyOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Enabled"
+    },
+    "sensitivity": {
+     "anyOf": [
+      {
+       "enum": [
+        "public",
+        "internal",
+        "confidential",
+        "restricted"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Sensitivity"
+    }
+   },
+   "required": [
+    "source_id"
+   ],
+   "title": "sources_update_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "memory.owners",
+  "group": "memory",
+  "effect": "read",
+  "summary": "列出可读对象（按类型分组，带各层记录数）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "列出可读对象（按类型分组，带各层记录数）。",
+   "properties": {
+    "owner_types": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Owner Types"
+    },
+    "query": {
+     "default": "",
+     "title": "Query",
+     "type": "string"
+    }
+   },
+   "title": "memory_owners_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "memory.owner_create",
+  "group": "memory",
+  "effect": "write",
+  "summary": "新建对象（写入业务卡；首次提交记忆时才建立记忆目录）。Run 用 runs.create 建立。 先用 memory.owners 查找：同一目标的继续或子任务沿用已有对象；主题相似只引用；独立交付目标才新建。 core-algorithm 只用于公司文档定义的关键算法，普通脚本/模块/工具不要建算法卡。",
+  "input": {
+   "additionalProperties": false,
+   "description": "新建对象（写入业务卡；首次提交记忆时才建立记忆目录）。Run 用 runs.create 建立。",
+   "properties": {
+    "owner_type": {
+     "enum": [
+      "research",
+      "project",
+      "core-algorithm",
+      "data",
+      "tool",
+      "report"
+     ],
+     "title": "Owner Type",
+     "type": "string"
+    },
+    "slug": {
+     "description": "小写字母/数字/连字符",
+     "title": "Slug",
+     "type": "string"
+    },
+    "title": {
+     "title": "Title",
+     "type": "string"
+    },
+    "description": {
+     "default": "",
+     "title": "Description",
+     "type": "string"
+    },
+    "keywords": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Keywords"
+    },
+    "source_document": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "core-algorithm 必填：定义该算法的公司算法/模块文档（路径或文档编号）",
+     "title": "Source Document"
+    },
+    "sensitivity": {
+     "default": "internal",
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ],
+     "title": "Sensitivity",
+     "type": "string"
+    }
+   },
+   "required": [
+    "owner_type",
+    "slug",
+    "title"
+   ],
+   "title": "memory_owner_create_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "memory.owner_adopt",
+  "group": "memory",
+  "effect": "write",
+  "summary": "把内容树中已有的文档登记为对象（原件不修改；须给出你看到的字节指纹）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "把内容树中已有的文档登记为对象（原件不修改；须给出你看到的字节指纹）。",
+   "properties": {
+    "path": {
+     "title": "Path",
+     "type": "string"
+    },
+    "expected_sha256": {
+     "title": "Expected Sha256",
+     "type": "string"
+    }
+   },
+   "required": [
+    "path",
+    "expected_sha256"
+   ],
+   "title": "memory_owner_adopt_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "memory.records",
+  "group": "memory",
+  "effect": "read",
+  "summary": "对象内的记录目录（按层级，分页；不含正文）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "对象内的记录目录（按层级，分页；不含正文）。",
+   "properties": {
+    "owner_id": {
+     "description": "对象 ID，如 RES-…、PRJ-…、RUN-…",
+     "title": "Owner Id",
+     "type": "string"
+    },
+    "levels": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Levels"
+    },
+    "main_only": {
+     "default": true,
+     "title": "Main Only",
+     "type": "boolean"
+    },
+    "offset": {
+     "default": 0,
+     "title": "Offset",
+     "type": "integer"
+    },
+    "limit": {
+     "default": 100,
+     "title": "Limit",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "owner_id"
+   ],
+   "title": "memory_records_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "memory.kinds",
+  "group": "memory",
+  "effect": "read",
+  "summary": "全部记录类型：层级、版本、由哪个操作写入、一句话用途。",
+  "input": {
+   "additionalProperties": false,
+   "description": "全部记录类型：层级、版本、由哪个操作写入、一句话用途。",
+   "properties": {},
+   "title": "memory_kinds_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "memory.contract",
+  "group": "memory",
+  "effect": "read",
+  "summary": "某类记录的草案契约：必填字段、payload 结构、写作要点和一份经校验的示例草案。写草案前先调用。",
+  "input": {
+   "additionalProperties": false,
+   "description": "某类记录的草案契约：必填字段、payload 结构、写作要点和一份经校验的示例草案。写草案前先调用。",
+   "properties": {
+    "kind": {
+     "description": "记录类型，如 detail、narrative、experience、overview、checkpoint",
+     "title": "Kind",
+     "type": "string"
+    }
+   },
+   "required": [
+    "kind"
+   ],
+   "title": "memory_contract_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "memory.inspect",
+  "group": "memory",
+  "effect": "read",
+  "summary": "读取对象的当前快照，或某条记录的当前/指定修订（含完整正文与固定引用）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "读取对象的当前快照，或某条记录的当前/指定修订（含完整正文与固定引用）。",
+   "properties": {
+    "owner_id": {
+     "description": "对象 ID，如 RES-…、PRJ-…、RUN-…",
+     "title": "Owner Id",
+     "type": "string"
+    },
+    "record_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Record Id"
+    },
+    "revision": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Revision"
+    }
+   },
+   "required": [
+    "owner_id"
+   ],
+   "title": "memory_inspect_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "memory.commit",
+  "group": "memory",
+  "effect": "write",
+  "summary": "保存一批记录（同一对象内原子提交）。dry_run=true 只预检不写入。",
+  "input": {
+   "additionalProperties": false,
+   "description": "保存一批记录（同一对象内原子提交）。dry_run=true 只预检不写入。",
+   "properties": {
+    "owner_id": {
+     "description": "对象 ID，如 RES-…、PRJ-…、RUN-…",
+     "title": "Owner Id",
+     "type": "string"
+    },
+    "operations": {
+     "description": "操作列表：新建 {op:'put_record', client_key, draft}；修订 {op:'put_record', record_id, expected_revision, draft}。draft 的字段与示例用 memory.contract(kind) 查询；批内引用可写 {client_key: 'x'}",
+     "items": {
+      "additionalProperties": true,
+      "type": "object"
+     },
+     "title": "Operations",
+     "type": "array"
+    },
+    "expected_head": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "description": "提交前看到的 HEAD commit_id；新对象为 null",
+     "title": "Expected Head"
+    },
+    "request_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "UUID；重试时用同一个保证幂等",
+     "title": "Request Id"
+    },
+    "dry_run": {
+     "default": false,
+     "title": "Dry Run",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "owner_id",
+    "operations",
+    "expected_head"
+   ],
+   "title": "memory_commit_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "memory.document",
+  "group": "memory",
+  "effect": "read",
+  "summary": "读取研究文稿：完整文稿 / 目录 / 单章上下文包（改写某章用）/ 依据变化影响。",
+  "input": {
+   "additionalProperties": false,
+   "description": "读取研究文稿：完整文稿 / 目录 / 单章上下文包（改写某章用）/ 依据变化影响。",
+   "properties": {
+    "owner_id": {
+     "description": "对象 ID，如 RES-…、PRJ-…、RUN-…",
+     "title": "Owner Id",
+     "type": "string"
+    },
+    "view": {
+     "default": "full",
+     "enum": [
+      "full",
+      "outline",
+      "section",
+      "impact"
+     ],
+     "title": "View",
+     "type": "string"
+    },
+    "document_type": {
+     "default": "research_process",
+     "enum": [
+      "research_process",
+      "research_report"
+     ],
+     "title": "Document Type",
+     "type": "string"
+    },
+    "document_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Document Id"
+    },
+    "section_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Section Id"
+    },
+    "max_chars": {
+     "default": 20000,
+     "title": "Max Chars",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "owner_id"
+   ],
+   "title": "memory_document_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "memory.figure",
+  "group": "memory",
+  "effect": "read",
+  "summary": "技术单元登记的图片（data URL）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "技术单元登记的图片（data URL）。",
+   "properties": {
+    "owner_id": {
+     "description": "对象 ID，如 RES-…、PRJ-…、RUN-…",
+     "title": "Owner Id",
+     "type": "string"
+    },
+    "record_id": {
+     "title": "Record Id",
+     "type": "string"
+    },
+    "revision": {
+     "title": "Revision",
+     "type": "integer"
+    },
+    "index": {
+     "title": "Index",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "owner_id",
+    "record_id",
+    "revision",
+    "index"
+   ],
+   "title": "memory_figure_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "memory.timeline",
+  "group": "memory",
+  "effect": "read",
+  "summary": "研究时间线：全部记录的全部修订与关联 Run（不含正文）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "研究时间线：全部记录的全部修订与关联 Run（不含正文）。",
+   "properties": {
+    "owner_id": {
+     "description": "对象 ID，如 RES-…、PRJ-…、RUN-…",
+     "title": "Owner Id",
+     "type": "string"
+    },
+    "offset": {
+     "default": 0,
+     "title": "Offset",
+     "type": "integer"
+    },
+    "limit": {
+     "default": 50,
+     "title": "Limit",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "owner_id"
+   ],
+   "title": "memory_timeline_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "memory.raw_materials",
+  "group": "memory",
+  "effect": "read",
+  "summary": "L0 原始材料清单（不读原件正文）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "L0 原始材料清单（不读原件正文）。",
+   "properties": {
+    "owner_id": {
+     "description": "对象 ID，如 RES-…、PRJ-…、RUN-…",
+     "title": "Owner Id",
+     "type": "string"
+    }
+   },
+   "required": [
+    "owner_id"
+   ],
+   "title": "memory_raw_materials_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "memory.raw_material",
+  "group": "memory",
+  "effect": "read",
+  "summary": "回读一个原始材料（按清单中的 ID；核对固定字节）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "回读一个原始材料（按清单中的 ID；核对固定字节）。",
+   "properties": {
+    "owner_id": {
+     "description": "对象 ID，如 RES-…、PRJ-…、RUN-…",
+     "title": "Owner Id",
+     "type": "string"
+    },
+    "material_id": {
+     "title": "Material Id",
+     "type": "string"
+    },
+    "max_chars": {
+     "default": 20000,
+     "title": "Max Chars",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "owner_id",
+    "material_id"
+   ],
+   "title": "memory_raw_material_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "memory.resume",
+  "group": "memory",
+  "effect": "read",
+  "summary": "续接对象的上下文：目标→检查点→最新概览/经过/技术→路线/问题/经验（只读）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "续接对象的上下文：目标→检查点→最新概览/经过/技术→路线/问题/经验（只读）。",
+   "properties": {
+    "owner_id": {
+     "description": "对象 ID，如 RES-…、PRJ-…、RUN-…",
+     "title": "Owner Id",
+     "type": "string"
+    }
+   },
+   "required": [
+    "owner_id"
+   ],
+   "title": "memory_resume_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "memory.export",
+  "group": "memory",
+  "effect": "read",
+  "summary": "导出对象的记忆（不产生新记录、不复制原件）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "导出对象的记忆（不产生新记录、不复制原件）。",
+   "properties": {
+    "owner_id": {
+     "description": "对象 ID，如 RES-…、PRJ-…、RUN-…",
+     "title": "Owner Id",
+     "type": "string"
+    },
+    "fmt": {
+     "default": "markdown",
+     "enum": [
+      "markdown",
+      "json",
+      "html"
+     ],
+     "title": "Fmt",
+     "type": "string"
+    },
+    "record_ids": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Record Ids"
+    },
+    "exclude_ids": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Exclude Ids"
+    },
+    "include_raw_materials": {
+     "default": false,
+     "title": "Include Raw Materials",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "owner_id"
+   ],
+   "title": "memory_export_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "memory.consolidate_prepare",
+  "group": "memory",
+  "effect": "read",
+  "summary": "阶段巩固的待处理清单：自上次巩固以来的变化、受影响下游与合并/冲突候选。",
+  "input": {
+   "additionalProperties": false,
+   "description": "阶段巩固的待处理清单：自上次巩固以来的变化、受影响下游与合并/冲突候选。",
+   "properties": {
+    "owner_id": {
+     "description": "对象 ID，如 RES-…、PRJ-…、RUN-…",
+     "title": "Owner Id",
+     "type": "string"
+    },
+    "since_commit": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Since Commit"
+    }
+   },
+   "required": [
+    "owner_id"
+   ],
+   "title": "memory_consolidate_prepare_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "memory.consolidate_apply",
+  "group": "memory",
+  "effect": "write",
+  "summary": "保存巩固处置（retain/revise/retract/defer…），可与本批实际修订一起提交。",
+  "input": {
+   "additionalProperties": false,
+   "description": "保存巩固处置（retain/revise/retract/defer…），可与本批实际修订一起提交。",
+   "properties": {
+    "owner_id": {
+     "description": "对象 ID，如 RES-…、PRJ-…、RUN-…",
+     "title": "Owner Id",
+     "type": "string"
+    },
+    "basis": {
+     "additionalProperties": true,
+     "title": "Basis",
+     "type": "object"
+    },
+    "decisions": {
+     "items": {
+      "additionalProperties": true,
+      "type": "object"
+     },
+     "title": "Decisions",
+     "type": "array"
+    },
+    "reason": {
+     "title": "Reason",
+     "type": "string"
+    },
+    "operations": {
+     "anyOf": [
+      {
+       "items": {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Operations"
+    },
+    "dry_run": {
+     "default": false,
+     "title": "Dry Run",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "owner_id",
+    "basis",
+    "decisions",
+    "reason"
+   ],
+   "title": "memory_consolidate_apply_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "memory.summary_materials",
+  "group": "memory",
+  "effect": "read",
+  "summary": "跨对象总结的固定材料包（不生成总结）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "跨对象总结的固定材料包（不生成总结）。",
+   "properties": {
+    "owner_ids": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Owner Ids",
+     "type": "array"
+    },
+    "exclude_ids": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Exclude Ids"
+    }
+   },
+   "required": [
+    "owner_ids"
+   ],
+   "title": "memory_summary_materials_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "memory.summary_save",
+  "group": "memory",
+  "effect": "write",
+  "summary": "把写好的总结保存为本对象的 L3/L4；依据对象有新提交则拒绝。",
+  "input": {
+   "additionalProperties": false,
+   "description": "把写好的总结保存为本对象的 L3/L4；依据对象有新提交则拒绝。",
+   "properties": {
+    "owner_id": {
+     "description": "对象 ID，如 RES-…、PRJ-…、RUN-…",
+     "title": "Owner Id",
+     "type": "string"
+    },
+    "draft": {
+     "additionalProperties": true,
+     "title": "Draft",
+     "type": "object"
+    },
+    "basis_heads": {
+     "additionalProperties": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "title": "Basis Heads",
+     "type": "object"
+    },
+    "record_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Record Id"
+    },
+    "expected_revision": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Expected Revision"
+    },
+    "dry_run": {
+     "default": false,
+     "title": "Dry Run",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "owner_id",
+    "draft",
+    "basis_heads"
+   ],
+   "title": "memory_summary_save_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "memory.feedback",
+  "group": "memory",
+  "effect": "write",
+  "summary": "记录检索结果的使用反馈（采用次数不是复核）。label=outcome 时 adopted_in 须指向实际应用它的 Run 或记录。",
+  "input": {
+   "additionalProperties": false,
+   "description": "记录检索结果的使用反馈（采用次数不是复核）。label=outcome 时 adopted_in 须指向实际应用它的 Run 或记录。",
+   "properties": {
+    "owner_id": {
+     "description": "对象 ID，如 RES-…、PRJ-…、RUN-…",
+     "title": "Owner Id",
+     "type": "string"
+    },
+    "query_id": {
+     "title": "Query Id",
+     "type": "string"
+    },
+    "target": {
+     "additionalProperties": true,
+     "title": "Target",
+     "type": "object"
+    },
+    "label": {
+     "enum": [
+      "missing",
+      "irrelevant",
+      "invalid_analogy",
+      "lost_boundary",
+      "stale",
+      "adopted",
+      "outcome"
+     ],
+     "title": "Label",
+     "type": "string"
+    },
+    "note": {
+     "default": "",
+     "title": "Note",
+     "type": "string"
+    },
+    "adopted_in": {
+     "anyOf": [
+      {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Adopted In"
+    },
+    "request_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "UUID；重试时沿用同一个，不会重复记录",
+     "title": "Request Id"
+    }
+   },
+   "required": [
+    "owner_id",
+    "query_id",
+    "target",
+    "label"
+   ],
+   "title": "memory_feedback_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "memory.recovery",
+  "group": "memory",
+  "effect": "admin",
+  "summary": "检查记忆目录健康状况（写锁、孤立提交、暂存残留）；只报告不修改。",
+  "input": {
+   "additionalProperties": false,
+   "description": "检查记忆目录健康状况（写锁、孤立提交、暂存残留）；只报告不修改。",
+   "properties": {
+    "owner_id": {
+     "description": "对象 ID，如 RES-…、PRJ-…、RUN-…",
+     "title": "Owner Id",
+     "type": "string"
+    }
+   },
+   "required": [
+    "owner_id"
+   ],
+   "title": "memory_recovery_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "query.search",
+  "group": "query",
+  "effect": "read",
+  "summary": "检索材料并逐个回到固定版本核对，返回第一页候选（候选不是已读正文）。",
+  "input": {
+   "$defs": {
+    "Budget": {
+     "additionalProperties": false,
+     "description": "累计硬上限。wall_ms 计活动执行时间（不含用户阅读停留）；0 表示禁止该类操作。",
+     "properties": {
+      "wall_ms": {
+       "default": 300000,
+       "maximum": 600000,
+       "minimum": 1,
+       "title": "Wall Ms",
+       "type": "integer"
+      },
+      "read_bytes": {
+       "default": 16777216,
+       "maximum": 33554432,
+       "minimum": 0,
+       "title": "Read Bytes",
+       "type": "integer"
+      },
+      "output_chars": {
+       "default": 80000,
+       "maximum": 100000,
+       "minimum": 0,
+       "title": "Output Chars",
+       "type": "integer"
+      },
+      "candidates": {
+       "default": 100,
+       "maximum": 2000,
+       "minimum": 0,
+       "title": "Candidates",
+       "type": "integer"
+      },
+      "graph_nodes": {
+       "default": 50,
+       "maximum": 1000,
+       "minimum": 0,
+       "title": "Graph Nodes",
+       "type": "integer"
+      },
+      "graph_edges": {
+       "default": 100,
+       "maximum": 2000,
+       "minimum": 0,
+       "title": "Graph Edges",
+       "type": "integer"
+      },
+      "graph_hops": {
+       "default": 2,
+       "maximum": 6,
+       "minimum": 0,
+       "title": "Graph Hops",
+       "type": "integer"
+      },
+      "model_tokens": {
+       "default": 512,
+       "maximum": 200000,
+       "minimum": 0,
+       "title": "Model Tokens",
+       "type": "integer"
+      },
+      "model_calls": {
+       "default": 1,
+       "maximum": 20,
+       "minimum": 0,
+       "title": "Model Calls",
+       "type": "integer"
+      },
+      "model_input_tokens": {
+       "default": 512,
+       "maximum": 150000,
+       "minimum": 0,
+       "title": "Model Input Tokens",
+       "type": "integer"
+      },
+      "model_output_tokens": {
+       "default": 0,
+       "maximum": 50000,
+       "minimum": 0,
+       "title": "Model Output Tokens",
+       "type": "integer"
+      },
+      "rerank_items": {
+       "default": 0,
+       "maximum": 200,
+       "minimum": 0,
+       "title": "Rerank Items",
+       "type": "integer"
+      }
+     },
+     "title": "Budget",
+     "type": "object"
+    },
+    "Scope": {
+     "additionalProperties": false,
+     "description": "直接候选的范围。不同维度同时满足；同一维度内任一值即可。None 表示不限。",
+     "properties": {
+      "owner_ids": {
+       "anyOf": [
+        {
+         "items": {
+          "type": "string"
+         },
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "限定对象；显式列出的对象才能看到其 owner_only 记录",
+       "title": "Owner Ids"
+      },
+      "owner_types": {
+       "anyOf": [
+        {
+         "items": {
+          "type": "string"
+         },
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "research / project / core-algorithm / run / knowledge …",
+       "title": "Owner Types"
+      },
+      "kinds": {
+       "anyOf": [
+        {
+         "items": {
+          "type": "string"
+         },
+         "type": "array"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Kinds"
+      },
+      "exclude_ids": {
+       "description": "排除的对象/记录/结论 ID；排除始终生效",
+       "items": {
+        "type": "string"
+       },
+       "title": "Exclude Ids",
+       "type": "array"
+      },
+      "updated_from": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Updated From"
+      },
+      "updated_before": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "title": "Updated Before"
+      }
+     },
+     "title": "Scope",
+     "type": "object"
+    }
+   },
+   "additionalProperties": false,
+   "description": "检索材料并逐个回到固定版本核对，返回第一页候选（候选不是已读正文）。",
+   "properties": {
+    "question": {
+     "title": "Question",
+     "type": "string"
+    },
+    "keywords": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Keywords"
+    },
+    "content_source": {
+     "default": "overview_experience",
+     "description": "overview_experience=L4/L3（默认）；process=L2 研究经过；technical=L1 技术内容；all=全部含原始来源",
+     "enum": [
+      "overview_experience",
+      "process",
+      "technical",
+      "all"
+     ],
+     "title": "Content Source",
+     "type": "string"
+    },
+    "scope": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/Scope"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    },
+    "review_filter": {
+     "default": "all",
+     "enum": [
+      "all",
+      "reviewed_only",
+      "exclude_unsafe",
+      "unreviewed_only"
+     ],
+     "title": "Review Filter",
+     "type": "string"
+    },
+    "purpose": {
+     "default": "exploration",
+     "enum": [
+      "exploration",
+      "formal"
+     ],
+     "title": "Purpose",
+     "type": "string"
+    },
+    "applicability": {
+     "default": "",
+     "description": "purpose=formal 时必填：结论的适用范围",
+     "title": "Applicability",
+     "type": "string"
+    },
+    "freshness": {
+     "default": "current",
+     "enum": [
+      "current",
+      "allow_stale"
+     ],
+     "title": "Freshness",
+     "type": "string"
+    },
+    "channels": {
+     "anyOf": [
+      {
+       "items": {
+        "enum": [
+         "identity",
+         "lexical",
+         "dense"
+        ],
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Channels"
+    },
+    "context_reach": {
+     "default": "any_readable",
+     "enum": [
+      "any_readable",
+      "same_scope"
+     ],
+     "title": "Context Reach",
+     "type": "string"
+    },
+    "result_limit": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Result Limit"
+    },
+    "budget": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/Budget"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null
+    },
+    "query_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Query Id"
+    }
+   },
+   "required": [
+    "question"
+   ],
+   "title": "query_search_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "query.page",
+  "group": "query",
+  "effect": "read",
+  "summary": "下一页候选（沿用原范围与累计预算）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "下一页候选（沿用原范围与累计预算）。",
+   "properties": {
+    "query_id": {
+     "description": "query.search 返回的 query_id",
+     "title": "Query Id",
+     "type": "string"
+    },
+    "cursor": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Cursor"
+    }
+   },
+   "required": [
+    "query_id"
+   ],
+   "title": "query_page_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "query.cancel",
+  "group": "query",
+  "effect": "read",
+  "summary": "取消查询（已完成部分保留）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "取消查询（已完成部分保留）。",
+   "properties": {
+    "query_id": {
+     "description": "query.search 返回的 query_id",
+     "title": "Query Id",
+     "type": "string"
+    }
+   },
+   "required": [
+    "query_id"
+   ],
+   "title": "query_cancel_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "query.assemble",
+  "group": "query",
+  "effect": "read",
+  "summary": "把所选候选组合成阅读包：正文 + 必要依据（+ 已采纳关联补充）；预算不足整块省略并报告。",
+  "input": {
+   "additionalProperties": false,
+   "description": "把所选候选组合成阅读包：正文 + 必要依据（+ 已采纳关联补充）；预算不足整块省略并报告。",
+   "properties": {
+    "query_id": {
+     "description": "query.search 返回的 query_id",
+     "title": "Query Id",
+     "type": "string"
+    },
+    "candidate_ids": {
+     "description": "候选 ID（C-…），来自本次查询已返回的结果",
+     "items": {
+      "type": "string"
+     },
+     "title": "Candidate Ids",
+     "type": "array"
+    },
+    "associations": {
+     "default": false,
+     "title": "Associations",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "query_id",
+    "candidate_ids"
+   ],
+   "title": "query_assemble_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "query.expand",
+  "group": "query",
+  "effect": "read",
+  "summary": "沿作者保存的固定引用展开：经验/概览 → 研究经过或技术依据。",
+  "input": {
+   "additionalProperties": false,
+   "description": "沿作者保存的固定引用展开：经验/概览 → 研究经过或技术依据。",
+   "properties": {
+    "query_id": {
+     "description": "query.search 返回的 query_id",
+     "title": "Query Id",
+     "type": "string"
+    },
+    "candidate_ids": {
+     "description": "候选 ID（C-…），来自本次查询已返回的结果",
+     "items": {
+      "type": "string"
+     },
+     "title": "Candidate Ids",
+     "type": "array"
+    },
+    "target": {
+     "enum": [
+      "process",
+      "technical"
+     ],
+     "title": "Target",
+     "type": "string"
+    }
+   },
+   "required": [
+    "query_id",
+    "candidate_ids",
+    "target"
+   ],
+   "title": "query_expand_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "query.deepen",
+  "group": "query",
+  "effect": "read",
+  "summary": "沿已保存关系有界深化（节点/边/跳数计入预算）；可达不等于科学支持。",
+  "input": {
+   "additionalProperties": false,
+   "description": "沿已保存关系有界深化（节点/边/跳数计入预算）；可达不等于科学支持。",
+   "properties": {
+    "query_id": {
+     "description": "query.search 返回的 query_id",
+     "title": "Query Id",
+     "type": "string"
+    },
+    "candidate_ids": {
+     "description": "候选 ID（C-…），来自本次查询已返回的结果",
+     "items": {
+      "type": "string"
+     },
+     "title": "Candidate Ids",
+     "type": "array"
+    },
+    "hops": {
+     "default": 2,
+     "title": "Hops",
+     "type": "integer"
+    },
+    "relations": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Relations"
+    },
+    "include_associations": {
+     "default": true,
+     "title": "Include Associations",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "query_id",
+    "candidate_ids"
+   ],
+   "title": "query_deepen_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "query.documents",
+  "group": "query",
+  "effect": "read",
+  "summary": "返回候选所属对象的完整文稿（按文稿去重，保持章节顺序）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "返回候选所属对象的完整文稿（按文稿去重，保持章节顺序）。",
+   "properties": {
+    "query_id": {
+     "description": "query.search 返回的 query_id",
+     "title": "Query Id",
+     "type": "string"
+    },
+    "candidate_ids": {
+     "description": "候选 ID（C-…），来自本次查询已返回的结果",
+     "items": {
+      "type": "string"
+     },
+     "title": "Candidate Ids",
+     "type": "array"
+    },
+    "document_type": {
+     "default": "research_process",
+     "enum": [
+      "research_process",
+      "research_report"
+     ],
+     "title": "Document Type",
+     "type": "string"
+    }
+   },
+   "required": [
+    "query_id",
+    "candidate_ids"
+   ],
+   "title": "query_documents_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "reading.start",
+  "group": "reading",
+  "effect": "write",
+  "summary": "创建阅读会话并立即召回，返回第一批对象筛选包（每个对象 2–4 个命中窗口，含 digest）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "创建阅读会话并立即召回，返回第一批对象筛选包（每个对象 2–4 个命中窗口，含 digest）。",
+   "properties": {
+    "question": {
+     "description": "要回答的问题，一句话，保留型号与数值原文",
+     "title": "Question",
+     "type": "string"
+    },
+    "conditions": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "问题的前提条件（自然语言），会显示给用户",
+     "title": "Conditions"
+    },
+    "strategy": {
+     "anyOf": [
+      {
+       "enum": [
+        "standard",
+        "associative",
+        "quick"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "standard=筛选后完整阅读（默认）；associative=不足时按联想方向补查；quick=只依据片段、不读全文",
+     "title": "Strategy"
+    },
+    "review_filter": {
+     "anyOf": [
+      {
+       "enum": [
+        "all",
+        "reviewed_only",
+        "exclude_unsafe",
+        "unreviewed_only"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "all（默认，带复核徽标）/ reviewed_only / exclude_unsafe / unreviewed_only",
+     "title": "Review Filter"
+    },
+    "variants": {
+     "anyOf": [
+      {
+       "items": {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "最多 2 条等义改写 [{language: zh|en, question, lexical_terms?}]；技术问题建议补一条英文；型号、数值必须原样保留",
+     "title": "Variants"
+    },
+    "protected_terms": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "必须原样出现的词（型号、编号）",
+     "title": "Protected Terms"
+    },
+    "domains": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "术语库领域，用于术语扩展",
+     "title": "Domains"
+    },
+    "owner_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "本次阅读服务于哪个对象（续接用）",
+     "title": "Owner Id"
+    },
+    "scope_owner_ids": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "只在这些对象中召回",
+     "title": "Scope Owner Ids"
+    },
+    "field_conditions": {
+     "anyOf": [
+      {
+       "items": {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "可选的显式字段条件，最多 16 条：[{id, kind: literal|numeric, field, operator: eq|ne|lt|le|gt|ge, expected, unit?}]。只在原文的“字段：值”中核对，冲突的对象排后、不删除",
+     "title": "Field Conditions"
+    }
+   },
+   "required": [
+    "question"
+   ],
+   "title": "reading_start_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "reading.assess",
+  "group": "reading",
+  "effect": "write",
+  "summary": "三态判断一批对象；返回下一批或“可以开始读”的提示。用户的改判优先，不会被覆盖。",
+  "input": {
+   "additionalProperties": false,
+   "description": "三态判断一批对象；返回下一批或“可以开始读”的提示。用户的改判优先，不会被覆盖。",
+   "properties": {
+    "session_id": {
+     "description": "阅读会话 ID（RS-…）",
+     "title": "Session Id",
+     "type": "string"
+    },
+    "judgments": {
+     "description": "[{owner_id, verdict, reason, digest, accepted_windows?}]。verdict：relevant=窗口显示它能回答问题或提供必要依据，值得完整阅读；uncertain=信息不足以判断，先 reading_peek 或交给用户；irrelevant=明确无关。reason 写依据窗口里的什么内容；digest 原样抄筛选包的 digest；quick 策略在 accepted_windows 列出可作为笔记依据的窗口 entry_id",
+     "items": {
+      "additionalProperties": true,
+      "type": "object"
+     },
+     "title": "Judgments",
+     "type": "array"
+    },
+    "request_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "可选 UUID；网络重试时沿用同一个，不会重复执行",
+     "title": "Request Id"
+    }
+   },
+   "required": [
+    "session_id",
+    "judgments"
+   ],
+   "title": "reading_assess_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "reading.peek",
+  "group": "reading",
+  "effect": "write",
+  "summary": "查看某对象更多的命中窗口（用于 uncertain 的对象）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "查看某对象更多的命中窗口（用于 uncertain 的对象）。",
+   "properties": {
+    "session_id": {
+     "description": "阅读会话 ID（RS-…）",
+     "title": "Session Id",
+     "type": "string"
+    },
+    "owner_id": {
+     "title": "Owner Id",
+     "type": "string"
+    }
+   },
+   "required": [
+    "session_id",
+    "owner_id"
+   ],
+   "title": "reading_peek_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "reading.read",
+  "group": "reading",
+  "effect": "write",
+  "summary": "完整阅读判为相关的对象：第 1 页附目录，按 unread_pages 读完全部页。quick 策略不可用。 对象在阅读期间有新提交时要求从第 1 页重读（STALE_BASIS）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "完整阅读判为相关的对象：第 1 页附目录，按 unread_pages 读完全部页。quick 策略不可用。\n对象在阅读期间有新提交时要求从第 1 页重读（STALE_BASIS）。",
+   "properties": {
+    "session_id": {
+     "description": "阅读会话 ID（RS-…）",
+     "title": "Session Id",
+     "type": "string"
+    },
+    "owner_id": {
+     "title": "Owner Id",
+     "type": "string"
+    },
+    "page": {
+     "default": 1,
+     "title": "Page",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "session_id",
+    "owner_id"
+   ],
+   "title": "reading_read_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "reading.note",
+  "group": "reading",
+  "effect": "write",
+  "summary": "保存某对象的研究笔记（standard/associative 须先读完全部页）；出处补全为固定引用。",
+  "input": {
+   "additionalProperties": false,
+   "description": "保存某对象的研究笔记（standard/associative 须先读完全部页）；出处补全为固定引用。",
+   "properties": {
+    "session_id": {
+     "description": "阅读会话 ID（RS-…）",
+     "title": "Session Id",
+     "type": "string"
+    },
+    "owner_id": {
+     "title": "Owner Id",
+     "type": "string"
+    },
+    "note": {
+     "description": "研究笔记（Markdown）：只写材料中的知识——问题如何演进、方法/公式（定义变量与单位）/条件、关键数据、反例与局限；关键句旁就近标出处 ID；不重复本次问题，不写自己的操作计划",
+     "title": "Note",
+     "type": "string"
+    },
+    "sources": {
+     "description": "出处 ID：必须是本会话交付过的（如 MEM-…、MEM-…#块ID、SRC-…）；quick 下只能是已采纳的窗口",
+     "items": {
+      "type": "string"
+     },
+     "title": "Sources",
+     "type": "array"
+    },
+    "clues": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "可选的探索线索（材料提到但未核实的方向、可能相关的对象）；只作导航，不会成为结论",
+     "title": "Clues"
+    },
+    "request_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "可选 UUID；网络重试时沿用同一个，不会重复执行",
+     "title": "Request Id"
+    }
+   },
+   "required": [
+    "session_id",
+    "owner_id",
+    "note",
+    "sources"
+   ],
+   "title": "reading_note_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "reading.synthesize",
+  "group": "reading",
+  "effect": "write",
+  "summary": "跨对象综合笔记；所依据的任何单篇笔记改变或陈旧后，综合稿自动失效。",
+  "input": {
+   "additionalProperties": false,
+   "description": "跨对象综合笔记；所依据的任何单篇笔记改变或陈旧后，综合稿自动失效。",
+   "properties": {
+    "session_id": {
+     "description": "阅读会话 ID（RS-…）",
+     "title": "Session Id",
+     "type": "string"
+    },
+    "note": {
+     "title": "Note",
+     "type": "string"
+    },
+    "sources": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Sources",
+     "type": "array"
+    },
+    "owner_ids": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Owner Ids",
+     "type": "array"
+    },
+    "request_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "可选 UUID；网络重试时沿用同一个，不会重复执行",
+     "title": "Request Id"
+    }
+   },
+   "required": [
+    "session_id",
+    "note",
+    "sources",
+    "owner_ids"
+   ],
+   "title": "reading_synthesize_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "reading.ask_user",
+  "group": "reading",
+  "effect": "write",
+  "summary": "向用户提问。fulltext=申请全文补偿（仅当发现召回不可用、不完整或不足，见 fulltext_available；批准后得到 approval_id）；direction=请用户定联想方向；clarify=澄清问题。用户可在对话或工作台回答。",
+  "input": {
+   "additionalProperties": false,
+   "description": "向用户提问。fulltext=申请全文补偿（仅当发现召回不可用、不完整或不足，见 fulltext_available；批准后得到\napproval_id）；direction=请用户定联想方向；clarify=澄清问题。用户可在对话或工作台回答。",
+   "properties": {
+    "session_id": {
+     "description": "阅读会话 ID（RS-…）",
+     "title": "Session Id",
+     "type": "string"
+    },
+    "kind": {
+     "enum": [
+      "fulltext",
+      "direction",
+      "clarify"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "prompt": {
+     "title": "Prompt",
+     "type": "string"
+    },
+    "options": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Options"
+    },
+    "request_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "可选 UUID；网络重试时沿用同一个，不会重复执行",
+     "title": "Request Id"
+    }
+   },
+   "required": [
+    "session_id",
+    "kind",
+    "prompt"
+   ],
+   "title": "reading_ask_user_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "reading.recall",
+  "group": "reading",
+  "effect": "write",
+  "summary": "补充召回：全文补偿（需用户批准）或联想补查（associative 策略，受轮数上限）。 想换一种问法重新找，请新开一个 reading_start。",
+  "input": {
+   "additionalProperties": false,
+   "description": "补充召回：全文补偿（需用户批准）或联想补查（associative 策略，受轮数上限）。\n想换一种问法重新找，请新开一个 reading_start。",
+   "properties": {
+    "session_id": {
+     "description": "阅读会话 ID（RS-…）",
+     "title": "Session Id",
+     "type": "string"
+    },
+    "mode": {
+     "enum": [
+      "fulltext",
+      "association"
+     ],
+     "title": "Mode",
+     "type": "string"
+    },
+    "approval_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "fulltext 模式必填：用户批准后的 approval_id",
+     "title": "Approval Id"
+    },
+    "association_text": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "association 模式：联想方向（由主 agent 制定）",
+     "title": "Association Text"
+    },
+    "request_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "可选 UUID；网络重试时沿用同一个，不会重复执行",
+     "title": "Request Id"
+    }
+   },
+   "required": [
+    "session_id",
+    "mode"
+   ],
+   "title": "reading_recall_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "reading.finish",
+  "group": "reading",
+  "effect": "write",
+  "summary": "结束会话并返回交接文本（综合稿优先；陈旧笔记不交付；超出上限的笔记整篇省略并列出缺口）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "结束会话并返回交接文本（综合稿优先；陈旧笔记不交付；超出上限的笔记整篇省略并列出缺口）。",
+   "properties": {
+    "session_id": {
+     "description": "阅读会话 ID（RS-…）",
+     "title": "Session Id",
+     "type": "string"
+    },
+    "outcome": {
+     "default": "",
+     "description": "一句话说明结束原因或结论去向，如“已回答，交给 work 保存”",
+     "title": "Outcome",
+     "type": "string"
+    },
+    "request_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "可选 UUID；网络重试时沿用同一个，不会重复执行",
+     "title": "Request Id"
+    }
+   },
+   "required": [
+    "session_id"
+   ],
+   "title": "reading_finish_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "reading.status",
+  "group": "reading",
+  "effect": "read",
+  "summary": "会话概况、当前批次、交接预览、预算消耗，以及用户在工作台上的新输入（每条只交付一次）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "会话概况、当前批次、交接预览、预算消耗，以及用户在工作台上的新输入（每条只交付一次）。",
+   "properties": {
+    "session_id": {
+     "description": "阅读会话 ID（RS-…）",
+     "title": "Session Id",
+     "type": "string"
+    }
+   },
+   "required": [
+    "session_id"
+   ],
+   "title": "reading_status_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "reading.delegate",
+  "group": "reading",
+  "effect": "read",
+  "summary": "子 agent 任务包（只描述任务；实际派工由宿主完成）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "子 agent 任务包（只描述任务；实际派工由宿主完成）。",
+   "properties": {
+    "session_id": {
+     "description": "阅读会话 ID（RS-…）",
+     "title": "Session Id",
+     "type": "string"
+    },
+    "host_supports_subagents": {
+     "title": "Host Supports Subagents",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "session_id",
+    "host_supports_subagents"
+   ],
+   "title": "reading_delegate_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "reading.list",
+  "group": "reading",
+  "effect": "read",
+  "summary": "阅读会话列表（最新在前）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "阅读会话列表（最新在前）。",
+   "properties": {
+    "status": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Status"
+    },
+    "owner_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Owner Id"
+    },
+    "limit": {
+     "default": 50,
+     "title": "Limit",
+     "type": "integer"
+    }
+   },
+   "title": "reading_list_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "reading.view",
+  "group": "reading",
+  "effect": "read",
+  "summary": "会话完整状态（时间线、筛选包、笔记、请求）；只读，不消费收件箱。",
+  "input": {
+   "additionalProperties": false,
+   "description": "会话完整状态（时间线、筛选包、笔记、请求）；只读，不消费收件箱。",
+   "properties": {
+    "session_id": {
+     "description": "阅读会话 ID（RS-…）",
+     "title": "Session Id",
+     "type": "string"
+    }
+   },
+   "required": [
+    "session_id"
+   ],
+   "title": "reading_view_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "reading.respond",
+  "group": "reading",
+  "effect": "user",
+  "summary": "回答 agent 的请求；批准全文补偿会生成 approval_id。",
+  "input": {
+   "additionalProperties": false,
+   "description": "回答 agent 的请求；批准全文补偿会生成 approval_id。",
+   "properties": {
+    "session_id": {
+     "description": "阅读会话 ID（RS-…）",
+     "title": "Session Id",
+     "type": "string"
+    },
+    "request_id": {
+     "title": "Request Id",
+     "type": "string"
+    },
+    "decision": {
+     "enum": [
+      "approve",
+      "deny",
+      "answer"
+     ],
+     "title": "Decision",
+     "type": "string"
+    },
+    "answer": {
+     "default": "",
+     "title": "Answer",
+     "type": "string"
+    }
+   },
+   "required": [
+    "session_id",
+    "request_id",
+    "decision"
+   ],
+   "title": "reading_respond_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "reading.override",
+  "group": "reading",
+  "effect": "user",
+  "summary": "用户改判某个对象（agent 不能再覆盖）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "用户改判某个对象（agent 不能再覆盖）。",
+   "properties": {
+    "session_id": {
+     "description": "阅读会话 ID（RS-…）",
+     "title": "Session Id",
+     "type": "string"
+    },
+    "owner_id": {
+     "title": "Owner Id",
+     "type": "string"
+    },
+    "verdict": {
+     "enum": [
+      "relevant",
+      "uncertain",
+      "irrelevant"
+     ],
+     "title": "Verdict",
+     "type": "string"
+    },
+    "reason": {
+     "default": "",
+     "title": "Reason",
+     "type": "string"
+    }
+   },
+   "required": [
+    "session_id",
+    "owner_id",
+    "verdict"
+   ],
+   "title": "reading_override_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "reading.direct",
+  "group": "reading",
+  "effect": "user",
+  "summary": "补充联想方向（下一轮联想补查使用）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "补充联想方向（下一轮联想补查使用）。",
+   "properties": {
+    "session_id": {
+     "description": "阅读会话 ID（RS-…）",
+     "title": "Session Id",
+     "type": "string"
+    },
+    "text": {
+     "title": "Text",
+     "type": "string"
+    }
+   },
+   "required": [
+    "session_id",
+    "text"
+   ],
+   "title": "reading_direct_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "reading.configure",
+  "group": "reading",
+  "effect": "user",
+  "summary": "切换阅读策略。",
+  "input": {
+   "additionalProperties": false,
+   "description": "切换阅读策略。",
+   "properties": {
+    "session_id": {
+     "description": "阅读会话 ID（RS-…）",
+     "title": "Session Id",
+     "type": "string"
+    },
+    "strategy": {
+     "enum": [
+      "standard",
+      "associative",
+      "quick"
+     ],
+     "title": "Strategy",
+     "type": "string"
+    }
+   },
+   "required": [
+    "session_id",
+    "strategy"
+   ],
+   "title": "reading_configure_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "reading.abort",
+  "group": "reading",
+  "effect": "user",
+  "summary": "中止会话（agent 之后的写操作会被拒绝）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "中止会话（agent 之后的写操作会被拒绝）。",
+   "properties": {
+    "session_id": {
+     "description": "阅读会话 ID（RS-…）",
+     "title": "Session Id",
+     "type": "string"
+    },
+    "reason": {
+     "default": "",
+     "title": "Reason",
+     "type": "string"
+    }
+   },
+   "required": [
+    "session_id"
+   ],
+   "title": "reading_abort_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "reading.archive",
+  "group": "reading",
+  "effect": "user",
+  "summary": "归档或恢复会话（历史保留）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "归档或恢复会话（历史保留）。",
+   "properties": {
+    "session_id": {
+     "description": "阅读会话 ID（RS-…）",
+     "title": "Session Id",
+     "type": "string"
+    },
+    "archived": {
+     "default": true,
+     "title": "Archived",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "session_id"
+   ],
+   "title": "reading_archive_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "config.get",
+  "group": "config",
+  "effect": "read",
+  "summary": "当前配置、revision 与各连接器密钥是否已设置（不返回密钥内容）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "当前配置、revision 与各连接器密钥是否已设置（不返回密钥内容）。",
+   "properties": {},
+   "title": "config_get_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "config.schema",
+  "group": "config",
+  "effect": "read",
+  "summary": "配置的 JSON Schema（字段、默认值与说明）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "配置的 JSON Schema（字段、默认值与说明）。",
+   "properties": {},
+   "title": "config_schema_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "config.update",
+  "group": "config",
+  "effect": "admin",
+  "summary": "修改配置（如数据库/索引位置、嵌入模型、向量后端、默认阅读策略、连接器）。返回需要的后续动作。",
+  "input": {
+   "additionalProperties": false,
+   "description": "修改配置（如数据库/索引位置、嵌入模型、向量后端、默认阅读策略、连接器）。返回需要的后续动作。",
+   "properties": {
+    "patch": {
+     "additionalProperties": true,
+     "description": "JSON Merge Patch：只写要改的字段；null 恢复默认",
+     "title": "Patch",
+     "type": "object"
+    },
+    "expected_revision": {
+     "description": "config.get 返回的 revision",
+     "title": "Expected Revision",
+     "type": "string"
+    },
+    "dry_run": {
+     "default": false,
+     "title": "Dry Run",
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "patch",
+    "expected_revision"
+   ],
+   "title": "config_update_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "config.secret_set",
+  "group": "config",
+  "effect": "user",
+  "summary": "把密钥写入本机凭据管理器（只在工作台/CLI；不暴露给 agent）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "把密钥写入本机凭据管理器（只在工作台/CLI；不暴露给 agent）。",
+   "properties": {
+    "secret_ref": {
+     "pattern": "^keyring:burrowl/",
+     "title": "Secret Ref",
+     "type": "string"
+    },
+    "value": {
+     "title": "Value",
+     "type": "string"
+    }
+   },
+   "required": [
+    "secret_ref",
+    "value"
+   ],
+   "title": "config_secret_set_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "index.status",
+  "group": "index",
+  "effect": "read",
+  "summary": "某对象各投影/通道的就绪状态（stale 表示落后于当前 HEAD）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "某对象各投影/通道的就绪状态（stale 表示落后于当前 HEAD）。",
+   "properties": {
+    "owner_id": {
+     "title": "Owner Id",
+     "type": "string"
+    }
+   },
+   "required": [
+    "owner_id"
+   ],
+   "title": "index_status_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "index.reconcile",
+  "group": "index",
+  "effect": "admin",
+  "summary": "按当前 HEAD 补齐检索投影（不改记忆）；sources=true 同时更新来源文件投影。",
+  "input": {
+   "additionalProperties": false,
+   "description": "按当前 HEAD 补齐检索投影（不改记忆）；sources=true 同时更新来源文件投影。",
+   "properties": {
+    "owner_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Owner Id"
+    },
+    "force": {
+     "default": false,
+     "title": "Force",
+     "type": "boolean"
+    },
+    "sources": {
+     "default": true,
+     "title": "Sources",
+     "type": "boolean"
+    }
+   },
+   "title": "index_reconcile_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "index.gaps",
+  "group": "index",
+  "effect": "read",
+  "summary": "发现层的确定性缺口（缺 L4 概览、技术单元缺检索说明）；内容是否充分仍需阅读判断。",
+  "input": {
+   "additionalProperties": false,
+   "description": "发现层的确定性缺口（缺 L4 概览、技术单元缺检索说明）；内容是否充分仍需阅读判断。",
+   "properties": {},
+   "title": "index_gaps_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "index.search",
+  "group": "index",
+  "effect": "read",
+  "summary": "直接检索投影（调试/诊断用；正式查询请用 query.search，它会回到固定版本核对）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "直接检索投影（调试/诊断用；正式查询请用 query.search，它会回到固定版本核对）。",
+   "properties": {
+    "query": {
+     "title": "Query",
+     "type": "string"
+    },
+    "corpus": {
+     "default": "fulltext",
+     "enum": [
+      "fulltext",
+      "discovery",
+      "source"
+     ],
+     "title": "Corpus",
+     "type": "string"
+    },
+    "owner_ids": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Owner Ids"
+    },
+    "levels": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Levels"
+    },
+    "review_filter": {
+     "default": "all",
+     "enum": [
+      "all",
+      "reviewed_only",
+      "exclude_unsafe",
+      "unreviewed_only"
+     ],
+     "title": "Review Filter",
+     "type": "string"
+    },
+    "group": {
+     "default": "record",
+     "enum": [
+      "record",
+      "owner"
+     ],
+     "title": "Group",
+     "type": "string"
+    },
+    "limit": {
+     "default": 20,
+     "title": "Limit",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "query"
+   ],
+   "title": "index_search_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "system.capabilities",
+  "group": "system",
+  "effect": "read",
+  "summary": "当前能力与降级情况（向量模型、重排模型、连接器）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "当前能力与降级情况（向量模型、重排模型、连接器）。",
+   "properties": {},
+   "title": "system_capabilities_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "system.guide",
+  "group": "system",
+  "effect": "read",
+  "summary": "读取 burrowl 工作流说明全文（与 Skill 文件相同）。客户端没有加载 burrowl Skill 时，用它代替 Skill。",
+  "input": {
+   "additionalProperties": false,
+   "description": "读取 burrowl 工作流说明全文（与 Skill 文件相同）。客户端没有加载 burrowl Skill 时，用它代替 Skill。",
+   "properties": {
+    "name": {
+     "description": "rules 公共规则；recording 记忆记录写作标准；burrowl-work / burrowl-read / burrowl-consolidate 工作流；burrowl-dev-check 框架开发",
+     "enum": [
+      "rules",
+      "recording",
+      "burrowl-work",
+      "burrowl-read",
+      "burrowl-consolidate",
+      "burrowl-dev-check"
+     ],
+     "title": "Name",
+     "type": "string"
+    }
+   },
+   "required": [
+    "name"
+   ],
+   "title": "system_guide_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "system.validate",
+  "group": "system",
+  "effect": "read",
+  "summary": "全工作区只读校验：提交链与指纹、写锁与残留、来源文件是否变化或缺失、索引是否落后。不修复。",
+  "input": {
+   "additionalProperties": false,
+   "description": "全工作区只读校验：提交链与指纹、写锁与残留、来源文件是否变化或缺失、索引是否落后。不修复。",
+   "properties": {},
+   "title": "system_validate_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "system.ops",
+  "group": "system",
+  "effect": "read",
+  "summary": "全部操作的目录（名称、分组、读写类型、说明、参数 schema）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "全部操作的目录（名称、分组、读写类型、说明、参数 schema）。",
+   "properties": {
+    "groups": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Groups"
+    }
+   },
+   "title": "system_ops_input",
+   "type": "object"
+  }
+ }
+]

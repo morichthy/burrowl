@@ -1,0 +1,79 @@
+{
+  "kind": "association",
+  "note": "关联（level=null）：相似、对照、依赖等导航关系，不是证据。analogous_to 必须写 shared_structure 与 transfer_limits。通常先由 relations.associations 产生候选，再用 relations.decide 处理；手写时 status=candidate。",
+  "operation": {
+    "op": "put_record",
+    "client_key": "new-association",
+    "draft": {
+      "owner_id": "RES-FLOATING-POINT-SUMMATION",
+      "kind": "association",
+      "title": "补偿经验与第三轮经过的同一失败模式",
+      "keywords": [],
+      "body_markdown": "",
+      "record_reason": "登记导航关联",
+      "sensitivity": "internal",
+      "sources": [
+        {
+          "target_kind": "record",
+          "target_id": "MEM-58fd845a-05a5-516c-8bbe-c88d887cbb91",
+          "revision": 6,
+          "sha256": "e5fc7cb2327f0b0412166c545c6ae9e862dad0692c0038775dcb4deb0766e3c2",
+          "locator": "record",
+          "relation": "references"
+        },
+        {
+          "target_kind": "record",
+          "target_id": "MEM-77b35d77-f6c1-5d05-80a1-7c3b9d5e9d09",
+          "revision": 4,
+          "sha256": "9918032b4a47d068d2056472853db83cee83c46cbb13501bac91b32458d203ed",
+          "locator": "record",
+          "relation": "references"
+        }
+      ],
+      "provenance_gap": null,
+      "payload": {
+        "from": {
+          "target_kind": "record",
+          "target_id": "MEM-58fd845a-05a5-516c-8bbe-c88d887cbb91",
+          "revision": 6,
+          "sha256": "e5fc7cb2327f0b0412166c545c6ae9e862dad0692c0038775dcb4deb0766e3c2",
+          "locator": "record",
+          "relation": "same_failure_mode"
+        },
+        "to": {
+          "target_kind": "record",
+          "target_id": "MEM-77b35d77-f6c1-5d05-80a1-7c3b9d5e9d09",
+          "revision": 4,
+          "sha256": "9918032b4a47d068d2056472853db83cee83c46cbb13501bac91b32458d203ed",
+          "locator": "record",
+          "relation": "same_failure_mode"
+        },
+        "relation": "same_failure_mode",
+        "explanation": "两者都记录了补偿项被抵消吞没的失败",
+        "shared_structure": null,
+        "transfer_limits": [],
+        "differences": [],
+        "basis_refs": [
+          {
+            "target_kind": "record",
+            "target_id": "MEM-58fd845a-05a5-516c-8bbe-c88d887cbb91",
+            "revision": 6,
+            "sha256": "e5fc7cb2327f0b0412166c545c6ae9e862dad0692c0038775dcb4deb0766e3c2",
+            "locator": "record",
+            "relation": "references"
+          },
+          {
+            "target_kind": "record",
+            "target_id": "MEM-77b35d77-f6c1-5d05-80a1-7c3b9d5e9d09",
+            "revision": 4,
+            "sha256": "9918032b4a47d068d2056472853db83cee83c46cbb13501bac91b32458d203ed",
+            "locator": "record",
+            "relation": "references"
+          }
+        ],
+        "status": "candidate",
+        "missing_refs": []
+      }
+    }
+  }
+}

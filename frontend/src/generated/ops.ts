@@ -1,0 +1,1715 @@
+// 自动生成，勿手改（npm run ops）。
+
+export declare namespace HubConnectors {
+  /**
+   * 已配置的连接器、发布策略与已发布条目数。
+   */
+  export interface Args {}
+}
+
+export declare namespace HubHealth {
+  /**
+   * 测试连接：服务版本、兼容性、能力、密钥是否已设置（不返回密钥）。
+   */
+  export interface Args {
+    connector_id: string;
+  }
+}
+
+export declare namespace HubPlan {
+  /**
+   * 预览发布：按策略（默认只发已复核的 L4/L3 与成稿文档）列出新增/更新/删除，返回 plan_hash。
+   */
+  export interface Args {
+    connector_id: string;
+  }
+}
+
+export declare namespace HubApply {
+  /**
+   * 执行发布。逐条记录结果，单条失败不影响其他条目。
+   */
+  export interface Args {
+    connector_id: string;
+    /**
+     * hub.plan 返回的 plan_hash；数据变化后需重新预览
+     */
+    plan_hash: string;
+    /**
+     * 覆盖外部已被修改的 Wiki 页面
+     */
+    force_wiki?: boolean;
+  }
+}
+
+export declare namespace HubStatus {
+  /**
+   * 发布状态：各状态计数、失败/漂移条目、最近几次执行；refresh 时轮询外部解析进度。
+   */
+  export interface Args {
+    connector_id: string;
+    refresh?: boolean;
+  }
+}
+
+export declare namespace HubSearch {
+  /**
+   * 在外部知识中枢检索；命中能对上本地条目时附 fixed_ref 与按本地当前状态计算的复核类别。
+   */
+  export interface Args {
+    query: string;
+    connector_ids?: string[] | null;
+    limit?: number;
+    review_filter?: "all" | "reviewed_only" | "exclude_unsafe" | "unreviewed_only";
+  }
+}
+
+export declare namespace WikiList {
+  /**
+   * 列出外部 Wiki 页面（authored_here 表示由本项目发布）。
+   */
+  export interface Args {
+    connector_id: string;
+    query?: string;
+    limit?: number;
+  }
+}
+
+export declare namespace WikiRead {
+  /**
+   * 读取一页外部 Wiki（含外部自动生成的页面）。
+   */
+  export interface Args {
+    connector_id: string;
+    slug: string;
+  }
+}
+
+export declare namespace WikiConfigure {
+  /**
+   * 按配置 wiki.mode 开启/关闭外部自动 Wiki（auto/both 开启）。
+   */
+  export interface Args {
+    connector_id: string;
+  }
+}
+
+export declare namespace ReviewQueue {
+  /**
+   * 待复核队列：默认列出未复核、已失效、有争议、被上游阻断的结论。
+   */
+  export interface Args {
+    states?:
+      ("not-reviewed" | "stale" | "disputed" | "upstream-blocked" | "accepted" | "retracted" | "superseded")[] | null;
+    owner_id?: string | null;
+    query?: string;
+    limit?: number;
+    offset?: number;
+  }
+}
+
+export declare namespace ReviewSubmit {
+  /**
+   * 复核一条结论。accepted 需要适用范围与支持性证据；superseded 需要替代结论。dry_run 只预检。
+   */
+  export interface Args {
+    target_claim_id: string;
+    state: "accepted" | "disputed" | "retracted" | "superseded" | "not-reviewed";
+    reason: string;
+    scope?: string | null;
+    evidence_refs?:
+      | {
+          [k: string]: unknown;
+        }[]
+      | null;
+    replacement_claim_id?: string | null;
+    dry_run?: boolean;
+  }
+}
+
+export declare namespace ReviewBatch {
+  /**
+   * 批量复核（逐条串行；单条失败不影响其他）。每项字段同 review.submit。
+   */
+  export interface Args {
+    items: {
+      [k: string]: unknown;
+    }[];
+    dry_run?: boolean;
+  }
+}
+
+export declare namespace ReviewHistory {
+  /**
+   * 一条结论的复核历史。
+   */
+  export interface Args {
+    claim_id: string;
+  }
+}
+
+export declare namespace ProvenanceImpact {
+  /**
+   * 这些内容变化后，哪些下游需要重新审阅（导航边只提示，supports/input 才是正式依赖）。
+   */
+  export interface Args {
+    changed_ids: string[];
+  }
+}
+
+export declare namespace ProvenanceLineage {
+  /**
+   * 沿依据追到可访问的原件身份（来源数不等于独立支持数）。
+   */
+  export interface Args {
+    target_ids: string[];
+  }
+}
+
+export declare namespace ProvenanceQuestionValidity {
+  /**
+   * 已解决问题的答案依据现在是否仍成立。
+   */
+  export interface Args {
+    question_id: string;
+    scope?: string | null;
+  }
+}
+
+export declare namespace ProvenanceFormal {
+  /**
+   * 正式使用：只返回在该范围内已接受、有效、来源可见的结论原文，其余列出原因。
+   */
+  export interface Args {
+    target_ids: string[];
+    scope: string;
+  }
+}
+
+export declare namespace RelationsGraph {
+  /**
+   * 材料关系图（子图）：对象、记录、来源与作者保存的类型化关系。
+   */
+  export interface Args {
+    center?: string | null;
+    hops?: number;
+    query?: string;
+    kinds?: string[] | null;
+    levels?: string[] | null;
+    excluded?: string[] | null;
+    limit?: number;
+  }
+}
+
+export declare namespace RelationsSimilar {
+  /**
+   * 为种子记录找关联候选（关键词重合 / 语义近邻）；只是待判断的线索。
+   */
+  export interface Args {
+    seeds: string[];
+    method?: "keyword" | "semantic";
+    limit?: number;
+  }
+}
+
+export declare namespace RelationsAssociations {
+  /**
+   * 已保存的关联记录。
+   */
+  export interface Args {
+    status?: ("candidate" | "accepted" | "rejected" | "withdrawn") | null;
+    record_id?: string | null;
+  }
+}
+
+export declare namespace RelationsDecide {
+  /**
+   * 保存关联判断（candidate/accepted/rejected/withdrawn）；只能是导航关系。
+   */
+  export interface Args {
+    owner_id: string;
+    /**
+     * {from, to, relation, explanation, shared_structure, transfer_limits[], basis_refs[], status}
+     */
+    payload: {
+      [k: string]: unknown;
+    };
+    reason: string;
+    dry_run?: boolean;
+  }
+}
+
+export declare namespace RelationsView {
+  /**
+   * 工作台关系图的本机视图偏好。
+   */
+  export interface Args {}
+}
+
+export declare namespace RelationsViewSave {
+  /**
+   * 保存关系图视图偏好（布局、分组、中心、排除项）。
+   */
+  export interface Args {
+    view: {
+      [k: string]: unknown;
+    };
+  }
+}
+
+export declare namespace RelationsNotes {
+  /**
+   * 关系图上的随手笔记（分组名、桥接问题、关系设想）。
+   */
+  export interface Args {}
+}
+
+export declare namespace RelationsNoteAdd {
+  /**
+   * 添加关系图笔记。
+   */
+  export interface Args {
+    kind: "cluster-name" | "bridge-question" | "relation-idea";
+    title: string;
+    text?: string;
+    refs?: string[] | null;
+  }
+}
+
+export declare namespace RelationsNoteResolve {
+  /**
+   * 更新关系图笔记状态。
+   */
+  export interface Args {
+    note_id: string;
+    status: "open" | "done" | "dismissed";
+  }
+}
+
+export declare namespace MaintenancePlan {
+  /**
+   * 来源变化或新反证后：列出受影响记录及其完整正文，生成维护计划。
+   */
+  export interface Args {
+    changed_ids: string[];
+    note?: string;
+  }
+}
+
+export declare namespace MaintenanceReview {
+  /**
+   * 记录逐项处置与修订草案，并逐对象预检（不写记忆）。
+   */
+  export interface Args {
+    plan_id: string;
+    /**
+     * [{target_id, action: retain|revise|resynthesize|retract|defer, reason, draft?}]
+     */
+    decisions: {
+      [k: string]: unknown;
+    }[];
+    expected_revision?: number | null;
+  }
+}
+
+export declare namespace MaintenanceApply {
+  /**
+   * 按对象逐个提交计划中的修订与撤回；可重试，部分完成会如实报告。
+   */
+  export interface Args {
+    plan_id: string;
+    expected_revision: number;
+  }
+}
+
+export declare namespace MaintenanceStatus {
+  /**
+   * 维护计划的当前状态。
+   */
+  export interface Args {
+    plan_id: string;
+  }
+}
+
+export declare namespace MonitorRun {
+  /**
+   * 扫描一次：对象 HEAD 与来源文件指纹的变化，并给出维护候选（观察不改变任何证据或复核状态）。
+   */
+  export interface Args {
+    /**
+     * 只比较，不写观察记录、不更新基线
+     */
+    dry_run?: boolean;
+  }
+}
+
+export declare namespace MonitorCandidates {
+  /**
+   * 来源变化影响到的维护候选；用 maintenance_plan 把它们纳入语义维护。
+   */
+  export interface Args {
+    status?: ("open" | "planned" | "dismissed") | null;
+  }
+}
+
+export declare namespace MonitorResolve {
+  /**
+   * （仅用户）处置维护候选。
+   */
+  export interface Args {
+    target_id: string;
+    status: "open" | "planned" | "dismissed";
+    note?: string;
+  }
+}
+
+export declare namespace MonitorObservations {
+  /**
+   * 最近的监测观察记录。
+   */
+  export interface Args {
+    limit?: number;
+  }
+}
+
+export declare namespace RunsCreate {
+  /**
+   * 新建 Run（一次实际分析/执行的记录容器），默认放在所属对象目录下。
+   */
+  export interface Args {
+    title: string;
+    owner_id?: string | null;
+    question?: string;
+    keywords?: string[] | null;
+  }
+}
+
+export declare namespace RunsRegister {
+  /**
+   * 登记已有文件为 Run 的输入/产物（固定字节指纹，可回滚）。
+   */
+  export interface Args {
+    run_id: string;
+    inputs?: string[] | null;
+    artifacts?: string[] | null;
+    preview?: boolean;
+  }
+}
+
+export declare namespace RunsExecute {
+  /**
+   * 前台运行 Python 脚本并登记输入、输出与日志（失败也登记）。参数可用 {input0}、{output_dir} 占位。
+   */
+  export interface Args {
+    run_id: string;
+    script: string;
+    inputs?: string[] | null;
+    args?: string[] | null;
+    timeout_seconds?: number;
+    preview?: boolean;
+  }
+}
+
+export declare namespace RunsUpdate {
+  /**
+   * 修改 Run 的结论、限制、状态等（不改输入/产物登记）。
+   */
+  export interface Args {
+    run_id: string;
+    /**
+     * 可改：title, question, conclusion, limitations, parameters, status, keywords, parent_run_ids
+     */
+    fields: {
+      [k: string]: unknown;
+    };
+    /**
+     * 读取时 run.json 的指纹（上次修改返回的 sha256）；不一致说明别人改过，拒绝覆盖
+     */
+    expected_sha256?: string | null;
+  }
+}
+
+export declare namespace RunsRollback {
+  /**
+   * 按登记回执恢复 run.json（不删除任何文件）。
+   */
+  export interface Args {
+    receipt: string;
+    preview?: boolean;
+  }
+}
+
+export declare namespace RunsSearch {
+  /**
+   * 按标题/问题/关键词查找 Run。
+   */
+  export interface Args {
+    query?: string;
+    owner_id?: string | null;
+    limit?: number;
+  }
+}
+
+export declare namespace SourcesList {
+  /**
+   * 已登记的来源文件（file 引用的唯一授权入口），附当前解析出的位置 location。
+   */
+  export interface Args {}
+}
+
+export declare namespace SourcesRoots {
+  /**
+   * 已登记的工作根（工作目录）与本次会话的工作目录。工作根下的来源记为"根 + 相对路径"，目录搬家只改根。
+   */
+  export interface Args {}
+}
+
+export declare namespace SourcesAddRoot {
+  /**
+   * 登记一个工作根。通常不必手动调用：登记本次工作目录里的文件时会自动建根。
+   */
+  export interface Args {
+    /**
+     * 工作目录的绝对路径（不能在数据目录内）
+     */
+    path: string;
+    title?: string;
+  }
+}
+
+export declare namespace SourcesRelocateRoot {
+  /**
+   * 工作目录整体搬家：逐个核对新位置下已登记文件的指纹，全部一致才改根的位置；已有固定引用不变。
+   */
+  export interface Args {
+    root_id: string;
+    new_path: string;
+    allow_missing?: boolean;
+  }
+}
+
+export declare namespace SourcesRegister {
+  /**
+   * 登记一个来源文件并记录当前字节指纹：L0 原件的唯一授权入口。原件留在原处，不复制、不修改。
+   * 工作目录里的文件自动记为"工作根 + 相对路径"，迁移时随根重定向。
+   * 同一 ID 重复登记同一文件是幂等的；内容变了请用新 ID；文件搬家用 sources.relocate / sources.relocate_root。
+   */
+  export interface Args {
+    source_id: string;
+    /**
+     * 工作目录等外部位置用绝对路径；数据目录内可用相对路径
+     */
+    path: string;
+    title?: string;
+    sensitivity?: "public" | "internal" | "confidential" | "restricted";
+  }
+}
+
+export declare namespace SourcesRegisterMany {
+  /**
+   * 批量登记来源（导入已有资料时使用）。
+   */
+  export interface Args {
+    /**
+     * [{source_id, path, title?, sensitivity?}]，逐条登记；单条失败不影响其他
+     */
+    items: {
+      [k: string]: unknown;
+    }[];
+  }
+}
+
+export declare namespace SourcesRelocate {
+  /**
+   * 原件搬家：新位置的字节必须与登记时一致，旧路径记入 relocated_from，已有固定引用继续有效。
+   */
+  export interface Args {
+    source_id: string;
+    new_path: string;
+  }
+}
+
+export declare namespace SourcesUpdate {
+  /**
+   * （仅用户）启用/停用来源或调整敏感级别。停用后引用它的记录会在读取时被隐去。
+   */
+  export interface Args {
+    source_id: string;
+    enabled?: boolean | null;
+    sensitivity?: ("public" | "internal" | "confidential" | "restricted") | null;
+  }
+}
+
+export declare namespace MemoryOwners {
+  /**
+   * 列出可读对象（按类型分组，带各层记录数）。
+   */
+  export interface Args {
+    owner_types?: string[] | null;
+    query?: string;
+  }
+}
+
+export declare namespace MemoryOwnerCreate {
+  /**
+   * 新建对象（写入业务卡；首次提交记忆时才建立记忆目录）。Run 用 runs.create 建立。
+   */
+  export interface Args {
+    owner_type: "research" | "project" | "core-algorithm" | "data" | "tool" | "report";
+    /**
+     * 小写字母/数字/连字符
+     */
+    slug: string;
+    title: string;
+    description?: string;
+    keywords?: string[] | null;
+    /**
+     * core-algorithm 必填：定义该算法的公司算法/模块文档（路径或文档编号）
+     */
+    source_document?: string | null;
+    sensitivity?: "public" | "internal" | "confidential" | "restricted";
+  }
+}
+
+export declare namespace MemoryOwnerAdopt {
+  /**
+   * 把内容树中已有的文档登记为对象（原件不修改；须给出你看到的字节指纹）。
+   */
+  export interface Args {
+    path: string;
+    expected_sha256: string;
+  }
+}
+
+export declare namespace MemoryRecords {
+  /**
+   * 对象内的记录目录（按层级，分页；不含正文）。
+   */
+  export interface Args {
+    /**
+     * 对象 ID，如 RES-…、PRJ-…、RUN-…
+     */
+    owner_id: string;
+    levels?: string[] | null;
+    main_only?: boolean;
+    offset?: number;
+    limit?: number;
+  }
+}
+
+export declare namespace MemoryKinds {
+  /**
+   * 全部记录类型：层级、版本、由哪个操作写入、一句话用途。
+   */
+  export interface Args {}
+}
+
+export declare namespace MemoryContract {
+  /**
+   * 某类记录的草案契约：必填字段、payload 结构、写作要点和一份经校验的示例草案。写草案前先调用。
+   */
+  export interface Args {
+    /**
+     * 记录类型，如 detail、narrative、experience、overview、checkpoint
+     */
+    kind: string;
+  }
+}
+
+export declare namespace MemoryInspect {
+  /**
+   * 读取对象的当前快照，或某条记录的当前/指定修订（含完整正文与固定引用）。
+   */
+  export interface Args {
+    /**
+     * 对象 ID，如 RES-…、PRJ-…、RUN-…
+     */
+    owner_id: string;
+    record_id?: string | null;
+    revision?: number | null;
+  }
+}
+
+export declare namespace MemoryCommit {
+  /**
+   * 保存一批记录（同一对象内原子提交）。dry_run=true 只预检不写入。
+   */
+  export interface Args {
+    /**
+     * 对象 ID，如 RES-…、PRJ-…、RUN-…
+     */
+    owner_id: string;
+    /**
+     * 操作列表：新建 {op:'put_record', client_key, draft}；修订 {op:'put_record', record_id, expected_revision, draft}。draft 的字段与示例用 memory.contract(kind) 查询；批内引用可写 {client_key: 'x'}
+     */
+    operations: {
+      [k: string]: unknown;
+    }[];
+    /**
+     * 提交前看到的 HEAD commit_id；新对象为 null
+     */
+    expected_head: string | null;
+    /**
+     * UUID；重试时用同一个保证幂等
+     */
+    request_id?: string | null;
+    dry_run?: boolean;
+  }
+}
+
+export declare namespace MemoryDocument {
+  /**
+   * 读取研究文稿：完整文稿 / 目录 / 单章上下文包（改写某章用）/ 依据变化影响。
+   */
+  export interface Args {
+    /**
+     * 对象 ID，如 RES-…、PRJ-…、RUN-…
+     */
+    owner_id: string;
+    view?: "full" | "outline" | "section" | "impact";
+    document_type?: "research_process" | "research_report";
+    document_id?: string | null;
+    section_id?: string | null;
+    max_chars?: number;
+  }
+}
+
+export declare namespace MemoryFigure {
+  /**
+   * 技术单元登记的图片（data URL）。
+   */
+  export interface Args {
+    /**
+     * 对象 ID，如 RES-…、PRJ-…、RUN-…
+     */
+    owner_id: string;
+    record_id: string;
+    revision: number;
+    index: number;
+  }
+}
+
+export declare namespace MemoryTimeline {
+  /**
+   * 研究时间线：全部记录的全部修订与关联 Run（不含正文）。
+   */
+  export interface Args {
+    /**
+     * 对象 ID，如 RES-…、PRJ-…、RUN-…
+     */
+    owner_id: string;
+    offset?: number;
+    limit?: number;
+  }
+}
+
+export declare namespace MemoryRawMaterials {
+  /**
+   * L0 原始材料清单（不读原件正文）。
+   */
+  export interface Args {
+    /**
+     * 对象 ID，如 RES-…、PRJ-…、RUN-…
+     */
+    owner_id: string;
+  }
+}
+
+export declare namespace MemoryRawMaterial {
+  /**
+   * 回读一个原始材料（按清单中的 ID；核对固定字节）。
+   */
+  export interface Args {
+    /**
+     * 对象 ID，如 RES-…、PRJ-…、RUN-…
+     */
+    owner_id: string;
+    material_id: string;
+    max_chars?: number;
+  }
+}
+
+export declare namespace MemoryResume {
+  /**
+   * 续接对象的上下文：目标→检查点→最新概览/经过/技术→路线/问题/经验（只读）。
+   */
+  export interface Args {
+    /**
+     * 对象 ID，如 RES-…、PRJ-…、RUN-…
+     */
+    owner_id: string;
+  }
+}
+
+export declare namespace MemoryExport {
+  /**
+   * 导出对象的记忆（不产生新记录、不复制原件）。
+   */
+  export interface Args {
+    /**
+     * 对象 ID，如 RES-…、PRJ-…、RUN-…
+     */
+    owner_id: string;
+    fmt?: "markdown" | "json" | "html";
+    record_ids?: string[] | null;
+    exclude_ids?: string[] | null;
+    include_raw_materials?: boolean;
+  }
+}
+
+export declare namespace MemoryConsolidatePrepare {
+  /**
+   * 阶段巩固的待处理清单：自上次巩固以来的变化、受影响下游与合并/冲突候选。
+   */
+  export interface Args {
+    /**
+     * 对象 ID，如 RES-…、PRJ-…、RUN-…
+     */
+    owner_id: string;
+    since_commit?: string | null;
+  }
+}
+
+export declare namespace MemoryConsolidateApply {
+  /**
+   * 保存巩固处置（retain/revise/retract/defer…），可与本批实际修订一起提交。
+   */
+  export interface Args {
+    /**
+     * 对象 ID，如 RES-…、PRJ-…、RUN-…
+     */
+    owner_id: string;
+    basis: {
+      [k: string]: unknown;
+    };
+    decisions: {
+      [k: string]: unknown;
+    }[];
+    reason: string;
+    operations?:
+      | {
+          [k: string]: unknown;
+        }[]
+      | null;
+    dry_run?: boolean;
+  }
+}
+
+export declare namespace MemorySummaryMaterials {
+  /**
+   * 跨对象总结的固定材料包（不生成总结）。
+   */
+  export interface Args {
+    owner_ids: string[];
+    exclude_ids?: string[] | null;
+  }
+}
+
+export declare namespace MemorySummarySave {
+  /**
+   * 把写好的总结保存为本对象的 L3/L4；依据对象有新提交则拒绝。
+   */
+  export interface Args {
+    /**
+     * 对象 ID，如 RES-…、PRJ-…、RUN-…
+     */
+    owner_id: string;
+    draft: {
+      [k: string]: unknown;
+    };
+    basis_heads: {
+      [k: string]: string | null;
+    };
+    record_id?: string | null;
+    expected_revision?: number | null;
+    dry_run?: boolean;
+  }
+}
+
+export declare namespace MemoryFeedback {
+  /**
+   * 记录检索结果的使用反馈（采用次数不是复核）。label=outcome 时 adopted_in 须指向实际应用它的 Run 或记录。
+   */
+  export interface Args {
+    /**
+     * 对象 ID，如 RES-…、PRJ-…、RUN-…
+     */
+    owner_id: string;
+    query_id: string;
+    target: {
+      [k: string]: unknown;
+    };
+    label: "missing" | "irrelevant" | "invalid_analogy" | "lost_boundary" | "stale" | "adopted" | "outcome";
+    note?: string;
+    adopted_in?: {
+      [k: string]: unknown;
+    } | null;
+    /**
+     * UUID；重试时沿用同一个，不会重复记录
+     */
+    request_id?: string | null;
+  }
+}
+
+export declare namespace MemoryRecovery {
+  /**
+   * 检查记忆目录健康状况（写锁、孤立提交、暂存残留）；只报告不修改。
+   */
+  export interface Args {
+    /**
+     * 对象 ID，如 RES-…、PRJ-…、RUN-…
+     */
+    owner_id: string;
+  }
+}
+
+export declare namespace QuerySearch {
+  /**
+   * 检索材料并逐个回到固定版本核对，返回第一页候选（候选不是已读正文）。
+   */
+  export interface Args {
+    question: string;
+    keywords?: string[] | null;
+    /**
+     * overview_experience=L4/L3（默认）；process=L2 研究经过；technical=L1 技术内容；all=全部含原始来源
+     */
+    content_source?: "overview_experience" | "process" | "technical" | "all";
+    scope?: Scope | null;
+    review_filter?: "all" | "reviewed_only" | "exclude_unsafe" | "unreviewed_only";
+    purpose?: "exploration" | "formal";
+    /**
+     * purpose=formal 时必填：结论的适用范围
+     */
+    applicability?: string;
+    freshness?: "current" | "allow_stale";
+    channels?: ("identity" | "lexical" | "dense")[] | null;
+    context_reach?: "any_readable" | "same_scope";
+    result_limit?: number | null;
+    budget?: Budget | null;
+    query_id?: string | null;
+  }
+  /**
+   * 直接候选的范围。不同维度同时满足；同一维度内任一值即可。None 表示不限。
+   */
+  export interface Scope {
+    /**
+     * 限定对象；显式列出的对象才能看到其 owner_only 记录
+     */
+    owner_ids?: string[] | null;
+    /**
+     * research / project / core-algorithm / run / knowledge …
+     */
+    owner_types?: string[] | null;
+    kinds?: string[] | null;
+    /**
+     * 排除的对象/记录/结论 ID；排除始终生效
+     */
+    exclude_ids?: string[];
+    updated_from?: string | null;
+    updated_before?: string | null;
+  }
+  /**
+   * 累计硬上限。wall_ms 计活动执行时间（不含用户阅读停留）；0 表示禁止该类操作。
+   */
+  export interface Budget {
+    wall_ms?: number;
+    read_bytes?: number;
+    output_chars?: number;
+    candidates?: number;
+    graph_nodes?: number;
+    graph_edges?: number;
+    graph_hops?: number;
+    model_tokens?: number;
+    model_calls?: number;
+    model_input_tokens?: number;
+    model_output_tokens?: number;
+    rerank_items?: number;
+  }
+}
+
+export declare namespace QueryPage {
+  /**
+   * 下一页候选（沿用原范围与累计预算）。
+   */
+  export interface Args {
+    /**
+     * query.search 返回的 query_id
+     */
+    query_id: string;
+    cursor?: string | null;
+  }
+}
+
+export declare namespace QueryCancel {
+  /**
+   * 取消查询（已完成部分保留）。
+   */
+  export interface Args {
+    /**
+     * query.search 返回的 query_id
+     */
+    query_id: string;
+  }
+}
+
+export declare namespace QueryAssemble {
+  /**
+   * 把所选候选组合成阅读包：正文 + 必要依据（+ 已采纳关联补充）；预算不足整块省略并报告。
+   */
+  export interface Args {
+    /**
+     * query.search 返回的 query_id
+     */
+    query_id: string;
+    /**
+     * 候选 ID（C-…），来自本次查询已返回的结果
+     */
+    candidate_ids: string[];
+    associations?: boolean;
+  }
+}
+
+export declare namespace QueryExpand {
+  /**
+   * 沿作者保存的固定引用展开：经验/概览 → 研究经过或技术依据。
+   */
+  export interface Args {
+    /**
+     * query.search 返回的 query_id
+     */
+    query_id: string;
+    /**
+     * 候选 ID（C-…），来自本次查询已返回的结果
+     */
+    candidate_ids: string[];
+    target: "process" | "technical";
+  }
+}
+
+export declare namespace QueryDeepen {
+  /**
+   * 沿已保存关系有界深化（节点/边/跳数计入预算）；可达不等于科学支持。
+   */
+  export interface Args {
+    /**
+     * query.search 返回的 query_id
+     */
+    query_id: string;
+    /**
+     * 候选 ID（C-…），来自本次查询已返回的结果
+     */
+    candidate_ids: string[];
+    hops?: number;
+    relations?: string[] | null;
+    include_associations?: boolean;
+  }
+}
+
+export declare namespace QueryDocuments {
+  /**
+   * 返回候选所属对象的完整文稿（按文稿去重，保持章节顺序）。
+   */
+  export interface Args {
+    /**
+     * query.search 返回的 query_id
+     */
+    query_id: string;
+    /**
+     * 候选 ID（C-…），来自本次查询已返回的结果
+     */
+    candidate_ids: string[];
+    document_type?: "research_process" | "research_report";
+  }
+}
+
+export declare namespace ReadingStart {
+  /**
+   * 创建阅读会话并立即召回，返回第一批对象筛选包（每个对象 2–4 个命中窗口，含 digest）。
+   */
+  export interface Args {
+    /**
+     * 要回答的问题，一句话，保留型号与数值原文
+     */
+    question: string;
+    /**
+     * 问题的前提条件（自然语言），会显示给用户
+     */
+    conditions?: string[] | null;
+    /**
+     * standard=筛选后完整阅读（默认）；associative=不足时按联想方向补查；quick=只依据片段、不读全文
+     */
+    strategy?: ("standard" | "associative" | "quick") | null;
+    /**
+     * all（默认，带复核徽标）/ reviewed_only / exclude_unsafe / unreviewed_only
+     */
+    review_filter?: ("all" | "reviewed_only" | "exclude_unsafe" | "unreviewed_only") | null;
+    /**
+     * 最多 2 条等义改写 [{language: zh|en, question, lexical_terms?}]；技术问题建议补一条英文；型号、数值必须原样保留
+     */
+    variants?:
+      | {
+          [k: string]: unknown;
+        }[]
+      | null;
+    /**
+     * 必须原样出现的词（型号、编号）
+     */
+    protected_terms?: string[] | null;
+    /**
+     * 术语库领域，用于术语扩展
+     */
+    domains?: string[] | null;
+    /**
+     * 本次阅读服务于哪个对象（续接用）
+     */
+    owner_id?: string | null;
+    /**
+     * 只在这些对象中召回
+     */
+    scope_owner_ids?: string[] | null;
+    /**
+     * 可选的显式字段条件，最多 16 条：[{id, kind: literal|numeric, field, operator: eq|ne|lt|le|gt|ge, expected, unit?}]。只在原文的“字段：值”中核对，冲突的对象排后、不删除
+     */
+    field_conditions?:
+      | {
+          [k: string]: unknown;
+        }[]
+      | null;
+  }
+}
+
+export declare namespace ReadingAssess {
+  /**
+   * 三态判断一批对象；返回下一批或“可以开始读”的提示。用户的改判优先，不会被覆盖。
+   */
+  export interface Args {
+    /**
+     * 阅读会话 ID（RS-…）
+     */
+    session_id: string;
+    /**
+     * [{owner_id, verdict, reason, digest, accepted_windows?}]。verdict：relevant=窗口显示它能回答问题或提供必要依据，值得完整阅读；uncertain=信息不足以判断，先 reading_peek 或交给用户；irrelevant=明确无关。reason 写依据窗口里的什么内容；digest 原样抄筛选包的 digest；quick 策略在 accepted_windows 列出可作为笔记依据的窗口 entry_id
+     */
+    judgments: {
+      [k: string]: unknown;
+    }[];
+    /**
+     * 可选 UUID；网络重试时沿用同一个，不会重复执行
+     */
+    request_id?: string | null;
+  }
+}
+
+export declare namespace ReadingPeek {
+  /**
+   * 查看某对象更多的命中窗口（用于 uncertain 的对象）。
+   */
+  export interface Args {
+    /**
+     * 阅读会话 ID（RS-…）
+     */
+    session_id: string;
+    owner_id: string;
+  }
+}
+
+export declare namespace ReadingRead {
+  /**
+   * 完整阅读判为相关的对象：第 1 页附目录，按 unread_pages 读完全部页。quick 策略不可用。
+   * 对象在阅读期间有新提交时要求从第 1 页重读（STALE_BASIS）。
+   */
+  export interface Args {
+    /**
+     * 阅读会话 ID（RS-…）
+     */
+    session_id: string;
+    owner_id: string;
+    page?: number;
+  }
+}
+
+export declare namespace ReadingNote {
+  /**
+   * 保存某对象的研究笔记（standard/associative 须先读完全部页）；出处补全为固定引用。
+   */
+  export interface Args {
+    /**
+     * 阅读会话 ID（RS-…）
+     */
+    session_id: string;
+    owner_id: string;
+    /**
+     * 研究笔记（Markdown）：只写材料中的知识——问题如何演进、方法/公式（定义变量与单位）/条件、关键数据、反例与局限；关键句旁就近标出处 ID；不重复本次问题，不写自己的操作计划
+     */
+    note: string;
+    /**
+     * 出处 ID：必须是本会话交付过的（如 MEM-…、MEM-…#块ID、SRC-…）；quick 下只能是已采纳的窗口
+     */
+    sources: string[];
+    /**
+     * 可选的探索线索（材料提到但未核实的方向、可能相关的对象）；只作导航，不会成为结论
+     */
+    clues?: string[] | null;
+    /**
+     * 可选 UUID；网络重试时沿用同一个，不会重复执行
+     */
+    request_id?: string | null;
+  }
+}
+
+export declare namespace ReadingSynthesize {
+  /**
+   * 跨对象综合笔记；所依据的任何单篇笔记改变或陈旧后，综合稿自动失效。
+   */
+  export interface Args {
+    /**
+     * 阅读会话 ID（RS-…）
+     */
+    session_id: string;
+    note: string;
+    sources: string[];
+    owner_ids: string[];
+    /**
+     * 可选 UUID；网络重试时沿用同一个，不会重复执行
+     */
+    request_id?: string | null;
+  }
+}
+
+export declare namespace ReadingAskUser {
+  /**
+   * 向用户提问。fulltext=申请全文补偿（仅当发现召回不可用、不完整或不足，见 fulltext_available；批准后得到
+   * approval_id）；direction=请用户定联想方向；clarify=澄清问题。用户可在对话或工作台回答。
+   */
+  export interface Args {
+    /**
+     * 阅读会话 ID（RS-…）
+     */
+    session_id: string;
+    kind: "fulltext" | "direction" | "clarify";
+    prompt: string;
+    options?: string[] | null;
+    /**
+     * 可选 UUID；网络重试时沿用同一个，不会重复执行
+     */
+    request_id?: string | null;
+  }
+}
+
+export declare namespace ReadingRecall {
+  /**
+   * 补充召回：全文补偿（需用户批准）或联想补查（associative 策略，受轮数上限）。
+   * 想换一种问法重新找，请新开一个 reading_start。
+   */
+  export interface Args {
+    /**
+     * 阅读会话 ID（RS-…）
+     */
+    session_id: string;
+    mode: "fulltext" | "association";
+    /**
+     * fulltext 模式必填：用户批准后的 approval_id
+     */
+    approval_id?: string | null;
+    /**
+     * association 模式：联想方向（由主 agent 制定）
+     */
+    association_text?: string | null;
+    /**
+     * 可选 UUID；网络重试时沿用同一个，不会重复执行
+     */
+    request_id?: string | null;
+  }
+}
+
+export declare namespace ReadingFinish {
+  /**
+   * 结束会话并返回交接文本（综合稿优先；陈旧笔记不交付；超出上限的笔记整篇省略并列出缺口）。
+   */
+  export interface Args {
+    /**
+     * 阅读会话 ID（RS-…）
+     */
+    session_id: string;
+    /**
+     * 一句话说明结束原因或结论去向，如“已回答，交给 work 保存”
+     */
+    outcome?: string;
+    /**
+     * 可选 UUID；网络重试时沿用同一个，不会重复执行
+     */
+    request_id?: string | null;
+  }
+}
+
+export declare namespace ReadingStatus {
+  /**
+   * 会话概况、当前批次、交接预览、预算消耗，以及用户在工作台上的新输入（每条只交付一次）。
+   */
+  export interface Args {
+    /**
+     * 阅读会话 ID（RS-…）
+     */
+    session_id: string;
+  }
+}
+
+export declare namespace ReadingDelegate {
+  /**
+   * 子 agent 任务包（只描述任务；实际派工由宿主完成）。
+   */
+  export interface Args {
+    /**
+     * 阅读会话 ID（RS-…）
+     */
+    session_id: string;
+    host_supports_subagents: boolean;
+  }
+}
+
+export declare namespace ReadingList {
+  /**
+   * 阅读会话列表（最新在前）。
+   */
+  export interface Args {
+    status?: string | null;
+    owner_id?: string | null;
+    limit?: number;
+  }
+}
+
+export declare namespace ReadingView {
+  /**
+   * 会话完整状态（时间线、筛选包、笔记、请求）；只读，不消费收件箱。
+   */
+  export interface Args {
+    /**
+     * 阅读会话 ID（RS-…）
+     */
+    session_id: string;
+  }
+}
+
+export declare namespace ReadingRespond {
+  /**
+   * 回答 agent 的请求；批准全文补偿会生成 approval_id。
+   */
+  export interface Args {
+    /**
+     * 阅读会话 ID（RS-…）
+     */
+    session_id: string;
+    request_id: string;
+    decision: "approve" | "deny" | "answer";
+    answer?: string;
+  }
+}
+
+export declare namespace ReadingOverride {
+  /**
+   * 用户改判某个对象（agent 不能再覆盖）。
+   */
+  export interface Args {
+    /**
+     * 阅读会话 ID（RS-…）
+     */
+    session_id: string;
+    owner_id: string;
+    verdict: "relevant" | "uncertain" | "irrelevant";
+    reason?: string;
+  }
+}
+
+export declare namespace ReadingDirect {
+  /**
+   * 补充联想方向（下一轮联想补查使用）。
+   */
+  export interface Args {
+    /**
+     * 阅读会话 ID（RS-…）
+     */
+    session_id: string;
+    text: string;
+  }
+}
+
+export declare namespace ReadingConfigure {
+  /**
+   * 切换阅读策略。
+   */
+  export interface Args {
+    /**
+     * 阅读会话 ID（RS-…）
+     */
+    session_id: string;
+    strategy: "standard" | "associative" | "quick";
+  }
+}
+
+export declare namespace ReadingAbort {
+  /**
+   * 中止会话（agent 之后的写操作会被拒绝）。
+   */
+  export interface Args {
+    /**
+     * 阅读会话 ID（RS-…）
+     */
+    session_id: string;
+    reason?: string;
+  }
+}
+
+export declare namespace ReadingArchive {
+  /**
+   * 归档或恢复会话（历史保留）。
+   */
+  export interface Args {
+    /**
+     * 阅读会话 ID（RS-…）
+     */
+    session_id: string;
+    archived?: boolean;
+  }
+}
+
+export declare namespace ConfigGet {
+  /**
+   * 当前配置、revision 与各连接器密钥是否已设置（不返回密钥内容）。
+   */
+  export interface Args {}
+}
+
+export declare namespace ConfigSchema {
+  /**
+   * 配置的 JSON Schema（字段、默认值与说明）。
+   */
+  export interface Args {}
+}
+
+export declare namespace ConfigUpdate {
+  /**
+   * 修改配置（如数据库/索引位置、嵌入模型、向量后端、默认阅读策略、连接器）。返回需要的后续动作。
+   */
+  export interface Args {
+    /**
+     * JSON Merge Patch：只写要改的字段；null 恢复默认
+     */
+    patch: {
+      [k: string]: unknown;
+    };
+    /**
+     * config.get 返回的 revision
+     */
+    expected_revision: string;
+    dry_run?: boolean;
+  }
+}
+
+export declare namespace ConfigSecretSet {
+  /**
+   * 把密钥写入本机凭据管理器（只在工作台/CLI；不暴露给 agent）。
+   */
+  export interface Args {
+    secret_ref: string;
+    value: string;
+  }
+}
+
+export declare namespace IndexStatus {
+  /**
+   * 某对象各投影/通道的就绪状态（stale 表示落后于当前 HEAD）。
+   */
+  export interface Args {
+    owner_id: string;
+  }
+}
+
+export declare namespace IndexReconcile {
+  /**
+   * 按当前 HEAD 补齐检索投影（不改记忆）；sources=true 同时更新来源文件投影。
+   */
+  export interface Args {
+    owner_id?: string | null;
+    force?: boolean;
+    sources?: boolean;
+  }
+}
+
+export declare namespace IndexGaps {
+  /**
+   * 发现层的确定性缺口（缺 L4 概览、技术单元缺检索说明）；内容是否充分仍需阅读判断。
+   */
+  export interface Args {}
+}
+
+export declare namespace IndexSearch {
+  /**
+   * 直接检索投影（调试/诊断用；正式查询请用 query.search，它会回到固定版本核对）。
+   */
+  export interface Args {
+    query: string;
+    corpus?: "fulltext" | "discovery" | "source";
+    owner_ids?: string[] | null;
+    levels?: string[] | null;
+    review_filter?: "all" | "reviewed_only" | "exclude_unsafe" | "unreviewed_only";
+    group?: "record" | "owner";
+    limit?: number;
+  }
+}
+
+export declare namespace SystemCapabilities {
+  /**
+   * 当前能力与降级情况（向量模型、重排模型、连接器）。
+   */
+  export interface Args {}
+}
+
+export declare namespace SystemGuide {
+  /**
+   * 读取 burrowl 工作流说明全文（与 Skill 文件相同）。客户端没有加载 burrowl Skill 时，用它代替 Skill。
+   */
+  export interface Args {
+    /**
+     * rules 公共规则；recording 记忆记录写作标准；burrowl-work / burrowl-read / burrowl-consolidate 工作流；burrowl-dev-check 框架开发
+     */
+    name: "rules" | "recording" | "burrowl-work" | "burrowl-read" | "burrowl-consolidate" | "burrowl-dev-check";
+  }
+}
+
+export declare namespace SystemValidate {
+  /**
+   * 全工作区只读校验：提交链与指纹、写锁与残留、来源文件是否变化或缺失、索引是否落后。不修复。
+   */
+  export interface Args {}
+}
+
+export declare namespace SystemOps {
+  /**
+   * 全部操作的目录（名称、分组、读写类型、说明、参数 schema）。
+   */
+  export interface Args {
+    groups?: string[] | null;
+  }
+}
+
+export interface OpArgs {
+  "hub.connectors": HubConnectors.Args;
+  "hub.health": HubHealth.Args;
+  "hub.plan": HubPlan.Args;
+  "hub.apply": HubApply.Args;
+  "hub.status": HubStatus.Args;
+  "hub.search": HubSearch.Args;
+  "wiki.list": WikiList.Args;
+  "wiki.read": WikiRead.Args;
+  "wiki.configure": WikiConfigure.Args;
+  "review.queue": ReviewQueue.Args;
+  "review.submit": ReviewSubmit.Args;
+  "review.batch": ReviewBatch.Args;
+  "review.history": ReviewHistory.Args;
+  "provenance.impact": ProvenanceImpact.Args;
+  "provenance.lineage": ProvenanceLineage.Args;
+  "provenance.question_validity": ProvenanceQuestionValidity.Args;
+  "provenance.formal": ProvenanceFormal.Args;
+  "relations.graph": RelationsGraph.Args;
+  "relations.similar": RelationsSimilar.Args;
+  "relations.associations": RelationsAssociations.Args;
+  "relations.decide": RelationsDecide.Args;
+  "relations.view": RelationsView.Args;
+  "relations.view_save": RelationsViewSave.Args;
+  "relations.notes": RelationsNotes.Args;
+  "relations.note_add": RelationsNoteAdd.Args;
+  "relations.note_resolve": RelationsNoteResolve.Args;
+  "maintenance.plan": MaintenancePlan.Args;
+  "maintenance.review": MaintenanceReview.Args;
+  "maintenance.apply": MaintenanceApply.Args;
+  "maintenance.status": MaintenanceStatus.Args;
+  "monitor.run": MonitorRun.Args;
+  "monitor.candidates": MonitorCandidates.Args;
+  "monitor.resolve": MonitorResolve.Args;
+  "monitor.observations": MonitorObservations.Args;
+  "runs.create": RunsCreate.Args;
+  "runs.register": RunsRegister.Args;
+  "runs.execute": RunsExecute.Args;
+  "runs.update": RunsUpdate.Args;
+  "runs.rollback": RunsRollback.Args;
+  "runs.search": RunsSearch.Args;
+  "sources.list": SourcesList.Args;
+  "sources.roots": SourcesRoots.Args;
+  "sources.add_root": SourcesAddRoot.Args;
+  "sources.relocate_root": SourcesRelocateRoot.Args;
+  "sources.register": SourcesRegister.Args;
+  "sources.register_many": SourcesRegisterMany.Args;
+  "sources.relocate": SourcesRelocate.Args;
+  "sources.update": SourcesUpdate.Args;
+  "memory.owners": MemoryOwners.Args;
+  "memory.owner_create": MemoryOwnerCreate.Args;
+  "memory.owner_adopt": MemoryOwnerAdopt.Args;
+  "memory.records": MemoryRecords.Args;
+  "memory.kinds": MemoryKinds.Args;
+  "memory.contract": MemoryContract.Args;
+  "memory.inspect": MemoryInspect.Args;
+  "memory.commit": MemoryCommit.Args;
+  "memory.document": MemoryDocument.Args;
+  "memory.figure": MemoryFigure.Args;
+  "memory.timeline": MemoryTimeline.Args;
+  "memory.raw_materials": MemoryRawMaterials.Args;
+  "memory.raw_material": MemoryRawMaterial.Args;
+  "memory.resume": MemoryResume.Args;
+  "memory.export": MemoryExport.Args;
+  "memory.consolidate_prepare": MemoryConsolidatePrepare.Args;
+  "memory.consolidate_apply": MemoryConsolidateApply.Args;
+  "memory.summary_materials": MemorySummaryMaterials.Args;
+  "memory.summary_save": MemorySummarySave.Args;
+  "memory.feedback": MemoryFeedback.Args;
+  "memory.recovery": MemoryRecovery.Args;
+  "query.search": QuerySearch.Args;
+  "query.page": QueryPage.Args;
+  "query.cancel": QueryCancel.Args;
+  "query.assemble": QueryAssemble.Args;
+  "query.expand": QueryExpand.Args;
+  "query.deepen": QueryDeepen.Args;
+  "query.documents": QueryDocuments.Args;
+  "reading.start": ReadingStart.Args;
+  "reading.assess": ReadingAssess.Args;
+  "reading.peek": ReadingPeek.Args;
+  "reading.read": ReadingRead.Args;
+  "reading.note": ReadingNote.Args;
+  "reading.synthesize": ReadingSynthesize.Args;
+  "reading.ask_user": ReadingAskUser.Args;
+  "reading.recall": ReadingRecall.Args;
+  "reading.finish": ReadingFinish.Args;
+  "reading.status": ReadingStatus.Args;
+  "reading.delegate": ReadingDelegate.Args;
+  "reading.list": ReadingList.Args;
+  "reading.view": ReadingView.Args;
+  "reading.respond": ReadingRespond.Args;
+  "reading.override": ReadingOverride.Args;
+  "reading.direct": ReadingDirect.Args;
+  "reading.configure": ReadingConfigure.Args;
+  "reading.abort": ReadingAbort.Args;
+  "reading.archive": ReadingArchive.Args;
+  "config.get": ConfigGet.Args;
+  "config.schema": ConfigSchema.Args;
+  "config.update": ConfigUpdate.Args;
+  "config.secret_set": ConfigSecretSet.Args;
+  "index.status": IndexStatus.Args;
+  "index.reconcile": IndexReconcile.Args;
+  "index.gaps": IndexGaps.Args;
+  "index.search": IndexSearch.Args;
+  "system.capabilities": SystemCapabilities.Args;
+  "system.guide": SystemGuide.Args;
+  "system.validate": SystemValidate.Args;
+  "system.ops": SystemOps.Args;
+}
+
+export type OpName = keyof OpArgs;
+
+export const OP_EFFECTS: Record<OpName, string> = {
+  "hub.connectors": "read",
+  "hub.health": "read",
+  "hub.plan": "read",
+  "hub.apply": "admin",
+  "hub.status": "read",
+  "hub.search": "read",
+  "wiki.list": "read",
+  "wiki.read": "read",
+  "wiki.configure": "admin",
+  "review.queue": "read",
+  "review.submit": "write",
+  "review.batch": "write",
+  "review.history": "read",
+  "provenance.impact": "read",
+  "provenance.lineage": "read",
+  "provenance.question_validity": "read",
+  "provenance.formal": "read",
+  "relations.graph": "read",
+  "relations.similar": "read",
+  "relations.associations": "read",
+  "relations.decide": "write",
+  "relations.view": "read",
+  "relations.view_save": "user",
+  "relations.notes": "read",
+  "relations.note_add": "user",
+  "relations.note_resolve": "user",
+  "maintenance.plan": "write",
+  "maintenance.review": "write",
+  "maintenance.apply": "write",
+  "maintenance.status": "read",
+  "monitor.run": "write",
+  "monitor.candidates": "read",
+  "monitor.resolve": "user",
+  "monitor.observations": "read",
+  "runs.create": "write",
+  "runs.register": "write",
+  "runs.execute": "write",
+  "runs.update": "write",
+  "runs.rollback": "write",
+  "runs.search": "read",
+  "sources.list": "read",
+  "sources.roots": "read",
+  "sources.add_root": "write",
+  "sources.relocate_root": "write",
+  "sources.register": "write",
+  "sources.register_many": "write",
+  "sources.relocate": "write",
+  "sources.update": "user",
+  "memory.owners": "read",
+  "memory.owner_create": "write",
+  "memory.owner_adopt": "write",
+  "memory.records": "read",
+  "memory.kinds": "read",
+  "memory.contract": "read",
+  "memory.inspect": "read",
+  "memory.commit": "write",
+  "memory.document": "read",
+  "memory.figure": "read",
+  "memory.timeline": "read",
+  "memory.raw_materials": "read",
+  "memory.raw_material": "read",
+  "memory.resume": "read",
+  "memory.export": "read",
+  "memory.consolidate_prepare": "read",
+  "memory.consolidate_apply": "write",
+  "memory.summary_materials": "read",
+  "memory.summary_save": "write",
+  "memory.feedback": "write",
+  "memory.recovery": "admin",
+  "query.search": "read",
+  "query.page": "read",
+  "query.cancel": "read",
+  "query.assemble": "read",
+  "query.expand": "read",
+  "query.deepen": "read",
+  "query.documents": "read",
+  "reading.start": "write",
+  "reading.assess": "write",
+  "reading.peek": "write",
+  "reading.read": "write",
+  "reading.note": "write",
+  "reading.synthesize": "write",
+  "reading.ask_user": "write",
+  "reading.recall": "write",
+  "reading.finish": "write",
+  "reading.status": "read",
+  "reading.delegate": "read",
+  "reading.list": "read",
+  "reading.view": "read",
+  "reading.respond": "user",
+  "reading.override": "user",
+  "reading.direct": "user",
+  "reading.configure": "user",
+  "reading.abort": "user",
+  "reading.archive": "user",
+  "config.get": "read",
+  "config.schema": "read",
+  "config.update": "admin",
+  "config.secret_set": "user",
+  "index.status": "read",
+  "index.reconcile": "admin",
+  "index.gaps": "read",
+  "index.search": "read",
+  "system.capabilities": "read",
+  "system.guide": "read",
+  "system.validate": "read",
+  "system.ops": "read",
+};

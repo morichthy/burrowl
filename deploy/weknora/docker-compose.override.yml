@@ -1,0 +1,8 @@
+# 复制到 WeKnora 源码目录（与 docker-compose.yml 同级）。只在本机回环地址上提供服务，局域网不可访问。
+services:
+  app:
+    ports: !override
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
+  frontend:
+    ports: !override
+      - "127.0.0.1:${FRONTEND_PORT:-8090}:80"

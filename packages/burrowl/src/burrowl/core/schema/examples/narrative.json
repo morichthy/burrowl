@@ -1,0 +1,109 @@
+{
+  "kind": "narrative",
+  "note": "L2 经过：body_markdown 写 背景 → 实际尝试、选择理由、观察与转折 → 简单结论和未决问题；stages 至少一段（situation/action/reason/outcome/evidence_refs）。需要复核的结论写进 claims。",
+  "operation": {
+    "op": "put_record",
+    "client_key": "new-narrative",
+    "draft": {
+      "owner_id": "RES-FLOATING-POINT-SUMMATION",
+      "kind": "narrative",
+      "title": "从单位增量丢失到补偿比较的第一轮经过",
+      "keywords": [
+        "浮点求和",
+        "Kahan"
+      ],
+      "body_markdown": "## 背景\n\n研究要比较求和顺序对抵消输入的影响。\n\n## 经过\n\n先用顺序求和处理三项抵消输入，单位增量完全丢失；随后加入 Kahan 补偿作对照，补偿后仍丢失，说明补偿不能覆盖所有抵消情形。\n\n## 结论与未决\n\n在这组三项输入上，顺序与补偿都未保住单位增量；更多排列需要后续实验。依据：[SRC-SUMMATION-R01]。",
+      "record_reason": "记录第一轮实际经过",
+      "sensitivity": "internal",
+      "sources": [
+        {
+          "target_kind": "file",
+          "target_id": "SRC-SUMMATION-R01",
+          "revision": null,
+          "sha256": "cdb1f9e4f0580d5baaea4a09416f75801e6c5d01eab96c601ded00a28e31134d",
+          "locator": "全文",
+          "relation": "input"
+        },
+        {
+          "target_kind": "record",
+          "target_id": "MEM-4acc73bb-59c7-560d-9415-fd42e9dcaa2d",
+          "revision": 1,
+          "sha256": "ba12342c6ca8afa0a1760dc517fd7bff2d1b60c7f082ee9113e419572834df51",
+          "locator": "record",
+          "relation": "references"
+        }
+      ],
+      "provenance_gap": null,
+      "payload": {
+        "question": "求和顺序与补偿能否保住被大数抵消的单位增量",
+        "limitations": [
+          "只有三项构造输入"
+        ],
+        "stages": [
+          {
+            "situation": "三项抵消输入",
+            "action": "顺序求和",
+            "reason": "建立基线",
+            "outcome": "单位增量丢失",
+            "evidence_refs": [
+              {
+                "target_kind": "file",
+                "target_id": "SRC-SUMMATION-R01",
+                "revision": null,
+                "sha256": "cdb1f9e4f0580d5baaea4a09416f75801e6c5d01eab96c601ded00a28e31134d",
+                "locator": "全文",
+                "relation": "supports"
+              }
+            ]
+          },
+          {
+            "situation": "基线丢失",
+            "action": "加入 Kahan 补偿对照",
+            "reason": "检验补偿能否恢复",
+            "outcome": "补偿后仍丢失",
+            "evidence_refs": [
+              {
+                "target_kind": "file",
+                "target_id": "SRC-SUMMATION-R01",
+                "revision": null,
+                "sha256": "cdb1f9e4f0580d5baaea4a09416f75801e6c5d01eab96c601ded00a28e31134d",
+                "locator": "全文",
+                "relation": "supports"
+              }
+            ]
+          }
+        ],
+        "claims": [
+          {
+            "claim_id": "CLM-EXAMPLE-NARR-1",
+            "statement": "在三项抵消输入上 Kahan 补偿未能保住单位增量",
+            "kind": "fact",
+            "scope": "三项构造的 binary64 抵消输入",
+            "evidence_refs": [
+              {
+                "target_kind": "file",
+                "target_id": "SRC-SUMMATION-R01",
+                "revision": null,
+                "sha256": "cdb1f9e4f0580d5baaea4a09416f75801e6c5d01eab96c601ded00a28e31134d",
+                "locator": "全文",
+                "relation": "supports"
+              }
+            ]
+          }
+        ],
+        "experience_refs": [],
+        "process_refs": [],
+        "technical_refs": [
+          {
+            "target_kind": "record",
+            "target_id": "MEM-4acc73bb-59c7-560d-9415-fd42e9dcaa2d",
+            "revision": 1,
+            "sha256": "ba12342c6ca8afa0a1760dc517fd7bff2d1b60c7f082ee9113e419572834df51",
+            "locator": "record",
+            "relation": "references"
+          }
+        ]
+      }
+    }
+  }
+}

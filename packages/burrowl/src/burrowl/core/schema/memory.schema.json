@@ -1,0 +1,7410 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "urn:burrowl:memory:current",
+ "title": "burrowl memory records (current version per kind)",
+ "x-current-versions": {
+  "source": 3,
+  "detail": 3,
+  "narrative": 4,
+  "experience": 4,
+  "overview": 4,
+  "document": 3,
+  "document_section": 3,
+  "question": 3,
+  "goal": 3,
+  "route": 3,
+  "checkpoint": 3,
+  "association": 3,
+  "representation": 3,
+  "policy": 3,
+  "consolidation": 3,
+  "feedback": 3,
+  "review": 3,
+  "wiki_page": 1
+ },
+ "$ref": "#/$defs/MemoryRecord",
+ "$defs": {
+  "Actor": {
+   "type": "object",
+   "properties": {
+    "kind": {
+     "enum": [
+      "human",
+      "ai",
+      "workflow"
+     ]
+    },
+    "id": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "kind",
+    "id"
+   ],
+   "additionalProperties": false
+  },
+  "AssociationDraftV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "association"
+    },
+    "level": {
+     "const": null
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string"
+    },
+    "payload": {
+     "$ref": "#/$defs/AssociationPayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "owner_id",
+    "kind",
+    "title",
+    "body_markdown",
+    "payload",
+    "sources",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "schema_version"
+   ],
+   "additionalProperties": false
+  },
+  "AssociationPayload": {
+   "type": "object",
+   "properties": {
+    "from": {
+     "$ref": "#/$defs/Ref"
+    },
+    "to": {
+     "$ref": "#/$defs/Ref"
+    },
+    "relation": {
+     "enum": [
+      "supports",
+      "input",
+      "contradicts",
+      "background",
+      "derived_from",
+      "refines",
+      "same_problem",
+      "same_failure_mode",
+      "prerequisite",
+      "analogous_to",
+      "used_in",
+      "references"
+     ]
+    },
+    "explanation": {
+     "type": "string",
+     "minLength": 1
+    },
+    "shared_structure": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "transfer_limits": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "differences": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     }
+    },
+    "basis_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     },
+     "minItems": 0
+    },
+    "status": {
+     "enum": [
+      "candidate",
+      "accepted",
+      "rejected",
+      "withdrawn"
+     ]
+    },
+    "missing_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/UnresolvedRef"
+     },
+     "minItems": 0
+    }
+   },
+   "required": [
+    "from",
+    "to",
+    "relation",
+    "explanation",
+    "shared_structure",
+    "transfer_limits",
+    "basis_refs",
+    "status"
+   ],
+   "additionalProperties": false
+  },
+  "AssociationRecordV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "association"
+    },
+    "level": {
+     "const": null
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string"
+    },
+    "payload": {
+     "$ref": "#/$defs/AssociationPayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "schema_version",
+    "record_id",
+    "owner_id",
+    "kind",
+    "level",
+    "title",
+    "keywords",
+    "body_markdown",
+    "payload",
+    "sources",
+    "provenance_gap",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "created_at",
+    "created_by",
+    "revision",
+    "previous_revision",
+    "updated_at",
+    "updated_by",
+    "change_reason",
+    "record_hash",
+    "content_hash"
+   ],
+   "additionalProperties": false
+  },
+  "CheckpointDraftV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "checkpoint"
+    },
+    "level": {
+     "const": null
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string"
+    },
+    "payload": {
+     "$ref": "#/$defs/CheckpointPayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "owner_id",
+    "kind",
+    "title",
+    "body_markdown",
+    "payload",
+    "sources",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "schema_version"
+   ],
+   "additionalProperties": false
+  },
+  "CheckpointPayload": {
+   "type": "object",
+   "properties": {
+    "goal_ref": {
+     "$ref": "#/$defs/Ref"
+    },
+    "route_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     },
+     "minItems": 0
+    },
+    "completed_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     },
+     "minItems": 0
+    },
+    "question_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     },
+     "minItems": 0
+    },
+    "next_step": {
+     "type": "string",
+     "minLength": 1
+    },
+    "prerequisites": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "stop_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "budget_remaining": {
+     "oneOf": [
+      {
+       "type": "object",
+       "additionalProperties": {
+        "type": "number"
+       }
+      },
+      {
+       "$ref": "#/$defs/UnknownValue"
+      }
+     ]
+    },
+    "missing_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/UnresolvedRef"
+     },
+     "minItems": 0
+    }
+   },
+   "required": [
+    "goal_ref",
+    "route_refs",
+    "completed_refs",
+    "question_refs",
+    "next_step",
+    "prerequisites",
+    "stop_reason",
+    "budget_remaining"
+   ],
+   "additionalProperties": false
+  },
+  "CheckpointRecordV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "checkpoint"
+    },
+    "level": {
+     "const": null
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string"
+    },
+    "payload": {
+     "$ref": "#/$defs/CheckpointPayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "schema_version",
+    "record_id",
+    "owner_id",
+    "kind",
+    "level",
+    "title",
+    "keywords",
+    "body_markdown",
+    "payload",
+    "sources",
+    "provenance_gap",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "created_at",
+    "created_by",
+    "revision",
+    "previous_revision",
+    "updated_at",
+    "updated_by",
+    "change_reason",
+    "record_hash",
+    "content_hash"
+   ],
+   "additionalProperties": false
+  },
+  "Claim": {
+   "type": "object",
+   "properties": {
+    "claim_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "statement": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "enum": [
+      "fact",
+      "calculation",
+      "inference",
+      "recommendation"
+     ]
+    },
+    "scope": {
+     "type": "string",
+     "minLength": 1
+    },
+    "evidence_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    }
+   },
+   "required": [
+    "claim_id",
+    "statement",
+    "kind",
+    "scope",
+    "evidence_refs"
+   ],
+   "additionalProperties": false
+  },
+  "CommitReceipt": {
+   "type": "object",
+   "properties": {
+    "request_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "commit_id": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "generation": {
+     "type": "integer"
+    },
+    "save_status": {
+     "enum": [
+      "committed",
+      "no_change",
+      "not_committed"
+     ]
+    },
+    "record_results": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/RecordResult"
+     },
+     "minItems": 0
+    },
+    "index_status": {
+     "enum": [
+      "indexed",
+      "pending",
+      "failed"
+     ]
+    },
+    "index_details": {
+     "$ref": "#/$defs/IndexDetails"
+    },
+    "warnings": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "error": {
+     "oneOf": [
+      {
+       "type": "object",
+       "properties": {
+        "code": {
+         "type": "string",
+         "minLength": 1
+        },
+        "message": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "code",
+        "message"
+       ],
+       "additionalProperties": false
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "recovery_ref": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    }
+   },
+   "required": [
+    "request_id",
+    "owner_id",
+    "commit_id",
+    "generation",
+    "save_status",
+    "record_results",
+    "index_status",
+    "index_details",
+    "warnings",
+    "error",
+    "recovery_ref"
+   ],
+   "additionalProperties": false
+  },
+  "CommitRequest": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "enum": [
+      1,
+      2,
+      3
+     ]
+    },
+    "request_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "actor": {
+     "$ref": "#/$defs/Actor"
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "expected_head": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "operations": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Operation"
+     },
+     "minItems": 1
+    },
+    "dry_run": {
+     "type": "boolean"
+    }
+   },
+   "required": [
+    "schema_version",
+    "request_id",
+    "actor",
+    "owner_id",
+    "expected_head",
+    "operations"
+   ],
+   "additionalProperties": false
+  },
+  "ConsolidationDecision": {
+   "type": "object",
+   "properties": {
+    "target": {
+     "$ref": "#/$defs/Ref"
+    },
+    "action": {
+     "enum": [
+      "revise",
+      "retain",
+      "defer"
+     ]
+    },
+    "reason": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "target",
+    "action",
+    "reason"
+   ],
+   "additionalProperties": false
+  },
+  "ConsolidationDraftV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "consolidation"
+    },
+    "level": {
+     "const": null
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string"
+    },
+    "payload": {
+     "$ref": "#/$defs/ConsolidationPayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "owner_id",
+    "kind",
+    "title",
+    "body_markdown",
+    "payload",
+    "sources",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "schema_version"
+   ],
+   "additionalProperties": false
+  },
+  "ConsolidationPayload": {
+   "type": "object",
+   "properties": {
+    "basis_heads": {
+     "type": "object",
+     "additionalProperties": {
+      "type": "string",
+      "minLength": 1
+     }
+    },
+    "trigger": {
+     "type": "string",
+     "minLength": 1
+    },
+    "affected_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     },
+     "minItems": 0
+    },
+    "decisions": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/ConsolidationDecision"
+     },
+     "minItems": 0
+    },
+    "remaining_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     },
+     "minItems": 0
+    },
+    "missing_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/UnresolvedRef"
+     },
+     "minItems": 0
+    }
+   },
+   "required": [
+    "basis_heads",
+    "trigger",
+    "affected_refs",
+    "decisions",
+    "remaining_refs"
+   ],
+   "additionalProperties": false
+  },
+  "ConsolidationRecordV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "consolidation"
+    },
+    "level": {
+     "const": null
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string"
+    },
+    "payload": {
+     "$ref": "#/$defs/ConsolidationPayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "schema_version",
+    "record_id",
+    "owner_id",
+    "kind",
+    "level",
+    "title",
+    "keywords",
+    "body_markdown",
+    "payload",
+    "sources",
+    "provenance_gap",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "created_at",
+    "created_by",
+    "revision",
+    "previous_revision",
+    "updated_at",
+    "updated_by",
+    "change_reason",
+    "record_hash",
+    "content_hash"
+   ],
+   "additionalProperties": false
+  },
+  "DetailDraftV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "detail"
+    },
+    "level": {
+     "const": "L1"
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "const": ""
+    },
+    "payload": {
+     "$ref": "#/$defs/TechnicalUnitPayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "owner_id",
+    "kind",
+    "title",
+    "body_markdown",
+    "payload",
+    "sources",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "schema_version"
+   ],
+   "additionalProperties": false
+  },
+  "DetailFigure": {
+   "type": "object",
+   "properties": {
+    "caption": {
+     "type": "string",
+     "minLength": 1
+    },
+    "ref": {
+     "$ref": "#/$defs/Ref"
+    }
+   },
+   "required": [
+    "caption",
+    "ref"
+   ],
+   "additionalProperties": false
+  },
+  "DetailRecordV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "detail"
+    },
+    "level": {
+     "const": "L1"
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "const": ""
+    },
+    "payload": {
+     "$ref": "#/$defs/TechnicalUnitPayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "schema_version",
+    "record_id",
+    "owner_id",
+    "kind",
+    "level",
+    "title",
+    "keywords",
+    "body_markdown",
+    "payload",
+    "sources",
+    "provenance_gap",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "created_at",
+    "created_by",
+    "revision",
+    "previous_revision",
+    "updated_at",
+    "updated_by",
+    "change_reason",
+    "record_hash",
+    "content_hash"
+   ],
+   "additionalProperties": false
+  },
+  "DocumentDraftV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "document"
+    },
+    "level": {
+     "const": null
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "const": ""
+    },
+    "payload": {
+     "$ref": "#/$defs/DocumentPayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "owner_id",
+    "kind",
+    "title",
+    "body_markdown",
+    "payload",
+    "sources",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "schema_version"
+   ],
+   "additionalProperties": false
+  },
+  "DocumentPayload": {
+   "type": "object",
+   "properties": {
+    "knowledge_facets": {
+     "$ref": "#/$defs/KnowledgeFacets"
+    },
+    "document_type": {
+     "enum": [
+      "research_process",
+      "research_report"
+     ]
+    },
+    "purpose": {
+     "type": "string",
+     "minLength": 1
+    },
+    "audience": {
+     "type": "string",
+     "minLength": 1
+    },
+    "scope": {
+     "type": "string",
+     "minLength": 1
+    },
+    "common_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     },
+     "minItems": 0
+    },
+    "section_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     },
+     "minItems": 1
+    },
+    "watch_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/WatchRef"
+     },
+     "minItems": 0
+    },
+    "missing_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/UnresolvedRef"
+     },
+     "minItems": 0
+    }
+   },
+   "required": [
+    "document_type",
+    "purpose",
+    "audience",
+    "scope",
+    "common_refs",
+    "section_refs",
+    "watch_refs",
+    "missing_refs"
+   ],
+   "additionalProperties": false
+  },
+  "DocumentRecordV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "document"
+    },
+    "level": {
+     "const": null
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "const": ""
+    },
+    "payload": {
+     "$ref": "#/$defs/DocumentPayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "schema_version",
+    "record_id",
+    "owner_id",
+    "kind",
+    "level",
+    "title",
+    "keywords",
+    "body_markdown",
+    "payload",
+    "sources",
+    "provenance_gap",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "created_at",
+    "created_by",
+    "revision",
+    "previous_revision",
+    "updated_at",
+    "updated_by",
+    "change_reason",
+    "record_hash",
+    "content_hash"
+   ],
+   "additionalProperties": false
+  },
+  "DocumentSectionDraftV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "document_section"
+    },
+    "level": {
+     "const": null
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "const": ""
+    },
+    "payload": {
+     "$ref": "#/$defs/DocumentSectionPayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "owner_id",
+    "kind",
+    "title",
+    "body_markdown",
+    "payload",
+    "sources",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "schema_version"
+   ],
+   "additionalProperties": false
+  },
+  "DocumentSectionPayload": {
+   "type": "object",
+   "properties": {
+    "knowledge_facets": {
+     "$ref": "#/$defs/KnowledgeFacets"
+    },
+    "section_key": {
+     "type": "string",
+     "minLength": 1
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "role": {
+     "enum": [
+      "introduction",
+      "methods",
+      "experiment",
+      "discussion",
+      "conclusion",
+      "appendix"
+     ]
+    },
+    "blocks": {
+     "type": "array",
+     "items": {
+      "oneOf": [
+       {
+        "$ref": "#/$defs/ReportProseBlock"
+       },
+       {
+        "$ref": "#/$defs/SectionUnitBlock"
+       }
+      ]
+     },
+     "minItems": 1
+    },
+    "watch_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/WatchRef"
+     },
+     "minItems": 0
+    },
+    "missing_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/UnresolvedRef"
+     },
+     "minItems": 0
+    }
+   },
+   "required": [
+    "section_key",
+    "title",
+    "role",
+    "blocks",
+    "watch_refs",
+    "missing_refs"
+   ],
+   "additionalProperties": false
+  },
+  "DocumentSectionRecordV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "document_section"
+    },
+    "level": {
+     "const": null
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "const": ""
+    },
+    "payload": {
+     "$ref": "#/$defs/DocumentSectionPayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "schema_version",
+    "record_id",
+    "owner_id",
+    "kind",
+    "level",
+    "title",
+    "keywords",
+    "body_markdown",
+    "payload",
+    "sources",
+    "provenance_gap",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "created_at",
+    "created_by",
+    "revision",
+    "previous_revision",
+    "updated_at",
+    "updated_by",
+    "change_reason",
+    "record_hash",
+    "content_hash"
+   ],
+   "additionalProperties": false
+  },
+  "ExperienceDraftV4": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 4
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "experience"
+    },
+    "level": {
+     "const": "L3"
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string",
+     "minLength": 1
+    },
+    "payload": {
+     "$ref": "#/$defs/ExperiencePayloadV4"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "owner_id",
+    "kind",
+    "title",
+    "body_markdown",
+    "payload",
+    "sources",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "schema_version"
+   ],
+   "additionalProperties": false
+  },
+  "ExperiencePayloadV4": {
+   "type": "object",
+   "properties": {
+    "problem_structure": {
+     "type": "string",
+     "minLength": 1
+    },
+    "recommendation": {
+     "type": "string",
+     "minLength": 1
+    },
+    "applicable": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 1
+    },
+    "prohibited": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "failure_modes": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "retry_conditions": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "claim_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     },
+     "minItems": 0
+    },
+    "claims": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Claim"
+     },
+     "minItems": 0
+    },
+    "missing_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/UnresolvedRef"
+     },
+     "minItems": 0
+    },
+    "knowledge_facets": {
+     "$ref": "#/$defs/KnowledgeFacets"
+    },
+    "process_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     }
+    },
+    "technical_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     }
+    },
+    "knowledge_type": {
+     "enum": [
+      "observation",
+      "conclusion",
+      "hypothesis",
+      "recommendation"
+     ]
+    }
+   },
+   "required": [
+    "problem_structure",
+    "recommendation",
+    "applicable",
+    "prohibited",
+    "failure_modes",
+    "retry_conditions",
+    "claim_refs",
+    "claims",
+    "knowledge_type",
+    "process_refs",
+    "technical_refs"
+   ],
+   "additionalProperties": false
+  },
+  "ExperienceRecordV4": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 4
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "experience"
+    },
+    "level": {
+     "const": "L3"
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string",
+     "minLength": 1
+    },
+    "payload": {
+     "$ref": "#/$defs/ExperiencePayloadV4"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "schema_version",
+    "record_id",
+    "owner_id",
+    "kind",
+    "level",
+    "title",
+    "keywords",
+    "body_markdown",
+    "payload",
+    "sources",
+    "provenance_gap",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "created_at",
+    "created_by",
+    "revision",
+    "previous_revision",
+    "updated_at",
+    "updated_by",
+    "change_reason",
+    "record_hash",
+    "content_hash"
+   ],
+   "additionalProperties": false
+  },
+  "FacetApplicability": {
+   "type": "object",
+   "properties": {
+    "description": {
+     "type": "string"
+    },
+    "conditions": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "exclusions": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "valid_from": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "valid_until": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "subject_versions": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     },
+     "minItems": 0
+    }
+   },
+   "required": [
+    "description",
+    "conditions",
+    "exclusions",
+    "valid_from",
+    "valid_until",
+    "subject_versions"
+   ],
+   "additionalProperties": false
+  },
+  "FacetAttempt": {
+   "type": "object",
+   "properties": {
+    "attempt_ref": {
+     "$ref": "#/$defs/Ref"
+    },
+    "outcome": {
+     "enum": [
+      "success",
+      "failure",
+      "mixed",
+      "unknown"
+     ]
+    },
+    "conditions": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    }
+   },
+   "required": [
+    "attempt_ref",
+    "outcome",
+    "conditions"
+   ],
+   "additionalProperties": false
+  },
+  "FacetConfidence": {
+   "type": "object",
+   "properties": {
+    "target": {
+     "$ref": "#/$defs/Ref"
+    },
+    "level": {
+     "enum": [
+      "high",
+      "medium",
+      "low",
+      "unknown"
+     ]
+    },
+    "assessed_by": {
+     "type": "string",
+     "minLength": 1
+    },
+    "method": {
+     "$ref": "#/$defs/FacetStrategy"
+    },
+    "basis": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     },
+     "minItems": 0
+    },
+    "applicability": {
+     "$ref": "#/$defs/FacetApplicability"
+    },
+    "calibrated_probability": {
+     "type": [
+      "number",
+      "null"
+     ]
+    },
+    "calibration_ref": {
+     "oneOf": [
+      {
+       "$ref": "#/$defs/Ref"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    }
+   },
+   "required": [
+    "target",
+    "level",
+    "assessed_by",
+    "method",
+    "basis",
+    "applicability",
+    "calibrated_probability",
+    "calibration_ref"
+   ],
+   "additionalProperties": false
+  },
+  "FacetStrategy": {
+   "type": "object",
+   "properties": {
+    "name": {
+     "type": "string",
+     "minLength": 1
+    },
+    "version": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "name",
+    "version"
+   ],
+   "additionalProperties": false
+  },
+  "Failure": {
+   "type": "object",
+   "properties": {
+    "category": {
+     "enum": [
+      "execution",
+      "no_improvement",
+      "counterexample",
+      "insufficient_evidence"
+     ]
+    },
+    "tested_scope": {
+     "type": "string",
+     "minLength": 1
+    },
+    "result": {
+     "type": "string",
+     "minLength": 1
+    },
+    "cannot_infer": {
+     "type": "string",
+     "minLength": 1
+    },
+    "retry_conditions": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    }
+   },
+   "required": [
+    "category",
+    "tested_scope",
+    "result",
+    "cannot_infer",
+    "retry_conditions"
+   ],
+   "additionalProperties": false
+  },
+  "FeedbackDraftV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "feedback"
+    },
+    "level": {
+     "const": null
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string"
+    },
+    "payload": {
+     "$ref": "#/$defs/FeedbackPayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "owner_id",
+    "kind",
+    "title",
+    "body_markdown",
+    "payload",
+    "sources",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "schema_version"
+   ],
+   "additionalProperties": false
+  },
+  "FeedbackPayload": {
+   "type": "object",
+   "properties": {
+    "query_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "target": {
+     "$ref": "#/$defs/Ref"
+    },
+    "label": {
+     "enum": [
+      "missing",
+      "irrelevant",
+      "invalid_analogy",
+      "lost_boundary",
+      "stale",
+      "adopted",
+      "outcome"
+     ]
+    },
+    "note": {
+     "type": "string"
+    },
+    "adopted_in": {
+     "oneOf": [
+      {
+       "$ref": "#/$defs/Ref"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "missing_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/UnresolvedRef"
+     },
+     "minItems": 0
+    }
+   },
+   "required": [
+    "query_id",
+    "target",
+    "label",
+    "note",
+    "adopted_in"
+   ],
+   "additionalProperties": false
+  },
+  "FeedbackRecordV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "feedback"
+    },
+    "level": {
+     "const": null
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string"
+    },
+    "payload": {
+     "$ref": "#/$defs/FeedbackPayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "schema_version",
+    "record_id",
+    "owner_id",
+    "kind",
+    "level",
+    "title",
+    "keywords",
+    "body_markdown",
+    "payload",
+    "sources",
+    "provenance_gap",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "created_at",
+    "created_by",
+    "revision",
+    "previous_revision",
+    "updated_at",
+    "updated_by",
+    "change_reason",
+    "record_hash",
+    "content_hash"
+   ],
+   "additionalProperties": false
+  },
+  "GoalDraftV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "goal"
+    },
+    "level": {
+     "const": null
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string"
+    },
+    "payload": {
+     "$ref": "#/$defs/GoalPayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "owner_id",
+    "kind",
+    "title",
+    "body_markdown",
+    "payload",
+    "sources",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "schema_version"
+   ],
+   "additionalProperties": false
+  },
+  "GoalPayload": {
+   "type": "object",
+   "properties": {
+    "objective": {
+     "type": "string",
+     "minLength": 1
+    },
+    "constraints": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "success_criteria": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "previous_goal_ref": {
+     "oneOf": [
+      {
+       "$ref": "#/$defs/Ref"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "change_impact": {
+     "type": "string",
+     "minLength": 1
+    },
+    "missing_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/UnresolvedRef"
+     },
+     "minItems": 0
+    }
+   },
+   "required": [
+    "objective",
+    "constraints",
+    "success_criteria",
+    "previous_goal_ref",
+    "change_impact"
+   ],
+   "additionalProperties": false
+  },
+  "GoalRecordV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "goal"
+    },
+    "level": {
+     "const": null
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string"
+    },
+    "payload": {
+     "$ref": "#/$defs/GoalPayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "schema_version",
+    "record_id",
+    "owner_id",
+    "kind",
+    "level",
+    "title",
+    "keywords",
+    "body_markdown",
+    "payload",
+    "sources",
+    "provenance_gap",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "created_at",
+    "created_by",
+    "revision",
+    "previous_revision",
+    "updated_at",
+    "updated_by",
+    "change_reason",
+    "record_hash",
+    "content_hash"
+   ],
+   "additionalProperties": false
+  },
+  "IndexDetails": {
+   "type": "object",
+   "properties": {
+    "fts": {
+     "type": "string"
+    },
+    "vector": {
+     "type": "string"
+    },
+    "indexed_generation": {
+     "type": [
+      "integer",
+      "null"
+     ]
+    },
+    "vector_generation": {
+     "type": [
+      "integer",
+      "null"
+     ]
+    },
+    "target_generation": {
+     "type": "integer"
+    },
+    "encoder_version": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "collection": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "reason": {
+     "type": "string"
+    },
+    "error": {
+     "oneOf": [
+      {
+       "type": "null"
+      },
+      {
+       "type": "object",
+       "properties": {
+        "code": {
+         "type": "string"
+        },
+        "message": {
+         "type": "string"
+        },
+        "details": {
+         "type": "object",
+         "additionalProperties": true
+        },
+        "errors": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "additionalProperties": true
+         }
+        }
+       },
+       "required": [
+        "code",
+        "message"
+       ],
+       "additionalProperties": false
+      }
+     ]
+    }
+   },
+   "additionalProperties": false
+  },
+  "KnowledgeFacets": {
+   "type": "object",
+   "properties": {
+    "roles": {
+     "type": "array",
+     "items": {
+      "enum": [
+       "fact_claim",
+       "insight",
+       "hypothesis",
+       "experience",
+       "method",
+       "principle",
+       "definition",
+       "constraint"
+      ]
+     },
+     "minItems": 0
+    },
+    "principle_kind": {
+     "oneOf": [
+      {
+       "enum": [
+        "definition",
+        "mathematical_axiom",
+        "derived_invariant",
+        "physical_law_model",
+        "engineering_assumption"
+       ]
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "attempts": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/FacetAttempt"
+     },
+     "minItems": 0
+    },
+    "applicability": {
+     "$ref": "#/$defs/FacetApplicability"
+    },
+    "counterexamples": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     },
+     "minItems": 0
+    },
+    "confidence": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/FacetConfidence"
+     },
+     "minItems": 0
+    },
+    "classification_basis": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     },
+     "minItems": 0
+    }
+   },
+   "required": [
+    "roles",
+    "principle_kind",
+    "attempts",
+    "applicability",
+    "counterexamples",
+    "confidence",
+    "classification_basis"
+   ],
+   "additionalProperties": false
+  },
+  "NarrativeDraftV4": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 4
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "narrative"
+    },
+    "level": {
+     "const": "L2"
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string",
+     "minLength": 1
+    },
+    "payload": {
+     "$ref": "#/$defs/NarrativePayloadV4"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "owner_id",
+    "kind",
+    "title",
+    "body_markdown",
+    "payload",
+    "sources",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "schema_version"
+   ],
+   "additionalProperties": false
+  },
+  "NarrativePayloadV4": {
+   "type": "object",
+   "properties": {
+    "occurred_at": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "failure": {
+     "oneOf": [
+      {
+       "$ref": "#/$defs/Failure"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "goal_ref": {
+     "oneOf": [
+      {
+       "$ref": "#/$defs/Ref"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "route_ref": {
+     "oneOf": [
+      {
+       "$ref": "#/$defs/Ref"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "question_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     }
+    },
+    "run_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     }
+    },
+    "claims": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Claim"
+     }
+    },
+    "missing_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/UnresolvedRef"
+     }
+    },
+    "process_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     }
+    },
+    "technical_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     }
+    },
+    "question": {
+     "type": "string",
+     "minLength": 1
+    },
+    "stages": {
+     "type": "array",
+     "minItems": 1,
+     "items": {
+      "type": "object",
+      "properties": {
+       "situation": {
+        "type": "string",
+        "minLength": 1
+       },
+       "action": {
+        "type": "string",
+        "minLength": 1
+       },
+       "reason": {
+        "type": "string",
+        "minLength": 1
+       },
+       "outcome": {
+        "type": "string",
+        "minLength": 1
+       },
+       "evidence_refs": {
+        "type": "array",
+        "items": {
+         "$ref": "#/$defs/Ref"
+        }
+       }
+      },
+      "required": [
+       "situation",
+       "action",
+       "reason",
+       "outcome",
+       "evidence_refs"
+      ],
+      "additionalProperties": false
+     }
+    },
+    "experience_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     }
+    },
+    "limitations": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     }
+    }
+   },
+   "required": [
+    "question",
+    "stages",
+    "experience_refs",
+    "limitations",
+    "claims",
+    "process_refs",
+    "technical_refs"
+   ],
+   "additionalProperties": false
+  },
+  "NarrativeRecordV4": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 4
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "narrative"
+    },
+    "level": {
+     "const": "L2"
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string",
+     "minLength": 1
+    },
+    "payload": {
+     "$ref": "#/$defs/NarrativePayloadV4"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "schema_version",
+    "record_id",
+    "owner_id",
+    "kind",
+    "level",
+    "title",
+    "keywords",
+    "body_markdown",
+    "payload",
+    "sources",
+    "provenance_gap",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "created_at",
+    "created_by",
+    "revision",
+    "previous_revision",
+    "updated_at",
+    "updated_by",
+    "change_reason",
+    "record_hash",
+    "content_hash"
+   ],
+   "additionalProperties": false
+  },
+  "NewUnitWatch": {
+   "type": "object",
+   "properties": {
+    "watch_type": {
+     "const": "new_unit"
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "baseline_head": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "baseline_unit_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    }
+   },
+   "required": [
+    "watch_type",
+    "owner_id",
+    "baseline_head",
+    "baseline_unit_ids"
+   ],
+   "additionalProperties": false
+  },
+  "Operation": {
+   "type": "object",
+   "properties": {
+    "op": {
+     "enum": [
+      "put_record",
+      "transition_question",
+      "set_policy",
+      "decide_association",
+      "save_checkpoint"
+     ]
+    },
+    "client_key": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "expected_revision": {
+     "type": "integer"
+    },
+    "draft": {
+     "$ref": "#/$defs/RequestDraft"
+    }
+   },
+   "required": [
+    "op",
+    "draft"
+   ],
+   "additionalProperties": false
+  },
+  "OverviewDraftV4": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 4
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "overview"
+    },
+    "level": {
+     "const": "L4"
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string",
+     "minLength": 1
+    },
+    "payload": {
+     "$ref": "#/$defs/OverviewPayloadV4"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "owner_id",
+    "kind",
+    "title",
+    "body_markdown",
+    "payload",
+    "sources",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "schema_version"
+   ],
+   "additionalProperties": false
+  },
+  "OverviewPayloadV4": {
+   "type": "object",
+   "properties": {
+    "claims": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Claim"
+     }
+    },
+    "missing_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/UnresolvedRef"
+     }
+    },
+    "process_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     }
+    },
+    "technical_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     }
+    },
+    "question": {
+     "type": "string",
+     "minLength": 1
+    },
+    "methods": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     }
+    },
+    "results": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     }
+    },
+    "current_stage": {
+     "type": "string",
+     "minLength": 1
+    },
+    "limitations": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     }
+    },
+    "open_questions": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     }
+    },
+    "experience_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     }
+    }
+   },
+   "required": [
+    "question",
+    "methods",
+    "results",
+    "current_stage",
+    "limitations",
+    "open_questions",
+    "experience_refs",
+    "claims",
+    "process_refs",
+    "technical_refs"
+   ],
+   "additionalProperties": false
+  },
+  "OverviewRecordV4": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 4
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "overview"
+    },
+    "level": {
+     "const": "L4"
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string",
+     "minLength": 1
+    },
+    "payload": {
+     "$ref": "#/$defs/OverviewPayloadV4"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "schema_version",
+    "record_id",
+    "owner_id",
+    "kind",
+    "level",
+    "title",
+    "keywords",
+    "body_markdown",
+    "payload",
+    "sources",
+    "provenance_gap",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "created_at",
+    "created_by",
+    "revision",
+    "previous_revision",
+    "updated_at",
+    "updated_by",
+    "change_reason",
+    "record_hash",
+    "content_hash"
+   ],
+   "additionalProperties": false
+  },
+  "OwnerDescriptor": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_type": {
+     "enum": [
+      "research",
+      "run",
+      "project",
+      "core-algorithm",
+      "knowledge",
+      "report",
+      "data",
+      "tool"
+     ]
+    },
+    "native_ref": {
+     "type": "object",
+     "properties": {
+      "path": {
+       "type": "string",
+       "minLength": 1
+      },
+      "id_field": {
+       "oneOf": [
+        {
+         "type": "string",
+         "minLength": 1
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "id_value": {
+       "oneOf": [
+        {
+         "type": "string",
+         "minLength": 1
+        },
+        {
+         "type": "null"
+        }
+       ]
+      }
+     },
+     "required": [
+      "path"
+     ],
+     "additionalProperties": false
+    },
+    "memory_home": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "adapter_version": {
+     "type": "integer"
+    },
+    "aliases": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    }
+   },
+   "required": [
+    "schema_version",
+    "owner_id",
+    "owner_type",
+    "native_ref",
+    "memory_home",
+    "created_at",
+    "created_by",
+    "adapter_version"
+   ],
+   "additionalProperties": false
+  },
+  "PolicyDraftV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "policy"
+    },
+    "level": {
+     "const": null
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string"
+    },
+    "payload": {
+     "$ref": "#/$defs/PolicyPayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "owner_id",
+    "kind",
+    "title",
+    "body_markdown",
+    "payload",
+    "sources",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "schema_version"
+   ],
+   "additionalProperties": false
+  },
+  "PolicyOverrides": {
+   "type": "object",
+   "properties": {
+    "retain": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     }
+    },
+    "granularity": {
+     "enum": [
+      "coarse",
+      "normal",
+      "fine"
+     ]
+    },
+    "auto_summary": {
+     "type": "boolean"
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "auto_deepen": {
+     "type": "boolean"
+    },
+    "checkpoint": {
+     "type": "boolean"
+    }
+   },
+   "required": [],
+   "additionalProperties": false
+  },
+  "PolicyPayload": {
+   "type": "object",
+   "properties": {
+    "mode": {
+     "enum": [
+      "basic",
+      "accumulate",
+      "explore"
+     ]
+    },
+    "overrides": {
+     "$ref": "#/$defs/PolicyOverrides"
+    },
+    "missing_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/UnresolvedRef"
+     },
+     "minItems": 0
+    }
+   },
+   "required": [
+    "mode",
+    "overrides"
+   ],
+   "additionalProperties": false
+  },
+  "PolicyRecordV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "policy"
+    },
+    "level": {
+     "const": null
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string"
+    },
+    "payload": {
+     "$ref": "#/$defs/PolicyPayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "schema_version",
+    "record_id",
+    "owner_id",
+    "kind",
+    "level",
+    "title",
+    "keywords",
+    "body_markdown",
+    "payload",
+    "sources",
+    "provenance_gap",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "created_at",
+    "created_by",
+    "revision",
+    "previous_revision",
+    "updated_at",
+    "updated_by",
+    "change_reason",
+    "record_hash",
+    "content_hash"
+   ],
+   "additionalProperties": false
+  },
+  "QuestionDraftV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "question"
+    },
+    "level": {
+     "const": null
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string"
+    },
+    "payload": {
+     "$ref": "#/$defs/QuestionPayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "owner_id",
+    "kind",
+    "title",
+    "body_markdown",
+    "payload",
+    "sources",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "schema_version"
+   ],
+   "additionalProperties": false
+  },
+  "QuestionPayload": {
+   "type": "object",
+   "properties": {
+    "question": {
+     "type": "string",
+     "minLength": 1
+    },
+    "status": {
+     "enum": [
+      "open",
+      "investigating",
+      "blocked",
+      "resolved",
+      "superseded"
+     ]
+    },
+    "decision_affected": {
+     "type": "string",
+     "minLength": 1
+    },
+    "missing_evidence": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "resolution_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     },
+     "minItems": 0
+    },
+    "replacement_ref": {
+     "oneOf": [
+      {
+       "$ref": "#/$defs/Ref"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "reopen_reason": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "missing_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/UnresolvedRef"
+     },
+     "minItems": 0
+    }
+   },
+   "required": [
+    "question",
+    "status",
+    "decision_affected",
+    "missing_evidence",
+    "resolution_refs",
+    "replacement_ref",
+    "reopen_reason"
+   ],
+   "additionalProperties": false
+  },
+  "QuestionRecordV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "question"
+    },
+    "level": {
+     "const": null
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string"
+    },
+    "payload": {
+     "$ref": "#/$defs/QuestionPayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "schema_version",
+    "record_id",
+    "owner_id",
+    "kind",
+    "level",
+    "title",
+    "keywords",
+    "body_markdown",
+    "payload",
+    "sources",
+    "provenance_gap",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "created_at",
+    "created_by",
+    "revision",
+    "previous_revision",
+    "updated_at",
+    "updated_by",
+    "change_reason",
+    "record_hash",
+    "content_hash"
+   ],
+   "additionalProperties": false
+  },
+  "RecordResult": {
+   "type": "object",
+   "properties": {
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "client_key": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "status": {
+     "enum": [
+      "would_create",
+      "would_update",
+      "no_change",
+      "created",
+      "updated"
+     ]
+    }
+   },
+   "required": [
+    "record_id",
+    "revision",
+    "content_hash",
+    "client_key"
+   ],
+   "additionalProperties": false
+  },
+  "Ref": {
+   "type": "object",
+   "properties": {
+    "target_kind": {
+     "enum": [
+      "owner",
+      "record",
+      "claim",
+      "file"
+     ]
+    },
+    "target_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "sha256": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "locator": {
+     "type": "string"
+    },
+    "relation": {
+     "enum": [
+      "supports",
+      "input",
+      "contradicts",
+      "background",
+      "derived_from",
+      "refines",
+      "same_problem",
+      "same_failure_mode",
+      "prerequisite",
+      "analogous_to",
+      "used_in",
+      "references",
+      "same_entity",
+      "mentions",
+      "depends_on",
+      "supersedes",
+      "contains",
+      "precedes",
+      "member_of",
+      "similar_structure"
+     ]
+    }
+   },
+   "required": [
+    "target_kind",
+    "target_id",
+    "revision",
+    "sha256",
+    "locator",
+    "relation"
+   ],
+   "additionalProperties": false
+  },
+  "ReportProseBlock": {
+   "type": "object",
+   "properties": {
+    "type": {
+     "const": "prose"
+    },
+    "markdown": {
+     "type": "string",
+     "minLength": 1
+    },
+    "evidence_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     }
+    }
+   },
+   "required": [
+    "type",
+    "markdown",
+    "evidence_refs"
+   ],
+   "additionalProperties": false
+  },
+  "RepresentationDraftV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "representation"
+    },
+    "level": {
+     "const": null
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string"
+    },
+    "payload": {
+     "$ref": "#/$defs/RepresentationPayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "owner_id",
+    "kind",
+    "title",
+    "body_markdown",
+    "payload",
+    "sources",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "schema_version"
+   ],
+   "additionalProperties": false
+  },
+  "RepresentationPayload": {
+   "type": "object",
+   "properties": {
+    "target": {
+     "$ref": "#/$defs/Ref"
+    },
+    "slot": {
+     "enum": [
+      "title",
+      "result",
+      "problem",
+      "trigger",
+      "failure",
+      "boundary"
+     ]
+    },
+    "text": {
+     "type": "string",
+     "minLength": 1
+    },
+    "boundary_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     },
+     "minItems": 0
+    },
+    "missing_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/UnresolvedRef"
+     },
+     "minItems": 0
+    }
+   },
+   "required": [
+    "target",
+    "slot",
+    "text",
+    "boundary_refs"
+   ],
+   "additionalProperties": false
+  },
+  "RepresentationRecordV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "representation"
+    },
+    "level": {
+     "const": null
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string"
+    },
+    "payload": {
+     "$ref": "#/$defs/RepresentationPayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "schema_version",
+    "record_id",
+    "owner_id",
+    "kind",
+    "level",
+    "title",
+    "keywords",
+    "body_markdown",
+    "payload",
+    "sources",
+    "provenance_gap",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "created_at",
+    "created_by",
+    "revision",
+    "previous_revision",
+    "updated_at",
+    "updated_by",
+    "change_reason",
+    "record_hash",
+    "content_hash"
+   ],
+   "additionalProperties": false
+  },
+  "RequestDraft": {
+   "type": "object",
+   "properties": {},
+   "additionalProperties": true
+  },
+  "RetrievalDescription": {
+   "type": "object",
+   "properties": {
+    "question": {
+     "type": "string",
+     "minLength": 1
+    },
+    "method": {
+     "type": "string",
+     "minLength": 1
+    },
+    "key_findings": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 1
+    },
+    "applicable": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 1
+    },
+    "not_applicable": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 1
+    },
+    "limitations": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 1
+    }
+   },
+   "required": [
+    "question",
+    "method",
+    "key_findings",
+    "applicable",
+    "not_applicable",
+    "limitations"
+   ],
+   "additionalProperties": false
+  },
+  "ReviewDraftV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "review"
+    },
+    "level": {
+     "const": null
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string"
+    },
+    "payload": {
+     "$ref": "#/$defs/ReviewPayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "owner_id",
+    "kind",
+    "title",
+    "body_markdown",
+    "payload",
+    "sources",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "schema_version"
+   ],
+   "additionalProperties": false
+  },
+  "ReviewPayload": {
+   "type": "object",
+   "properties": {
+    "target_claim_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "target_content_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "state": {
+     "enum": [
+      "not-reviewed",
+      "accepted",
+      "disputed",
+      "retracted",
+      "superseded"
+     ]
+    },
+    "reviewer": {
+     "$ref": "#/$defs/Actor"
+    },
+    "reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "evidence_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     },
+     "minItems": 0
+    },
+    "scope": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "replacement_claim_id": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "missing_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/UnresolvedRef"
+     },
+     "minItems": 0
+    }
+   },
+   "required": [
+    "target_claim_id",
+    "target_content_hash",
+    "state",
+    "reviewer",
+    "reason",
+    "evidence_refs",
+    "scope",
+    "replacement_claim_id"
+   ],
+   "additionalProperties": false
+  },
+  "ReviewRecordV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "review"
+    },
+    "level": {
+     "const": null
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string"
+    },
+    "payload": {
+     "$ref": "#/$defs/ReviewPayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "schema_version",
+    "record_id",
+    "owner_id",
+    "kind",
+    "level",
+    "title",
+    "keywords",
+    "body_markdown",
+    "payload",
+    "sources",
+    "provenance_gap",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "created_at",
+    "created_by",
+    "revision",
+    "previous_revision",
+    "updated_at",
+    "updated_by",
+    "change_reason",
+    "record_hash",
+    "content_hash"
+   ],
+   "additionalProperties": false
+  },
+  "RevisionWatch": {
+   "type": "object",
+   "properties": {
+    "watch_type": {
+     "const": "revision"
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "baseline_revision": {
+     "type": "integer"
+    },
+    "baseline_record_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "watch_type",
+    "record_id",
+    "baseline_revision",
+    "baseline_record_hash"
+   ],
+   "additionalProperties": false
+  },
+  "RouteDraftV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "route"
+    },
+    "level": {
+     "const": null
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string"
+    },
+    "payload": {
+     "$ref": "#/$defs/RoutePayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "owner_id",
+    "kind",
+    "title",
+    "body_markdown",
+    "payload",
+    "sources",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "schema_version"
+   ],
+   "additionalProperties": false
+  },
+  "RoutePayload": {
+   "type": "object",
+   "properties": {
+    "goal_ref": {
+     "$ref": "#/$defs/Ref"
+    },
+    "hypothesis": {
+     "type": "string",
+     "minLength": 1
+    },
+    "status": {
+     "enum": [
+      "planned",
+      "active",
+      "blocked",
+      "closed",
+      "superseded"
+     ]
+    },
+    "attempt_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     },
+     "minItems": 0
+    },
+    "blocker": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "next_step": {
+     "type": "string",
+     "minLength": 1
+    },
+    "reopen_condition": {
+     "type": "string",
+     "minLength": 1
+    },
+    "replacement_ref": {
+     "oneOf": [
+      {
+       "$ref": "#/$defs/Ref"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "missing_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/UnresolvedRef"
+     },
+     "minItems": 0
+    }
+   },
+   "required": [
+    "goal_ref",
+    "hypothesis",
+    "status",
+    "attempt_refs",
+    "blocker",
+    "next_step",
+    "reopen_condition",
+    "replacement_ref"
+   ],
+   "additionalProperties": false
+  },
+  "RouteRecordV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "route"
+    },
+    "level": {
+     "const": null
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string"
+    },
+    "payload": {
+     "$ref": "#/$defs/RoutePayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "schema_version",
+    "record_id",
+    "owner_id",
+    "kind",
+    "level",
+    "title",
+    "keywords",
+    "body_markdown",
+    "payload",
+    "sources",
+    "provenance_gap",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "created_at",
+    "created_by",
+    "revision",
+    "previous_revision",
+    "updated_at",
+    "updated_by",
+    "change_reason",
+    "record_hash",
+    "content_hash"
+   ],
+   "additionalProperties": false
+  },
+  "SectionUnitBlock": {
+   "type": "object",
+   "properties": {
+    "type": {
+     "const": "unit"
+    },
+    "ref": {
+     "$ref": "#/$defs/Ref"
+    },
+    "block_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    }
+   },
+   "required": [
+    "type",
+    "ref"
+   ],
+   "additionalProperties": false
+  },
+  "SourceDraftV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "source"
+    },
+    "level": {
+     "const": "L0"
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string"
+    },
+    "payload": {
+     "$ref": "#/$defs/SourcePayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "owner_id",
+    "kind",
+    "title",
+    "body_markdown",
+    "payload",
+    "sources",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "schema_version"
+   ],
+   "additionalProperties": false
+  },
+  "SourcePayload": {
+   "type": "object",
+   "properties": {
+    "source_ref": {
+     "$ref": "#/$defs/SourceRef"
+    },
+    "acquisition": {
+     "enum": [
+      "original_link",
+      "verbatim_export",
+      "excerpt"
+     ]
+    },
+    "completeness": {
+     "enum": [
+      "complete",
+      "partial",
+      "unknown"
+     ]
+    },
+    "acquired_at": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "missing_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/UnresolvedRef"
+     },
+     "minItems": 0
+    }
+   },
+   "required": [
+    "source_ref",
+    "acquisition",
+    "completeness",
+    "acquired_at"
+   ],
+   "additionalProperties": false
+  },
+  "SourceRecordV3": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 3
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "source"
+    },
+    "level": {
+     "const": "L0"
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string"
+    },
+    "payload": {
+     "$ref": "#/$defs/SourcePayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "schema_version",
+    "record_id",
+    "owner_id",
+    "kind",
+    "level",
+    "title",
+    "keywords",
+    "body_markdown",
+    "payload",
+    "sources",
+    "provenance_gap",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "created_at",
+    "created_by",
+    "revision",
+    "previous_revision",
+    "updated_at",
+    "updated_by",
+    "change_reason",
+    "record_hash",
+    "content_hash"
+   ],
+   "additionalProperties": false
+  },
+  "SourceRef": {
+   "$ref": "#/$defs/Ref"
+  },
+  "TechnicalBlock": {
+   "type": "object",
+   "properties": {
+    "block_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "role": {
+     "enum": [
+      "introduction",
+      "definitions",
+      "methods",
+      "inputs",
+      "derivation",
+      "results",
+      "discussion",
+      "limitations",
+      "appendix"
+     ]
+    },
+    "markdown": {
+     "type": "string",
+     "minLength": 1
+    },
+    "requires_block_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    }
+   },
+   "required": [
+    "block_id",
+    "role",
+    "markdown",
+    "requires_block_ids"
+   ],
+   "additionalProperties": false
+  },
+  "TechnicalUnitPayload": {
+   "type": "object",
+   "properties": {
+    "knowledge_facets": {
+     "$ref": "#/$defs/KnowledgeFacets"
+    },
+    "unit_type": {
+     "enum": [
+      "experiment",
+      "method",
+      "derivation",
+      "analysis"
+     ]
+    },
+    "retrieval_description": {
+     "$ref": "#/$defs/RetrievalDescription"
+    },
+    "run_ref": {
+     "oneOf": [
+      {
+       "$ref": "#/$defs/Ref"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "evidence_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ref"
+     },
+     "minItems": 0
+    },
+    "blocks": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/TechnicalBlock"
+     },
+     "minItems": 1
+    },
+    "figures": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/DetailFigure"
+     },
+     "minItems": 0
+    },
+    "missing_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/UnresolvedRef"
+     },
+     "minItems": 0
+    }
+   },
+   "required": [
+    "unit_type",
+    "retrieval_description",
+    "run_ref",
+    "evidence_refs",
+    "blocks",
+    "figures",
+    "missing_refs"
+   ],
+   "additionalProperties": false
+  },
+  "UnknownValue": {
+   "type": "object",
+   "properties": {
+    "value": {
+     "type": "null"
+    },
+    "reason": {
+     "enum": [
+      "unknown",
+      "not_acquired",
+      "not_applicable"
+     ]
+    },
+    "note": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "value",
+    "reason",
+    "note"
+   ],
+   "additionalProperties": false
+  },
+  "UnresolvedRef": {
+   "type": "object",
+   "properties": {
+    "requested_target": {
+     "type": "string",
+     "minLength": 1
+    },
+    "reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "observed_at": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "requested_target",
+    "reason",
+    "observed_at"
+   ],
+   "additionalProperties": false
+  },
+  "WatchRef": {
+   "oneOf": [
+    {
+     "$ref": "#/$defs/RevisionWatch"
+    },
+    {
+     "$ref": "#/$defs/NewUnitWatch"
+    }
+   ]
+  },
+  "WikiPagePayload": {
+   "type": "object",
+   "required": [
+    "slug",
+    "page_type",
+    "aliases",
+    "source_refs"
+   ],
+   "additionalProperties": false,
+   "properties": {
+    "slug": {
+     "type": "string",
+     "minLength": 1
+    },
+    "page_type": {
+     "enum": [
+      "summary",
+      "entity",
+      "concept",
+      "synthesis",
+      "comparison",
+      "index"
+     ]
+    },
+    "aliases": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     }
+    },
+    "source_refs": {
+     "type": "array",
+     "minItems": 1,
+     "items": {
+      "$ref": "#/$defs/Ref"
+     }
+    },
+    "missing_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/UnresolvedRef"
+     }
+    }
+   }
+  },
+  "WikiPageDraftV1": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 1
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "wiki_page"
+    },
+    "level": {
+     "const": null
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string",
+     "minLength": 1
+    },
+    "payload": {
+     "$ref": "#/$defs/WikiPagePayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "owner_id",
+    "kind",
+    "title",
+    "body_markdown",
+    "payload",
+    "sources",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "schema_version"
+   ],
+   "additionalProperties": false
+  },
+  "WikiPageRecordV1": {
+   "type": "object",
+   "properties": {
+    "schema_version": {
+     "const": 1
+    },
+    "record_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "owner_id": {
+     "type": "string",
+     "minLength": 1
+    },
+    "kind": {
+     "const": "wiki_page"
+    },
+    "level": {
+     "const": null
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    },
+    "body_markdown": {
+     "type": "string",
+     "minLength": 1
+    },
+    "payload": {
+     "$ref": "#/$defs/WikiPagePayload"
+    },
+    "sources": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceRef"
+     },
+     "minItems": 0
+    },
+    "provenance_gap": {
+     "oneOf": [
+      {
+       "type": "string",
+       "minLength": 1
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "record_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "discovery": {
+     "enum": [
+      "owner_only",
+      "workspace_summary"
+     ]
+    },
+    "sensitivity": {
+     "enum": [
+      "public",
+      "internal",
+      "confidential",
+      "restricted"
+     ]
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "created_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "revision": {
+     "type": "integer"
+    },
+    "previous_revision": {
+     "oneOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "updated_at": {
+     "type": "string",
+     "minLength": 1
+    },
+    "updated_by": {
+     "$ref": "#/$defs/Actor"
+    },
+    "change_reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "record_hash": {
+     "type": "string",
+     "minLength": 1
+    },
+    "content_hash": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "schema_version",
+    "record_id",
+    "owner_id",
+    "kind",
+    "level",
+    "title",
+    "keywords",
+    "body_markdown",
+    "payload",
+    "sources",
+    "provenance_gap",
+    "record_reason",
+    "discovery",
+    "sensitivity",
+    "created_at",
+    "created_by",
+    "revision",
+    "previous_revision",
+    "updated_at",
+    "updated_by",
+    "change_reason",
+    "record_hash",
+    "content_hash"
+   ],
+   "additionalProperties": false
+  },
+  "MemoryDraft": {
+   "oneOf": [
+    {
+     "$ref": "#/$defs/SourceDraftV3"
+    },
+    {
+     "$ref": "#/$defs/DetailDraftV3"
+    },
+    {
+     "$ref": "#/$defs/NarrativeDraftV4"
+    },
+    {
+     "$ref": "#/$defs/ExperienceDraftV4"
+    },
+    {
+     "$ref": "#/$defs/OverviewDraftV4"
+    },
+    {
+     "$ref": "#/$defs/DocumentDraftV3"
+    },
+    {
+     "$ref": "#/$defs/DocumentSectionDraftV3"
+    },
+    {
+     "$ref": "#/$defs/QuestionDraftV3"
+    },
+    {
+     "$ref": "#/$defs/GoalDraftV3"
+    },
+    {
+     "$ref": "#/$defs/RouteDraftV3"
+    },
+    {
+     "$ref": "#/$defs/CheckpointDraftV3"
+    },
+    {
+     "$ref": "#/$defs/AssociationDraftV3"
+    },
+    {
+     "$ref": "#/$defs/RepresentationDraftV3"
+    },
+    {
+     "$ref": "#/$defs/PolicyDraftV3"
+    },
+    {
+     "$ref": "#/$defs/ConsolidationDraftV3"
+    },
+    {
+     "$ref": "#/$defs/FeedbackDraftV3"
+    },
+    {
+     "$ref": "#/$defs/ReviewDraftV3"
+    },
+    {
+     "$ref": "#/$defs/WikiPageDraftV1"
+    }
+   ]
+  },
+  "MemoryRecord": {
+   "oneOf": [
+    {
+     "$ref": "#/$defs/SourceRecordV3"
+    },
+    {
+     "$ref": "#/$defs/DetailRecordV3"
+    },
+    {
+     "$ref": "#/$defs/NarrativeRecordV4"
+    },
+    {
+     "$ref": "#/$defs/ExperienceRecordV4"
+    },
+    {
+     "$ref": "#/$defs/OverviewRecordV4"
+    },
+    {
+     "$ref": "#/$defs/DocumentRecordV3"
+    },
+    {
+     "$ref": "#/$defs/DocumentSectionRecordV3"
+    },
+    {
+     "$ref": "#/$defs/QuestionRecordV3"
+    },
+    {
+     "$ref": "#/$defs/GoalRecordV3"
+    },
+    {
+     "$ref": "#/$defs/RouteRecordV3"
+    },
+    {
+     "$ref": "#/$defs/CheckpointRecordV3"
+    },
+    {
+     "$ref": "#/$defs/AssociationRecordV3"
+    },
+    {
+     "$ref": "#/$defs/RepresentationRecordV3"
+    },
+    {
+     "$ref": "#/$defs/PolicyRecordV3"
+    },
+    {
+     "$ref": "#/$defs/ConsolidationRecordV3"
+    },
+    {
+     "$ref": "#/$defs/FeedbackRecordV3"
+    },
+    {
+     "$ref": "#/$defs/ReviewRecordV3"
+    },
+    {
+     "$ref": "#/$defs/WikiPageRecordV1"
+    }
+   ]
+  }
+ }
+}

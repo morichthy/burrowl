@@ -1,0 +1,56 @@
+{
+  "kind": "document",
+  "note": "文稿根（level=null）：document_type 为 research_process（完整过程稿）或 research_report（精简报告）；section_refs 按阅读顺序列章节；先保存章节再保存文稿根。",
+  "operation": {
+    "op": "put_record",
+    "client_key": "new-document",
+    "draft": {
+      "owner_id": "RES-FLOATING-POINT-SUMMATION",
+      "kind": "document",
+      "title": "浮点求和研究：精简报告（示例）",
+      "keywords": [],
+      "body_markdown": "",
+      "record_reason": "编排面向读者的报告",
+      "sensitivity": "internal",
+      "sources": [
+        {
+          "target_kind": "record",
+          "target_id": "MEM-4acc73bb-59c7-560d-9415-fd42e9dcaa2d",
+          "revision": 1,
+          "sha256": "ba12342c6ca8afa0a1760dc517fd7bff2d1b60c7f082ee9113e419572834df51",
+          "locator": "record",
+          "relation": "references"
+        }
+      ],
+      "provenance_gap": null,
+      "payload": {
+        "document_type": "research_report",
+        "purpose": "概括方法、结果与边界",
+        "audience": "需要快速了解结论的读者",
+        "scope": "已完成的三轮实验",
+        "common_refs": [
+          {
+            "target_kind": "record",
+            "target_id": "MEM-4acc73bb-59c7-560d-9415-fd42e9dcaa2d",
+            "revision": 1,
+            "sha256": "ba12342c6ca8afa0a1760dc517fd7bff2d1b60c7f082ee9113e419572834df51",
+            "locator": "record",
+            "relation": "references"
+          }
+        ],
+        "section_refs": [
+          {
+            "target_kind": "record",
+            "target_id": "MEM-240055fb-b318-5e3e-85a0-dadf88507a18",
+            "revision": 1,
+            "sha256": "e73d93cd8e625924ae01ddd9ae80476c3652311335ecbfcfd47c914d8fa9be41",
+            "locator": "record",
+            "relation": "contains"
+          }
+        ],
+        "watch_refs": [],
+        "missing_refs": []
+      }
+    }
+  }
+}

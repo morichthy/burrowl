@@ -1,0 +1,93 @@
+{
+  "round": 1,
+  "question": "同一组数改变排列后，逐项求和与fsum的误差是否变化？",
+  "input_sha256": "83d97bbfcf42bdbbe3780df71d202033bc8cede38f197913da5d0b77f5f7cf45",
+  "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+  "platform": "Windows-11-10.0.22631-SP0",
+  "float_mantissa_bits": 53,
+  "reference": "Exact rational sum of input floats, cross-checked with integer arithmetic",
+  "summary": {
+    "sequential": {
+      "cases": 3,
+      "exact_matches": 1,
+      "max_absolute_error": 1000.0
+    },
+    "math.fsum": {
+      "cases": 3,
+      "exact_matches": 3,
+      "max_absolute_error": 0.0
+    }
+  },
+  "rows": [
+    {
+      "case": "large_first",
+      "method": "sequential",
+      "n": 1001,
+      "result": 1e+16,
+      "result_hex": "0x1.1c37937e08000p+53",
+      "exact_sum": "10000000000001000",
+      "absolute_error_exact": "1000",
+      "absolute_error": 1000.0,
+      "exact_match": false
+    },
+    {
+      "case": "large_first",
+      "method": "math.fsum",
+      "n": 1001,
+      "result": 1.0000000000001e+16,
+      "result_hex": "0x1.1c37937e081f4p+53",
+      "exact_sum": "10000000000001000",
+      "absolute_error_exact": "0",
+      "absolute_error": 0.0,
+      "exact_match": true
+    },
+    {
+      "case": "small_first",
+      "method": "sequential",
+      "n": 1001,
+      "result": 1.0000000000001e+16,
+      "result_hex": "0x1.1c37937e081f4p+53",
+      "exact_sum": "10000000000001000",
+      "absolute_error_exact": "0",
+      "absolute_error": 0.0,
+      "exact_match": true
+    },
+    {
+      "case": "small_first",
+      "method": "math.fsum",
+      "n": 1001,
+      "result": 1.0000000000001e+16,
+      "result_hex": "0x1.1c37937e081f4p+53",
+      "exact_sum": "10000000000001000",
+      "absolute_error_exact": "0",
+      "absolute_error": 0.0,
+      "exact_match": true
+    },
+    {
+      "case": "cancel_after_small",
+      "method": "sequential",
+      "n": 1002,
+      "result": 0.0,
+      "result_hex": "0x0.0p+0",
+      "exact_sum": "1000",
+      "absolute_error_exact": "1000",
+      "absolute_error": 1000.0,
+      "exact_match": false
+    },
+    {
+      "case": "cancel_after_small",
+      "method": "math.fsum",
+      "n": 1002,
+      "result": 1000.0,
+      "result_hex": "0x1.f400000000000p+9",
+      "exact_sum": "1000",
+      "absolute_error_exact": "0",
+      "absolute_error": 0.0,
+      "exact_match": true
+    }
+  ],
+  "limitations": [
+    "Constructed dimensionless finite inputs only.",
+    "No overflow, NaN, infinity, timing or proof of universal correctness."
+  ]
+}

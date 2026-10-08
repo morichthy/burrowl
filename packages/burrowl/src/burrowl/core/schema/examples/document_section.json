@@ -1,0 +1,66 @@
+{
+  "kind": "document_section",
+  "note": "文稿章节（level=null）：blocks 由 prose（作者写的衔接文字，附 evidence_refs）和 unit（整块收录技术单元，block_ids 选块，自动补必需定义）组成；body_markdown 为空。",
+  "operation": {
+    "op": "put_record",
+    "client_key": "new-document_section",
+    "draft": {
+      "owner_id": "RES-FLOATING-POINT-SUMMATION",
+      "kind": "document_section",
+      "title": "方法：精确基准",
+      "keywords": [],
+      "body_markdown": "",
+      "record_reason": "为文稿组织方法章节",
+      "sensitivity": "internal",
+      "sources": [
+        {
+          "target_kind": "record",
+          "target_id": "MEM-4acc73bb-59c7-560d-9415-fd42e9dcaa2d",
+          "revision": 1,
+          "sha256": "ba12342c6ca8afa0a1760dc517fd7bff2d1b60c7f082ee9113e419572834df51",
+          "locator": "record",
+          "relation": "references"
+        }
+      ],
+      "provenance_gap": null,
+      "payload": {
+        "section_key": "methods-baseline",
+        "title": "方法：精确基准",
+        "role": "methods",
+        "watch_refs": [],
+        "missing_refs": [],
+        "blocks": [
+          {
+            "type": "prose",
+            "markdown": "本节说明误差的计算基准。",
+            "evidence_refs": [
+              {
+                "target_kind": "record",
+                "target_id": "MEM-4acc73bb-59c7-560d-9415-fd42e9dcaa2d",
+                "revision": 1,
+                "sha256": "ba12342c6ca8afa0a1760dc517fd7bff2d1b60c7f082ee9113e419572834df51",
+                "locator": "record",
+                "relation": "supports"
+              }
+            ]
+          },
+          {
+            "type": "unit",
+            "ref": {
+              "target_kind": "record",
+              "target_id": "MEM-4acc73bb-59c7-560d-9415-fd42e9dcaa2d",
+              "revision": 1,
+              "sha256": "ba12342c6ca8afa0a1760dc517fd7bff2d1b60c7f082ee9113e419572834df51",
+              "locator": "record",
+              "relation": "contains"
+            },
+            "block_ids": [
+              "definitions",
+              "reference"
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

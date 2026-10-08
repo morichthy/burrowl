@@ -1,0 +1,58 @@
+"""端到端测试用的工作台服务：复制浮点样例到临时目录，补一条未复核结论、一个待用户回复的阅读会话、
+一个指向临时目录的 Markdown 库连接器，然后在固定端口与固定 token 下启动。
+
+用法：uv run python frontend/e2e/server.py <端口>（由 playwright.config.ts 的 webServer 启动）
+"""
+import json
+import shutil
+import sys
+import tempfile
+from pathlib import Path
+
+import uvicorn
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
+from burrowl.app import App  # noqa: E402
+from burrowl.interfaces.api import create_api  # noqa: E402
+from burrowl.interfaces.ops.registry import Ctx, call  # noqa: E402
+from tests.service.helpers import narrative_draft, register_source, request  # noqa: E402
+
+TOKEN = "e2e"
+
+
+def seed(base: Path) -> dict:
+    data, vault = base / "data", base / "vault"
+    shutil.copytree(ROOT / "tests" / "fixtures" / "workspace", data)
+    vault.mkdir()
+    app = App.open(data, fake_vectors=True)
+    agent = Ctx(app=app, actor={"kind": "ai", "id": "e2e-agent"}, channel="cli")
+    owner = app.storage.owners.create("research", "order-demo", "求和顺序演示")
+    evidence = register_source(app.storage, "SRC-ORDER-DEMO", "research/order-demo/data/result.txt", "升序误差 0.0\n")
+    app.memory.commit(request(owner.owner_id, None, {"op": "put_record", "client_key": "n",
+                                                     "draft": narrative_draft(owner.owner_id, evidence)
+                                                     | {"discovery": "workspace_summary"}}))
+    app.index.reconcile()
+    session = call(agent, "reading.start", {"question": "Kahan 补偿求和的误差界是多少"})
+    call(agent, "reading.ask_user", {"session_id": session["session_id"], "kind": "fulltext",
+                                     "prompt": "是否允许全文补偿召回？"})
+    current = call(agent, "config.get", {})
+    call(agent, "config.update", {"expected_revision": current["revision"], "patch": {"connectors": [
+        {"id": "vault", "type": "mdvault", "options": {"path": str(vault)},
+         "publish": {"levels": ["L2", "L3", "L4"], "include_documents": False}}]}})
+    return {"data": str(data), "vault": str(vault), "session_id": session["session_id"], "owner_id": owner.owner_id}
+
+
+def main(port: int) -> None:
+    base = Path(tempfile.mkdtemp(prefix="burrowl-e2e-"))
+    info = seed(base)
+    (ROOT / "frontend" / "e2e" / ".state.json").write_text(json.dumps(info), encoding="utf-8")
+    app = App.open(info["data"], fake_vectors=True)
+    api, _ = create_api(app, token=TOKEN, static_dir=ROOT / "frontend" / "dist", port=port,
+                        actor={"kind": "human", "id": "e2e-user"})
+    uvicorn.run(api, host="127.0.0.1", port=port, log_level="warning")
+
+
+if __name__ == "__main__":
+    main(int(sys.argv[1]))

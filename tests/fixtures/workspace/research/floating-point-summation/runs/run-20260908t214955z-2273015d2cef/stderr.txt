@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "C:\Users\livky\.codex\worktrees\cf08\A_work_auto_flow\research\floating-point-summation\runs\run-20260908t214955z-2273015d2cef\reproduce.py", line 206, in <module>
+    main()
+  File "C:\Users\livky\.codex\worktrees\cf08\A_work_auto_flow\research\floating-point-summation\runs\run-20260908t214955z-2273015d2cef\reproduce.py", line 198, in main
+    output['plot_environment'] = plot(rounds, args.output, args.plot_dependencies)
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\livky\.codex\worktrees\cf08\A_work_auto_flow\research\floating-point-summation\runs\run-20260908t214955z-2273015d2cef\reproduce.py", line 86, in plot
+    matplotlib.use('Agg')
+    ^^^^^^^^^^^^^^
+AttributeError: module 'matplotlib' has no attribute 'use'

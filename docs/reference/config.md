@@ -1,0 +1,848 @@
+# 配置参考（自动生成，勿手改）
+
+配置文件：`<数据目录>/.burrowl/config.json`。通过工作台设置页、MCP `config_update` 或 `burrowl call config.update` 修改（JSON Merge Patch + expected_revision）。密钥只存引用。
+
+## 默认值
+
+```json
+{
+  "schema_version": 1,
+  "collaboration": {
+    "subagents": "auto",
+    "subagent_requirements": "优先使用低成本、较低能力的可用模型，采用低推理深度；须能完成材料检索、完整阅读和结构化笔记。"
+  },
+  "query": {
+    "result_limit": 20,
+    "review_filter": "all",
+    "budget": {
+      "wall_ms": 300000,
+      "read_bytes": 16777216,
+      "output_chars": 80000,
+      "candidates": 100,
+      "graph_nodes": 50,
+      "graph_edges": 100,
+      "graph_hops": 2,
+      "model_tokens": 512,
+      "model_calls": 1,
+      "model_input_tokens": 512,
+      "model_output_tokens": 0,
+      "rerank_items": 0
+    }
+  },
+  "reading": {
+    "strategy": "standard",
+    "review_filter": "all",
+    "result_limit": 10,
+    "association": {
+      "enabled": true,
+      "max_rounds": 3
+    },
+    "context": {
+      "max_owners": 10,
+      "note_max_tokens": 6000
+    },
+    "screening": {
+      "regular_windows": 3,
+      "max_windows": 4,
+      "batch_owners": 10
+    },
+    "reranking": {
+      "mode": "auto",
+      "candidate_limit": 30,
+      "window_tokens": 512
+    },
+    "budget": {
+      "wall_ms": 300000,
+      "read_bytes": 16777216,
+      "output_chars": 80000,
+      "candidates": 1000,
+      "graph_nodes": 50,
+      "graph_edges": 100,
+      "graph_hops": 2,
+      "model_tokens": 65536,
+      "model_calls": 20,
+      "model_input_tokens": 65536,
+      "model_output_tokens": 0,
+      "rerank_items": 100
+    }
+  },
+  "index": {
+    "path": ".burrowl/index/index.sqlite3",
+    "embedding": {
+      "provider": "fastembed",
+      "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+      "path": null,
+      "dim": 384
+    },
+    "vector": {
+      "kind": "sqlite-vec",
+      "url": null,
+      "secret_ref": null
+    },
+    "reranker": {
+      "path": null
+    },
+    "ocr_enabled": true
+  },
+  "server": {
+    "host": "127.0.0.1",
+    "port": 0
+  },
+  "mcp": {
+    "toolsets": [
+      "memory",
+      "review",
+      "query",
+      "reading",
+      "provenance",
+      "relations",
+      "maintenance",
+      "monitor",
+      "runs",
+      "sources",
+      "index",
+      "hub",
+      "wiki",
+      "config",
+      "system"
+    ],
+    "mode": "auto"
+  },
+  "connectors": []
+}
+```
+
+## JSON Schema
+
+```json
+{
+  "$defs": {
+    "Association": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "max_rounds": {
+          "default": 3,
+          "maximum": 20,
+          "minimum": 1,
+          "title": "Max Rounds",
+          "type": "integer"
+        }
+      },
+      "title": "Association",
+      "type": "object"
+    },
+    "Budget": {
+      "additionalProperties": false,
+      "description": "累计硬上限。wall_ms 计活动执行时间（不含用户阅读停留）；0 表示禁止该类操作。",
+      "properties": {
+        "wall_ms": {
+          "default": 300000,
+          "maximum": 600000,
+          "minimum": 1,
+          "title": "Wall Ms",
+          "type": "integer"
+        },
+        "read_bytes": {
+          "default": 16777216,
+          "maximum": 33554432,
+          "minimum": 0,
+          "title": "Read Bytes",
+          "type": "integer"
+        },
+        "output_chars": {
+          "default": 80000,
+          "maximum": 100000,
+          "minimum": 0,
+          "title": "Output Chars",
+          "type": "integer"
+        },
+        "candidates": {
+          "default": 100,
+          "maximum": 2000,
+          "minimum": 0,
+          "title": "Candidates",
+          "type": "integer"
+        },
+        "graph_nodes": {
+          "default": 50,
+          "maximum": 1000,
+          "minimum": 0,
+          "title": "Graph Nodes",
+          "type": "integer"
+        },
+        "graph_edges": {
+          "default": 100,
+          "maximum": 2000,
+          "minimum": 0,
+          "title": "Graph Edges",
+          "type": "integer"
+        },
+        "graph_hops": {
+          "default": 2,
+          "maximum": 6,
+          "minimum": 0,
+          "title": "Graph Hops",
+          "type": "integer"
+        },
+        "model_tokens": {
+          "default": 512,
+          "maximum": 200000,
+          "minimum": 0,
+          "title": "Model Tokens",
+          "type": "integer"
+        },
+        "model_calls": {
+          "default": 1,
+          "maximum": 20,
+          "minimum": 0,
+          "title": "Model Calls",
+          "type": "integer"
+        },
+        "model_input_tokens": {
+          "default": 512,
+          "maximum": 150000,
+          "minimum": 0,
+          "title": "Model Input Tokens",
+          "type": "integer"
+        },
+        "model_output_tokens": {
+          "default": 0,
+          "maximum": 50000,
+          "minimum": 0,
+          "title": "Model Output Tokens",
+          "type": "integer"
+        },
+        "rerank_items": {
+          "default": 0,
+          "maximum": 200,
+          "minimum": 0,
+          "title": "Rerank Items",
+          "type": "integer"
+        }
+      },
+      "title": "Budget",
+      "type": "object"
+    },
+    "Collaboration": {
+      "additionalProperties": false,
+      "properties": {
+        "subagents": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "off"
+          ],
+          "title": "Subagents",
+          "type": "string"
+        },
+        "subagent_requirements": {
+          "default": "优先使用低成本、较低能力的可用模型，采用低推理深度；须能完成材料检索、完整阅读和结构化笔记。",
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Subagent Requirements",
+          "type": "string"
+        }
+      },
+      "title": "Collaboration",
+      "type": "object"
+    },
+    "ConnectorConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z][a-z0-9-]{0,31}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "description": "连接器类型，如 weknora、mdvault",
+          "pattern": "^[a-z][a-z0-9-]{0,31}$",
+          "title": "Type",
+          "type": "string"
+        },
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "base_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Base Url"
+        },
+        "tenant_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tenant Id"
+        },
+        "secret_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "keyring:burrowl/<id> 或 env:VAR；配置文件里从不存明文",
+          "title": "Secret Ref"
+        },
+        "collection": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "目标知识库（WeKnora 为知识库 ID 或名称）",
+          "title": "Collection"
+        },
+        "options": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Options",
+          "type": "object"
+        },
+        "publish": {
+          "$ref": "#/$defs/PublishPolicy"
+        },
+        "wiki": {
+          "$ref": "#/$defs/WikiSettings"
+        }
+      },
+      "required": [
+        "id",
+        "type"
+      ],
+      "title": "ConnectorConfig",
+      "type": "object"
+    },
+    "Embedding": {
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "default": "fastembed",
+          "enum": [
+            "fastembed",
+            "none"
+          ],
+          "title": "Provider",
+          "type": "string"
+        },
+        "model": {
+          "default": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+          "title": "Model",
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "本地模型目录；相对路径相对数据目录。为空时使用安装包自带模型",
+          "title": "Path"
+        },
+        "dim": {
+          "default": 384,
+          "maximum": 4096,
+          "minimum": 1,
+          "title": "Dim",
+          "type": "integer"
+        }
+      },
+      "title": "Embedding",
+      "type": "object"
+    },
+    "IndexConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "default": ".burrowl/index/index.sqlite3",
+          "description": "检索索引文件；可放到其他磁盘，删除后可重建",
+          "title": "Path",
+          "type": "string"
+        },
+        "embedding": {
+          "$ref": "#/$defs/Embedding"
+        },
+        "vector": {
+          "$ref": "#/$defs/VectorBackend"
+        },
+        "reranker": {
+          "$ref": "#/$defs/RerankerModel"
+        },
+        "ocr_enabled": {
+          "default": true,
+          "title": "Ocr Enabled",
+          "type": "boolean"
+        }
+      },
+      "title": "IndexConfig",
+      "type": "object"
+    },
+    "McpConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "toolsets": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Toolsets",
+          "type": "array"
+        },
+        "mode": {
+          "default": "auto",
+          "description": "auto：接入 burrowl 的对话默认按 burrowl-work / burrowl-read / burrowl-consolidate 工作，成果存入本数据目录；manual：只在用户明确要求时使用。启动参数 --mode 优先；修改后需重启 MCP 服务",
+          "enum": [
+            "auto",
+            "manual"
+          ],
+          "title": "Mode",
+          "type": "string"
+        }
+      },
+      "title": "McpConfig",
+      "type": "object"
+    },
+    "PublishPolicy": {
+      "additionalProperties": false,
+      "description": "哪些知识发布到外部知识中枢。默认只发布已复核的 L4/L3 概览经验与成稿文档。",
+      "properties": {
+        "levels": {
+          "items": {
+            "enum": [
+              "L0",
+              "L1",
+              "L2",
+              "L3",
+              "L4"
+            ],
+            "type": "string"
+          },
+          "title": "Levels",
+          "type": "array"
+        },
+        "include_documents": {
+          "default": true,
+          "title": "Include Documents",
+          "type": "boolean"
+        },
+        "review_filter": {
+          "default": "reviewed_only",
+          "enum": [
+            "all",
+            "reviewed_only",
+            "exclude_unsafe",
+            "unreviewed_only"
+          ],
+          "title": "Review Filter",
+          "type": "string"
+        },
+        "owner_types": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Owner Types"
+        },
+        "owner_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Owner Ids"
+        },
+        "exclude_sensitivity": {
+          "items": {
+            "enum": [
+              "internal",
+              "confidential",
+              "restricted"
+            ],
+            "type": "string"
+          },
+          "title": "Exclude Sensitivity",
+          "type": "array"
+        },
+        "on_retract": {
+          "default": "delete",
+          "enum": [
+            "delete",
+            "mark"
+          ],
+          "title": "On Retract",
+          "type": "string"
+        }
+      },
+      "title": "PublishPolicy",
+      "type": "object"
+    },
+    "QueryDefaults": {
+      "additionalProperties": false,
+      "properties": {
+        "result_limit": {
+          "default": 20,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Result Limit",
+          "type": "integer"
+        },
+        "review_filter": {
+          "default": "all",
+          "enum": [
+            "all",
+            "reviewed_only",
+            "exclude_unsafe",
+            "unreviewed_only"
+          ],
+          "title": "Review Filter",
+          "type": "string"
+        },
+        "budget": {
+          "$ref": "#/$defs/Budget"
+        }
+      },
+      "title": "QueryDefaults",
+      "type": "object"
+    },
+    "ReadingContext": {
+      "additionalProperties": false,
+      "properties": {
+        "max_owners": {
+          "default": 10,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Max Owners",
+          "type": "integer"
+        },
+        "note_max_tokens": {
+          "default": 6000,
+          "maximum": 50000,
+          "minimum": 512,
+          "title": "Note Max Tokens",
+          "type": "integer"
+        }
+      },
+      "title": "ReadingContext",
+      "type": "object"
+    },
+    "ReadingDefaults": {
+      "additionalProperties": false,
+      "properties": {
+        "strategy": {
+          "default": "standard",
+          "enum": [
+            "standard",
+            "associative",
+            "quick"
+          ],
+          "title": "Strategy",
+          "type": "string"
+        },
+        "review_filter": {
+          "default": "all",
+          "enum": [
+            "all",
+            "reviewed_only",
+            "exclude_unsafe",
+            "unreviewed_only"
+          ],
+          "title": "Review Filter",
+          "type": "string"
+        },
+        "result_limit": {
+          "default": 10,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Result Limit",
+          "type": "integer"
+        },
+        "association": {
+          "$ref": "#/$defs/Association"
+        },
+        "context": {
+          "$ref": "#/$defs/ReadingContext"
+        },
+        "screening": {
+          "$ref": "#/$defs/Screening"
+        },
+        "reranking": {
+          "$ref": "#/$defs/Reranking"
+        },
+        "budget": {
+          "$ref": "#/$defs/Budget"
+        }
+      },
+      "title": "ReadingDefaults",
+      "type": "object"
+    },
+    "RerankerModel": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ONNX Cross-encoder 模型目录；为空时使用安装包自带模型",
+          "title": "Path"
+        }
+      },
+      "title": "RerankerModel",
+      "type": "object"
+    },
+    "Reranking": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "default": "auto",
+          "enum": [
+            "off",
+            "auto",
+            "required"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "candidate_limit": {
+          "default": 30,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Candidate Limit",
+          "type": "integer"
+        },
+        "window_tokens": {
+          "default": 512,
+          "maximum": 512,
+          "minimum": 64,
+          "title": "Window Tokens",
+          "type": "integer"
+        }
+      },
+      "title": "Reranking",
+      "type": "object"
+    },
+    "Screening": {
+      "additionalProperties": false,
+      "properties": {
+        "regular_windows": {
+          "default": 3,
+          "maximum": 4,
+          "minimum": 1,
+          "title": "Regular Windows",
+          "type": "integer"
+        },
+        "max_windows": {
+          "default": 4,
+          "maximum": 4,
+          "minimum": 1,
+          "title": "Max Windows",
+          "type": "integer"
+        },
+        "batch_owners": {
+          "default": 10,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Batch Owners",
+          "type": "integer"
+        }
+      },
+      "title": "Screening",
+      "type": "object"
+    },
+    "ServerConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "host": {
+          "const": "127.0.0.1",
+          "default": "127.0.0.1",
+          "title": "Host",
+          "type": "string"
+        },
+        "port": {
+          "default": 0,
+          "description": "0 表示随机端口",
+          "maximum": 65535,
+          "minimum": 0,
+          "title": "Port",
+          "type": "integer"
+        }
+      },
+      "title": "ServerConfig",
+      "type": "object"
+    },
+    "VectorBackend": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "default": "sqlite-vec",
+          "enum": [
+            "sqlite-vec",
+            "qdrant-server",
+            "none"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "qdrant-server 的地址，如 http://127.0.0.1:6333",
+          "title": "Url"
+        },
+        "secret_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Secret Ref"
+        }
+      },
+      "title": "VectorBackend",
+      "type": "object"
+    },
+    "WikiSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "default": "both",
+          "enum": [
+            "off",
+            "auto",
+            "authored",
+            "both"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "synthesis_model_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "WeKnora 自动 Wiki 使用的模型 ID",
+          "title": "Synthesis Model Id"
+        }
+      },
+      "title": "WikiSettings",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "collaboration": {
+      "$ref": "#/$defs/Collaboration"
+    },
+    "query": {
+      "$ref": "#/$defs/QueryDefaults"
+    },
+    "reading": {
+      "$ref": "#/$defs/ReadingDefaults"
+    },
+    "index": {
+      "$ref": "#/$defs/IndexConfig"
+    },
+    "server": {
+      "$ref": "#/$defs/ServerConfig"
+    },
+    "mcp": {
+      "$ref": "#/$defs/McpConfig"
+    },
+    "connectors": {
+      "items": {
+        "$ref": "#/$defs/ConnectorConfig"
+      },
+      "title": "Connectors",
+      "type": "array"
+    }
+  },
+  "title": "BurrowlConfig",
+  "type": "object"
+}
+```

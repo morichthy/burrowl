@@ -1,0 +1,18 @@
+{
+  "command": [
+    "C:\\Users\\livky\\.codex\\worktrees\\cf08\\A_work_auto_flow\\services\\qdrant\\runtime\\python.exe",
+    "C:\\Users\\livky\\.codex\\worktrees\\cf08\\A_work_auto_flow\\research\\floating-point-summation\\runs\\run-20260908t214955z-2273015d2cef\\reproduce.py",
+    "--root",
+    "C:\\Users\\livky\\.codex\\worktrees\\cf08\\A_work_auto_flow",
+    "--manifest",
+    "C:\\Users\\livky\\.codex\\worktrees\\cf08\\A_work_auto_flow\\research\\floating-point-summation\\runs\\run-20260908t214955z-2273015d2cef\\source-manifest.json",
+    "--output",
+    "C:\\Users\\livky\\.codex\\worktrees\\cf08\\A_work_auto_flow\\research\\floating-point-summation\\runs\\run-20260908t214955z-2273015d2cef\\outputs",
+    "--plot-dependencies",
+    "C:\\Users\\livky\\.codex\\worktrees\\cf08\\A_work_auto_flow\\.local\\summation-plot-deps"
+  ],
+  "started_at": "2026-09-08T21:54:18.487560Z",
+  "ended_at": "2026-09-08T21:54:18.825929Z",
+  "elapsed_seconds": 0.3234267000007094,
+  "exit_code": 1
+}
