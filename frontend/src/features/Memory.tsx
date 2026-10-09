@@ -16,15 +16,41 @@ interface OwnerSummary {
 
 export function Owners() {
   const [query, setQuery] = useState("");
+  // 对象类型多选取并集；空数组表示全部。在已分组的结果上筛选，类型计数不随勾选变化。
+  const [types, setTypes] = useState<string[]>([]);
+  const [persistedOnly, setPersistedOnly] = useState(false);
   const owners = useOp<{ groups: { owner_type: string; owners: OwnerSummary[] }[] }>("memory.owners", { query });
+  const groups = (owners.data?.groups ?? [])
+    .filter((g) => !types.length || types.includes(g.owner_type))
+    .map((g) => ({ ...g, owners: persistedOnly ? g.owners.filter((o) => o.persisted) : g.owners }))
+    .filter((g) => g.owners.length);
+  const toggleType = (type: string) => setTypes((now) => (now.includes(type) ? now.filter((t) => t !== type) : [...now, type]));
   return (
     <Panel title="系统记忆">
       <div className="toolbar">
         <input placeholder="按名称或 ID 筛选" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <label className="check hint">
+          <input type="checkbox" checked={persistedOnly} onChange={() => setPersistedOnly(!persistedOnly)} /> 隐藏尚无记忆的对象
+        </label>
       </div>
+      {owners.data?.groups.length ? (
+        <div className="chips" role="group" aria-label="按对象类型筛选">
+          <label className={types.length ? "" : "on"}>
+            <input type="checkbox" checked={!types.length} onChange={() => setTypes([])} />
+            全部
+          </label>
+          {owners.data.groups.map((g) => (
+            <label key={g.owner_type} className={types.includes(g.owner_type) ? "on" : ""}>
+              <input type="checkbox" checked={types.includes(g.owner_type)} onChange={() => toggleType(g.owner_type)} />
+              {label(OWNER_TYPES, g.owner_type)} <span className="count">{g.owners.length}</span>
+            </label>
+          ))}
+        </div>
+      ) : null}
       <ErrorBox error={owners.error} />
       <Loading show={owners.loading && !owners.data} />
-      {owners.data?.groups.map((g) => (
+      {owners.data && !groups.length ? <Empty>没有符合筛选条件的对象。</Empty> : null}
+      {groups.map((g) => (
         <section key={g.owner_type}>
           <h3>
             {label(OWNER_TYPES, g.owner_type)} <span className="count">{g.owners.length}</span>

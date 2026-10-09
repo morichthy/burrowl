@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { OwnerView, RecordView } from "./Memory";
+import { Owners, OwnerView, RecordView } from "./Memory";
 
 let calls: { name: string; args: Record<string, unknown> }[];
 
@@ -34,6 +34,13 @@ function mock(name: string, args: Record<string, unknown>): unknown {
           sources: [],
           payload: {},
         },
+      };
+    case "memory.owners":
+      return {
+        groups: [
+          { owner_type: "research", owners: [{ owner_id: "RES-X", owner_type: "research", title: "求和研究", persisted: true, sensitivity: "internal", counts: { L4: 1 } }] },
+          { owner_type: "run", owners: [{ owner_id: "RUN-1", owner_type: "run", title: "一次运行", persisted: false, sensitivity: "internal", counts: {} }] },
+        ],
       };
     case "review.queue":
       return { items: [], counts: {} };
@@ -82,5 +89,19 @@ describe("系统记忆", () => {
     expect(screen.getByText(/正在查看历史修订 1/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "回到当前版本" }));
     expect(await screen.findByText("新正文")).toBeInTheDocument();
+  });
+});
+
+describe("对象列表", () => {
+  it("按对象类型筛选，并可隐藏尚无记忆的对象", async () => {
+    render(<Owners />);
+    expect(await screen.findByText("一次运行")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("checkbox", { name: /研究/ }));
+    expect(screen.queryByText("一次运行")).not.toBeInTheDocument();
+    expect(screen.getByText("求和研究")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("checkbox", { name: "全部" }));
+    expect(screen.getByText("一次运行")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("checkbox", { name: /隐藏尚无记忆/ }));
+    expect(screen.queryByText("一次运行")).not.toBeInTheDocument();
   });
 });

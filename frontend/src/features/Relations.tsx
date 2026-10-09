@@ -64,14 +64,16 @@ interface Note {
   created_at: string;
 }
 
+// 节点类型色：在浅色和深色画布上都可辨认
 const TYPE_COLORS: Record<string, string> = {
-  owner: "#3b6ea5",
-  record: "#6a9955",
-  source: "#b5852b",
-  claim: "#a05195",
-  concept: "#d0573a",
-  block: "#9aa7b0",
+  owner: "#6670e8",
+  record: "#3aa876",
+  source: "#d39b38",
+  claim: "#b26ad8",
+  concept: "#e0664a",
+  block: "#8f9bab",
 };
+const NODE_TYPE_LABELS: Record<string, string> = { owner: "对象", record: "记录", claim: "结论", concept: "概念", source: "来源", block: "L1 块" };
 const CATEGORIES: { value: string; label: string; color: string }[] = [
   { value: "structure", label: "结构", color: "#c8c8c8" },
   { value: "evidence", label: "证据", color: "#3d8b5a" },
@@ -167,9 +169,9 @@ export function Relations() {
       >
         <div className="toolbar">
           <input placeholder="按标题筛选" value={view.query ?? ""} onChange={(e) => setView({ ...view, query: e.target.value })} />
-          <label>
+          <label className="check">
             展开层数{" "}
-            <input type="number" min={1} max={4} value={view.hops ?? 2} onChange={(e) => setView({ ...view, hops: Number(e.target.value) })} />
+            <input type="number" className="narrow" min={1} max={4} value={view.hops ?? 2} onChange={(e) => setView({ ...view, hops: Number(e.target.value) })} />
           </label>
           <label className="check">
             <input type="checkbox" checked={!!view.communities} onChange={(e) => setView({ ...view, communities: e.target.checked })} />
@@ -229,7 +231,7 @@ export function Relations() {
         <ErrorBox error={graph.error ?? saveView.error} />
         <Loading show={graph.loading} />
         {graph.data?.truncated ? <div className="notice">节点过多，只显示了一部分；请缩小范围或设置中心。</div> : null}
-        <GraphCanvas data={graph.data} communities={communities} links={candidates.data?.candidates ?? []} onSelect={setFocus} />
+        <GraphCanvas data={graph.data} communities={communities} links={candidates.data?.candidates ?? []} selectedId={focus?.id} onSelect={setFocus} />
         <p className="hint">
           {graph.data?.nodes.length ?? 0} 个节点、{graph.data?.edges.length ?? 0} 条关系
           {communities ? `，${new Set(Object.values(communities)).size} 个社区` : ""}。颜色是关系类别；关联的实线、虚线、点线分别表示有依据、可能、推测；浅色是待判断的候选。
@@ -267,65 +269,279 @@ function detect(data: GraphData): Record<string, number> {
   return louvain(g, { resolution: 1, rng });
 }
 
+// 画布颜色取自页面主题变量，深浅色切换时重新应用样式
+function theme() {
+  const css = getComputedStyle(document.documentElement);
+  const v = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback;
+  return { text: v("--text", "#1c2230"), muted: v("--muted", "#677085"), bg: v("--panel-2", "#f8f9fb"), accent: v("--accent", "#4f5bd5"), line: v("--line-strong", "#cfd4dd") };
+}
+
+function graphStyle(t: ReturnType<typeof theme>) {
+  // cytoscape 的样式类型过窄（不认 data() 映射与过渡），这里整体放宽
+  return [
+    {
+      selector: "node",
+      style: {
+        label: "data(label)",
+        width: "data(size)",
+        height: "data(size)",
+        "background-color": "data(color)",
+        "border-width": 0,
+        color: t.text,
+        "font-size": 10,
+        "text-valign": "bottom",
+        "text-margin-y": 4,
+        "text-outline-color": t.bg,
+        "text-outline-width": 2,
+        "text-max-width": "140px",
+        "text-wrap": "ellipsis",
+        // 标签随放大逐渐出现（约 1.3 倍起），默认视图只看结构，避免文字糊成一片
+        "min-zoomed-font-size": 13,
+        "transition-property": "opacity, border-width, width, height",
+        "transition-duration": "0.2s",
+      },
+    },
+    {
+      selector: "edge",
+      style: {
+        width: 1.5,
+        "line-color": "data(color)",
+        "line-style": "data(line)",
+        "line-opacity": 0.45,
+        "curve-style": "straight",
+        "target-arrow-shape": "triangle",
+        "target-arrow-color": "data(color)",
+        "arrow-scale": 0.5,
+        "transition-property": "opacity, line-opacity, width",
+        "transition-duration": "0.2s",
+      },
+    },
+    { selector: "edge.invalid", style: { "line-color": t.line, "target-arrow-color": t.line } },
+    { selector: "edge.candidate", style: { "line-style": "dashed", "line-color": "#d08a2c", width: 1.5, "target-arrow-shape": "none", "line-opacity": 0.8 } },
+    { selector: "node.major", style: { "font-size": 13, "min-zoomed-font-size": 5, "font-weight": 600 } },
+    { selector: ".faded", style: { opacity: 0.12 } },
+    { selector: "node.highlighted", style: { "min-zoomed-font-size": 0, "font-weight": 600 } },
+    { selector: "edge.highlighted", style: { "line-opacity": 0.95, width: 1.6 } },
+    { selector: "node:selected", style: { "border-width": 3, "border-color": t.accent, "border-opacity": 0.9, "min-zoomed-font-size": 0 } },
+  ] as unknown as cytoscape.StylesheetJson;
+}
+
+/** 悬停或选中：突出节点及其直接邻居，其余淡出（不移动任何节点）。 */
+function highlight(cy: cytoscape.Core, node: cytoscape.NodeSingular | undefined) {
+  cy.batch(() => {
+    cy.elements().removeClass("faded highlighted");
+    if (!node) return;
+    const near = node.closedNeighborhood();
+    cy.elements().not(near).addClass("faded");
+    near.addClass("highlighted");
+  });
+}
+
+/** 平滑地把全部节点放进画面；节点很少时不放大到 1.6 倍以上，避免标签过大。 */
+// 力导向布局参数：斥力大、边长适中，接近 Obsidian 图谱的疏朗效果；只在节点集合变化时运行
+const LAYOUT = {
+  name: "cose",
+  animate: "end",
+  animationEasing: "ease-out-cubic",
+  fit: false,
+  // cose 的弹簧在小图上偏硬：加大斥力、减弱弹簧（edgeElasticity 越大越弱），并把标签算进节点尺寸
+  // 标签不计入节点尺寸（否则整图过散、缩放过小）；较强的 gravity 让孤立分量靠拢
+  nodeRepulsion: () => 400000,
+  edgeElasticity: () => 200,
+  idealEdgeLength: () => 80,
+  nodeOverlap: 20,
+  componentSpacing: 100,
+  gravity: 1,
+  numIter: 1200,
+};
+
+function smoothFit(cy: cytoscape.Core, duration = 450) {
+  const eles = cy.elements();
+  if (eles.empty()) return;
+  const box = eles.boundingBox();
+  const pad = 40;
+  const zoom = Math.min(1.6, (cy.width() - 2 * pad) / Math.max(box.w, 1), (cy.height() - 2 * pad) / Math.max(box.h, 1));
+  const pan = { x: cy.width() / 2 - zoom * (box.x1 + box.w / 2), y: cy.height() / 2 - zoom * (box.y1 + box.h / 2) };
+  if (duration) cy.animate({ zoom, pan }, { duration, easing: "ease-in-out-cubic" });
+  else cy.viewport({ zoom, pan });
+}
+
+const edgeKey = (e: GraphEdge) => `${e.source}→${e.target}:${e.type}`;
+
 function GraphCanvas(props: {
   data: GraphData | undefined;
   communities: Record<string, number> | null;
   links: CandidateLink[];
+  selectedId: string | undefined;
   onSelect: (node: GraphNode | undefined) => void;
 }) {
   const container = useRef<HTMLDivElement>(null);
-  const { data, communities, links, onSelect } = props;
+  const cyRef = useRef<cytoscape.Core>(undefined);
+  const nodesRef = useRef(new Map<string, GraphNode>());
+  const onSelect = useRef(props.onSelect);
+  onSelect.current = props.onSelect;
+  const { data, communities, links, selectedId } = props;
+  const inJsdom = typeof navigator !== "undefined" && navigator.userAgent.includes("jsdom");
+
+  // 画布只创建一次：数据、着色、候选、选中都在原实例上增量更新，位置和视野不会被重置
   useEffect(() => {
-    if (!container.current || !data || navigator.userAgent.includes("jsdom")) return;
-    const known = new Set(data.nodes.map((n) => n.id));
-    const cy = cytoscape({
-      container: container.current,
-      elements: [
-        ...data.nodes.map((n) => ({
-          data: {
-            id: n.id,
-            label: n.title.slice(0, 24),
-            color: communities ? PALETTE[(communities[n.id] ?? 0) % PALETTE.length] : (TYPE_COLORS[n.type] ?? "#888"),
-          },
-        })),
-        ...data.edges.map((e, i) => ({
-          data: {
-            id: `e${i}`,
-            source: e.source,
-            target: e.target,
-            color: CATEGORIES.find((c) => c.value === e.category)?.color ?? "#bbb",
-            line: e.category === "navigation" ? LINE_STYLE[e.certainty ?? "plausible"] ?? "solid" : "solid",
-          },
-          classes: [e.candidate ? "candidate" : "", e.state === "invalid" ? "invalid" : ""].filter(Boolean).join(" "),
-        })),
-        ...links
-          .filter((l) => known.has(l.from.target_id) && known.has(l.to.target_id))
-          .map((l, i) => ({ data: { id: `c${i}`, source: l.from.target_id, target: l.to.target_id }, classes: "candidate" })),
-      ],
-      style: [
-        { selector: "node", style: { label: "data(label)", "font-size": 9, "min-zoomed-font-size": 7, "background-color": "data(color)", width: 14, height: 14 } },
-        {
-          selector: "edge",
-          style: {
-            width: 1,
-            "line-color": "data(color)",
-            "line-style": "data(line)" as never,
-            "curve-style": "bezier",
-            "target-arrow-shape": "triangle",
-            "target-arrow-color": "data(color)",
-            "arrow-scale": 0.6,
-          },
-        },
-        { selector: "edge.invalid", style: { "line-color": "#ddd", "target-arrow-color": "#ddd" } },
-        { selector: "edge.candidate", style: { "line-style": "dashed", "line-color": "#d08a2c", width: 1.5, "target-arrow-shape": "none" } },
-        { selector: "node:selected", style: { "border-width": 3, "border-color": "#d08a2c" } },
-      ],
-      layout: { name: "cose", animate: false },
+    if (!container.current || inJsdom) return;
+    const cy = cytoscape({ container: container.current, style: graphStyle(theme()), minZoom: 0.1, maxZoom: 4, wheelSensitivity: 0.3 });
+    const selected = () => cy.nodes(":selected").first();
+    cy.on("tap", "node", (event) => onSelect.current(nodesRef.current.get(event.target.id())));
+    cy.on("select", "node", (event) => highlight(cy, event.target));
+    cy.on("unselect", "node", () => highlight(cy, selected().nonempty() ? selected() : undefined));
+    cy.on("mouseover", "node", (event) => highlight(cy, event.target));
+    cy.on("mouseout", "node", () => highlight(cy, selected().nonempty() ? selected() : undefined));
+    const media = window.matchMedia?.("(prefers-color-scheme: dark)");
+    const restyle = () => cy.style(graphStyle(theme()));
+    media?.addEventListener("change", restyle);
+    cyRef.current = cy;
+    return () => {
+      media?.removeEventListener("change", restyle);
+      cy.destroy();
+      cyRef.current = undefined;
+    };
+  }, [inJsdom]);
+
+  // 数据变化：按 ID 增删，已有节点保持原位；只对新节点做布局，并以动画过渡
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy || !data) return;
+    nodesRef.current = new Map(data.nodes.map((n) => [n.id, n]));
+    const degree = new Map<string, number>();
+    data.edges.forEach((e) => {
+      degree.set(e.source, (degree.get(e.source) ?? 0) + 1);
+      degree.set(e.target, (degree.get(e.target) ?? 0) + 1);
     });
-    cy.on("tap", "node", (event) => onSelect(data.nodes.find((n) => n.id === event.target.id())));
-    return () => cy.destroy();
-  }, [data, communities, links, onSelect]);
-  return <div ref={container} className="graph" aria-label="关系图" />;
+    const edgeIds = new Map<string, GraphEdge>();
+    data.edges.forEach((e) => {
+      if (!nodesRef.current.has(e.source) || !nodesRef.current.has(e.target)) return;
+      let id = edgeKey(e);
+      for (let i = 1; edgeIds.has(id); i++) id = `${edgeKey(e)}#${i}`;
+      edgeIds.set(id, e);
+    });
+    const fresh = new Set<string>();
+    let removedNodes = 0;
+    cy.batch(() => {
+      const stale = cy.elements().filter((el) => (el.isNode() ? !nodesRef.current.has(el.id()) : !el.hasClass("suggest") && !edgeIds.has(el.id())));
+      removedNodes = stale.nodes().length;
+      stale.remove();
+      for (const n of data.nodes) {
+        // 节点大小随连接数增长（开方压缩，避免枢纽节点过大）
+        const fields = { label: n.title.slice(0, 28), size: 14 + Math.min(30, Math.sqrt(degree.get(n.id) ?? 0) * 5) };
+        const existing = cy.getElementById(n.id);
+        if (existing.nonempty()) existing.data(fields);
+        else {
+          fresh.add(n.id);
+          cy.add({ group: "nodes", data: { id: n.id, ...fields } });
+        }
+        // 对象节点是图的骨架，标签在较小缩放下也显示
+        cy.getElementById(n.id).toggleClass("major", n.type === "owner");
+      }
+      for (const [id, e] of edgeIds) {
+        const fields = {
+          color: CATEGORIES.find((c) => c.value === e.category)?.color ?? "#bbb",
+          line: e.category === "navigation" ? (LINE_STYLE[e.certainty ?? "plausible"] ?? "solid") : "solid",
+        };
+        const existing = cy.getElementById(id);
+        if (existing.nonempty()) existing.data(fields);
+        else cy.add({ group: "edges", data: { id, source: e.source, target: e.target, ...fields } });
+        cy.getElementById(id)
+          .toggleClass("candidate", !!e.candidate)
+          .toggleClass("invalid", e.state === "invalid");
+      }
+    });
+    if (!fresh.size) {
+      // 只删不增（如设置中心、加过滤）：剩余节点从当前位置平滑舒展开，不随机重排
+      if (removedNodes && cy.nodes().nonempty()) {
+        const relax = cy.layout({ ...LAYOUT, randomize: false, animationDuration: 450 } as cytoscape.LayoutOptions);
+        relax.one("layoutstop", () => smoothFit(cy));
+        relax.run();
+      }
+      return;
+    }
+    const added = cy.nodes().filter((n) => fresh.has(n.id()));
+    const kept = cy.nodes().not(added);
+    const first = kept.empty();
+    // 新节点从已有邻居附近出现，而不是从画面原点飞入
+    const box = kept.boundingBox();
+    const middle = first ? { x: 0, y: 0 } : { x: (box.x1 + box.x2) / 2, y: (box.y1 + box.y2) / 2 };
+    added.forEach((n) => {
+      const anchor = n.neighborhood().nodes().filter((m) => !fresh.has(m.id()))[0] as cytoscape.NodeSingular | undefined;
+      const base = anchor ? anchor.position() : middle;
+      n.position({ x: base.x + (Math.random() - 0.5) * 60, y: base.y + (Math.random() - 0.5) * 60 });
+    });
+    kept.lock();
+    // 首次加载没有旧布局可保持，直接一次排好；之后的增量变化才用动画过渡
+    const layout = cy.layout({ ...LAYOUT, randomize: first, animate: first ? false : "end", animationDuration: 450 } as cytoscape.LayoutOptions);
+    layout.one("layoutstop", () => {
+      kept.unlock();
+      smoothFit(cy, first ? 0 : 450);
+    });
+    layout.run();
+  }, [data]);
+
+  // 社区着色只改颜色
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy || !data) return;
+    cy.batch(() =>
+      data.nodes.forEach((n) =>
+        cy.getElementById(n.id).data("color", communities ? PALETTE[(communities[n.id] ?? 0) % PALETTE.length] : (TYPE_COLORS[n.type] ?? "#888")),
+      ),
+    );
+  }, [data, communities]);
+
+  // 关联候选是叠加的虚线，增删时不触发布局
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    cy.batch(() => {
+      cy.$(".suggest").remove();
+      links
+        .filter((l) => cy.getElementById(l.from.target_id).nonempty() && cy.getElementById(l.to.target_id).nonempty())
+        .forEach((l, i) => cy.add({ group: "edges", data: { id: `suggest-${i}`, source: l.from.target_id, target: l.to.target_id, color: "#d08a2c", line: "dashed" }, classes: "candidate suggest" }));
+    });
+  }, [links, data]);
+
+  // 侧栏选中的节点与画布同步（只改选中态，不平移、不缩放）
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    const target = selectedId ? cy.getElementById(selectedId) : cy.collection();
+    if (target.nonempty() && target.selected()) return;
+    cy.$("node:selected").unselect();
+    target.select();
+  }, [selectedId, data]);
+
+  const fit = () => cyRef.current && smoothFit(cyRef.current, 400);
+  const focusSelected = () => {
+    const cy = cyRef.current;
+    const node = selectedId ? cy?.getElementById(selectedId) : undefined;
+    if (cy && node?.nonempty()) cy.animate({ center: { eles: node }, zoom: Math.max(cy.zoom(), 1.2) }, { duration: 450, easing: "ease-in-out-cubic" });
+  };
+  return (
+    <div className="graph-wrap">
+      <div ref={container} className="graph" aria-label="关系图" />
+      <div className="graph-controls">
+        <button type="button" className="small" onClick={fit} title="把全部节点放进画面">
+          适应画面
+        </button>
+        <button type="button" className="small" disabled={!selectedId} onClick={focusSelected} title="平滑移动到选中的节点">
+          定位选中
+        </button>
+      </div>
+      <div className="graph-legend" hidden={!!communities}>
+        {NODE_TYPES.map((t) => (
+          <span key={t}>
+            <i style={{ background: TYPE_COLORS[t] }} />
+            {NODE_TYPE_LABELS[t]}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function Focus(props: {
