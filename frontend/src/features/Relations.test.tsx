@@ -104,6 +104,12 @@ describe("关系图筛选（R12 T-P2.8）", () => {
     expect(cats.getByRole("checkbox", { name: "结论关系" })).toBeDisabled();
   });
 
+  it("重点关系有单独的图例，样式相同的依赖与前提合并为一项", async () => {
+    render(<Relations />);
+    const legend = within(await screen.findByLabelText("重点关系图例"));
+    for (const name of ["矛盾", "替代", "支持", "输入依据", "依赖/前提"]) expect(legend.getByText(name)).toBeInTheDocument();
+  });
+
   it("只有旧筛选字段的已保存视图使用当前默认节点类型", async () => {
     stored = { filters: { levels: ["L0"], showBlocks: true } };
     render(<Relations />);

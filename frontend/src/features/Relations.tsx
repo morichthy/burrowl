@@ -6,7 +6,7 @@
 import cytoscape from "cytoscape";
 import Graph from "graphology";
 import louvain from "graphology-communities-louvain";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useAction, useOp } from "../api";
 import { KINDS, label, MATURITY, REVIEW_BADGES } from "../labels";
 import { Empty, ErrorBox, href, Loading, Panel, Tag, Time } from "../ui";
@@ -97,6 +97,19 @@ const EDGE_TYPE_LABELS: Record<string, string> = {
 // 形状区分节点类型（不只靠颜色，色弱也能分辨）；对象另加一圈光环
 const NODE_SHAPES: Record<string, string> = { owner: "ellipse", record: "ellipse", block: "ellipse", source: "round-rectangle", claim: "round-diamond", concept: "round-hexagon" };
 const UNSAFE_REVIEW = new Set(["disputed", "retracted", "superseded", "stale", "upstream-blocked"]);
+/**
+ * 重点关系：在类别颜色之外再用线型、粗细和箭头形状区分，按顺序取优先（一条连线只套用最靠前的一种）。
+ * dash 是 [实线段, 间隙…] 的像素长度（cytoscape line-dash-pattern），空数组为实线。
+ */
+const EMPHASIS: { type: string; label: string; color?: string; dash: number[]; width: number; arrow: string; legend: string }[] = [
+  { type: "contradicts", label: "矛盾", color: "#d64545", dash: [7, 4], width: 2.6, arrow: "tee", legend: "红色长虚线，端点是挡板" },
+  { type: "supersedes", label: "替代", color: "#8e5bd0", dash: [10, 3, 2, 3], width: 2.4, arrow: "triangle-backcurve", legend: "紫色点划线" },
+  { type: "supports", label: "支持", dash: [], width: 2.6, arrow: "triangle", legend: "加粗实线" },
+  { type: "input", label: "输入依据", dash: [], width: 2.2, arrow: "vee", legend: "实线，燕尾箭头" },
+  { type: "depends_on", label: "依赖", color: "#4f6a8f", dash: [2, 3], width: 2, arrow: "square", legend: "蓝灰点线，方块端点" },
+  { type: "prerequisite", label: "前提", color: "#4f6a8f", dash: [2, 3], width: 2, arrow: "square", legend: "蓝灰点线，方块端点" },
+];
+const EMPHASIS_BY_TYPE = new Map(EMPHASIS.map((e, i) => [e.type, { ...e, order: i }]));
 const NODE_TYPES =["owner", "record", "block", "claim", "concept", "source"];
 // 默认隐藏内容块以免图过密；空数组则明确表示不显示任何节点。
 const DEFAULT_NODE_TYPES = NODE_TYPES.filter((type) => type !== "block");
@@ -338,7 +351,7 @@ export function Relations() {
         <p className="hint">
           {graph.data?.nodes.length ?? 0} 个节点、{graph.data?.edges.length ?? 0} 条关系
           {links.length && links.length < (graph.data?.edges.length ?? 0) ? `（合并为 ${links.length} 条连线）` : ""}
-          {communities ? `，${new Set(Object.values(communities)).size} 个社区` : ""}。悬停查看名称与关系，双击节点以它为中心展开。连线颜色是关系类别；关联的实线、虚线、点线分别表示有依据、可能、推测；橙色虚线是待判断的候选；节点的红色虚线边框表示复核有问题。
+          {communities ? `，${new Set(Object.values(communities)).size} 个社区` : ""}。悬停查看名称与关系，双击节点以它为中心展开。连线颜色是关系类别；关联的实线、虚线、点线分别表示有依据、可能、推测；矛盾、替代、支持、输入依据、依赖/前提另有专门的线型和箭头（见图例）；橙色虚线是待判断的候选；节点的红色虚线边框表示复核有问题。
         </p>
       </Panel>
       <aside>
@@ -425,13 +438,25 @@ function graphStyle(t: ReturnType<typeof theme>) {
         "source-arrow-shape": "data(sourceArrow)",
         "target-arrow-color": "data(color)",
         "source-arrow-color": "data(color)",
-        "arrow-scale": 0.55,
+        // 箭头约为线宽的 3 倍：缩小视图时仍能看清方向
+        "arrow-scale": 0.95,
         "transition-property": "opacity, line-opacity, width",
         "transition-duration": "0.2s",
       },
     },
     // 结构边（属于、包含）只是骨架，淡一些，让引用、证据等语义关系更突出
-    { selector: "edge.structure", style: { "line-opacity": 0.3 } },
+    { selector: "edge.structure", style: { "line-opacity": 0.3, "arrow-scale": 0.7 } },
+    // 重点关系：不透明度更高，线型、粗细与箭头形状各不相同（箭头形状由 data(targetArrow/sourceArrow) 给出）
+    ...EMPHASIS.map((em) => ({
+      selector: `edge.em-${em.type}`,
+      style: {
+        width: em.width,
+        "line-opacity": 0.85,
+        "line-style": em.dash.length ? "dashed" : "solid",
+        ...(em.dash.length ? { "line-dash-pattern": em.dash } : {}),
+        ...(em.color ? { "line-color": em.color, "target-arrow-color": em.color, "source-arrow-color": em.color } : {}),
+      },
+    })),
     { selector: "edge.invalid", style: { "line-color": t.line, "target-arrow-color": t.line, "source-arrow-color": t.line } },
     { selector: "edge.candidate", style: { "line-style": "dashed", "line-color": "#d08a2c", width: 1.5, "target-arrow-shape": "none", "source-arrow-shape": "none", "line-opacity": 0.85 } },
     { selector: ".faded", style: { opacity: 0.1 } },
@@ -645,20 +670,29 @@ function GraphCanvas(props: {
       }
       for (const link of links) {
         const main = mainEdge(link);
+        // 重点关系只看有效、已采纳的边；它决定这条连线的线型、颜色和它所指那一端的箭头形状
+        const special = link.edges
+          .filter((e) => e.state !== "invalid" && !e.candidate && EMPHASIS_BY_TYPE.has(e.type))
+          .sort((x, y) => EMPHASIS_BY_TYPE.get(x.type)!.order - EMPHASIS_BY_TYPE.get(y.type)!.order)[0];
+        const em = special ? EMPHASIS_BY_TYPE.get(special.type)! : undefined;
+        const colored = special ?? main;
+        const arrowAt = (end: string, any: boolean) => (special?.target === end ? em!.arrow : any ? "triangle" : "none");
         const fields = {
-          color: CATEGORIES.find((c) => c.value === main.category)?.color ?? "#bbb",
+          color: em?.color ?? CATEGORIES.find((c) => c.value === colored.category)?.color ?? "#bbb",
           line: main.category === "navigation" ? (LINE_STYLE[main.certainty ?? "plausible"] ?? "solid") : "solid",
           // 一对节点之间同时有多类关系时线稍粗
-          width: 1.2 + 0.5 * Math.min(3, new Set(link.edges.map((e) => e.category)).size - 1),
+          width: 1.5 + 0.5 * Math.min(3, new Set(link.edges.map((e) => e.category)).size - 1),
           category: main.category ?? "reference",
           label: linkLabel(link),
-          targetArrow: link.forward ? "triangle" : "none",
-          sourceArrow: link.backward ? "triangle" : "none",
+          targetArrow: arrowAt(link.target, link.forward),
+          sourceArrow: arrowAt(link.source, link.backward),
         };
         const existing = cy.getElementById(link.id);
         if (existing.nonempty()) existing.data(fields);
         else cy.add({ group: "edges", data: { id: link.id, source: link.source, target: link.target, ...fields } });
-        cy.getElementById(link.id)
+        const edge = cy.getElementById(link.id);
+        EMPHASIS.forEach((x) => edge.toggleClass(`em-${x.type}`, x.type === em?.type));
+        edge
           .toggleClass("structure", main.category === "structure")
           .toggleClass("candidate", link.edges.every((e) => e.candidate))
           .toggleClass("invalid", link.edges.every((e) => e.state === "invalid"));
@@ -758,16 +792,52 @@ function GraphCanvas(props: {
           ))}
         </div>
       ) : null}
-      {/* 形状始终表示节点类型；按社区着色时颜色改表示社区，图例改为中性色 */}
-      <div className="graph-legend">
-        {NODE_TYPES.map((t) => (
-          <span key={t}>
-            <i className={`shape shape-${t}`} style={{ background: communities ? "var(--muted)" : TYPE_COLORS[t] }} />
-            {NODE_TYPE_LABELS[t]}
-          </span>
-        ))}
+      <div className="graph-legends">
+        {/* 形状始终表示节点类型；按社区着色时颜色改表示社区，图例改为中性色 */}
+        <div className="graph-legend">
+          {NODE_TYPES.map((t) => (
+            <span key={t}>
+              <i className={`shape shape-${t}`} style={{ background: communities ? "var(--muted)" : TYPE_COLORS[t] }} />
+              {NODE_TYPE_LABELS[t]}
+            </span>
+          ))}
+        </div>
+        <div className="graph-legend" aria-label="重点关系图例">
+          {EMPHASIS_LEGEND.map((em) => (
+            <span key={em.label}>
+              <EdgeSample color={em.color} dash={em.dash} width={em.width} arrow={em.arrow} />
+              {em.label}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
+  );
+}
+
+// 图例中合并样式相同的重点关系（依赖与前提共用一种线型）
+const EMPHASIS_LEGEND = EMPHASIS.reduce<(typeof EMPHASIS)[number][]>((acc, em) => {
+  const same = acc.find((x) => x.legend === em.legend);
+  if (same) same.label = `${same.label}/${em.label}`;
+  else acc.push({ ...em });
+  return acc;
+}, []);
+
+/** 图例里的一小段连线：线型、粗细与箭头形状和画布一致（没有专属颜色的用"证据"类别色）。 */
+function EdgeSample({ color, dash, width, arrow }: { color?: string; dash: number[]; width: number; arrow: string }) {
+  const c = color ?? CATEGORIES.find((x) => x.value === "evidence")!.color;
+  const heads: Record<string, ReactNode> = {
+    triangle: <polygon points="22,1.5 30,6 22,10.5" fill={c} />,
+    "triangle-backcurve": <path d="M21,1.5 L30,6 L21,10.5 Q24,6 21,1.5Z" fill={c} />,
+    vee: <polygon points="21,1.5 30,6 21,10.5 24,6" fill={c} />,
+    tee: <rect x="27" y="1" width="2.6" height="10" fill={c} />,
+    square: <rect x="24" y="2.5" width="6" height="6" fill={c} />,
+  };
+  return (
+    <svg className="edge-sample" width="30" height="12" viewBox="0 0 30 12" aria-hidden="true">
+      <line x1="1" y1="6" x2="25" y2="6" stroke={c} strokeWidth={width} strokeDasharray={dash.length ? dash.join(" ") : undefined} />
+      {heads[arrow]}
+    </svg>
   );
 }
 

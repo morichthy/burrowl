@@ -251,8 +251,11 @@ textarea { width: 100%; min-height: 64px; line-height: 1.55; }
 }
 .graph-controls { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; }
 .graph-controls button { background: color-mix(in srgb, var(--panel) 85%, transparent); backdrop-filter: blur(4px); box-shadow: var(--shadow); }
-.graph-legend { position: absolute; left: 10px; bottom: 10px; display: flex; gap: 12px; flex-wrap: wrap; padding: 5px 10px; border-radius: 999px; font-size: 12px; color: var(--muted); background: color-mix(in srgb, var(--panel) 85%, transparent); backdrop-filter: blur(4px); border: 1px solid var(--line); pointer-events: none; }
+/* 图例叠在画布左下：上行节点类型，下行重点关系 */
+.graph-legends { position: absolute; left: 10px; bottom: 10px; right: 10px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; pointer-events: none; }
+.graph-legend { display: flex; gap: 12px; flex-wrap: wrap; padding: 5px 10px; border-radius: 999px; font-size: 12px; color: var(--muted); background: color-mix(in srgb, var(--panel) 85%, transparent); backdrop-filter: blur(4px); border: 1px solid var(--line); pointer-events: none; }
 .graph-legend i { margin-right: 5px; }
+.graph-legend .edge-sample { margin-right: 5px; vertical-align: -2px; }
 /* 悬停说明卡：不拦截鼠标，避免在节点和卡片之间来回闪烁 */
 .graph-tip {
   position: absolute; z-index: 2; max-width: 280px; padding: 7px 10px; border-radius: var(--radius-sm); pointer-events: none;
