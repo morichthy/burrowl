@@ -31,6 +31,9 @@ REVIEW_FILTERS = {"all": None, "reviewed_only": ["accepted"], "unreviewed_only":
 VERSIONS = {"fulltext": projections.FULLTEXT_VERSION, "discovery": projections.DISCOVERY_VERSION,
             "graph": graph_projection.GRAPH_VERSION}
 BUILDERS = {"fulltext": projections.fulltext, "discovery": projections.discovery}
+# 总体就绪必须覆盖检索和图的全部水位。关系页只补图，不能据此宣布材料已能被检索。
+REQUIRED_STATES = {(corpus, channel) for corpus in BUILDERS for channel in ("lexical", "vector")} | {
+    ("graph", "edges")}
 
 
 def build_embedder(config: IndexConfig, data_root: Path, *, default_model_dir: Path | None = None) -> Embedder | None:
@@ -74,9 +77,18 @@ class IndexService:
     def status(self, owner_id: str) -> dict[str, Any]:
         owner = self.storage.owners.scan().find(owner_id)
         head = self.storage.store.read_snapshot(owner).head if owner and owner.persisted else None
-        details = {f"{s['corpus']}.{s['channel']}": s["status"] if self._fresh(s, owner, head) else
-                   ("stale" if s["status"] == "indexed" else s["status"]) for s in self.db.states([owner_id])}
-        ready = bool(details) and all(v in {"indexed", "disabled"} for v in details.values())
+        states = {(s["corpus"], s["channel"]): s for s in self.db.states([owner_id])}
+        details = {}
+        ready = True
+        for corpus, channel in sorted(REQUIRED_STATES):
+            state = states.get((corpus, channel))
+            fresh = state is not None and self._fresh(state, owner, head)
+            # 只有确实未配置模型的向量通道允许 disabled；缺失或过时的关键词/图水位必须补偿。
+            disabled = state is not None and channel == "vector" and self._disabled_ok(state)
+            details[f"{corpus}.{channel}"] = (
+                "not_indexed" if state is None else "indexed" if fresh else "disabled" if disabled
+                else "stale" if state["status"] in {"indexed", "disabled"} else state["status"])
+            ready = ready and (fresh or disabled)
         return {"index_status": "indexed" if ready else "pending", "details": details}
 
     # ---------- 维护 ----------
@@ -87,7 +99,7 @@ class IndexService:
 
     def _disabled_ok(self, state: dict) -> bool:
         """disabled 只在当前确实没有模型时才算正常；装上模型后要补建，并在补建前报告缺口。"""
-        return state["status"] == "disabled" and self.db.embedder is None
+        return state["channel"] == "vector" and state["status"] == "disabled" and self.db.embedder is None
 
     def _fresh(self, state: dict, owner: Owner | None, head: dict | None) -> bool:
         return (owner is not None and state["status"] == "indexed" and json.loads(state["head"] or "null") == head
@@ -214,7 +226,7 @@ class IndexService:
             head = self.storage.store.read_snapshot(owner).head if owner.persisted else None
             states = self.db.states([owner.owner_id])
             fresh = states and all(self._fresh(s, owner, head) or self._disabled_ok(s) for s in states)
-            if force or not fresh or len(states) < len(BUILDERS) * 2 + 1:  # 每个投影两个通道 + 图
+            if force or not fresh or not REQUIRED_STATES <= {(s["corpus"], s["channel"]) for s in states}:
                 results.append(self.sync_owner(owner.owner_id, graph=graph, index=index))
         removed = []
         if owner_id is None:

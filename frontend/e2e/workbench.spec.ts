@@ -19,6 +19,29 @@ async function op(request: APIRequestContext, name: string, args: object) {
 
 test.describe.configure({ mode: "serial" });
 
+test("检索：未索引材料显示非空提示，补齐后原问题恢复命中", async ({ page }) => {
+  await page.goto("#/search");
+  await page.getByRole("textbox", { name: "问题" }).fill("虚拟环境");
+  await page.getByRole("button", { name: "检索", exact: true }).click();
+  const notice = page.locator(".notice");
+  await expect(notice).toHaveCount(1);
+  await expect(notice).toContainText("尚未建立检索索引");
+  await expect(notice).toContainText("关键词、向量");
+  await expect(page.locator(".results")).not.toContainText("虚拟环境验证概览");
+  await page.screenshot({ path: "test-results/search-index-gap.png", fullPage: true });
+  // 输入框已改但尚未提交：修复按钮重试的仍是原来的“虚拟环境”。
+  await page.getByRole("textbox", { name: "问题" }).fill("存储与检索");
+  const [retried] = await Promise.all([
+    page.waitForResponse((response) => response.url().endsWith("/query.search")),
+    page.getByRole("button", { name: "补齐索引并重试" }).click(),
+  ]);
+  expect(retried.request().postDataJSON()).toMatchObject({ question: "虚拟环境", content_source: "overview_experience" });
+  expect((await retried.json()).items.map((item: { title: string }) => item.title)).toContain("虚拟环境验证概览");
+  await expect(page.locator(".results")).toContainText("虚拟环境验证概览");
+  await expect(notice).toHaveCount(0);
+  await page.screenshot({ path: "test-results/search-index-restored.png", fullPage: true });
+});
+
 test("阅读会话：agent 的判断实时出现；用户批准后 agent 从 inbox 收到 approval_id", async ({ page, request }) => {
   const { session_id } = state();
   await page.goto(`#/reading/${session_id}`);

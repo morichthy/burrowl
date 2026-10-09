@@ -144,6 +144,7 @@ handle 分配和正文链接解析发生在第 1 步（`MemoryService.prepare`�
 - 融合用 RRF，排序不代表科学可信度。
 - 查询有累计预算（时间、读取、输出、候选）；阅读会话的召回轮次也受预算约束。
 - 嵌入模型或重排模型缺失时：关键词检索照常，向量通道报告未就绪，重排报告不可用。重排设为 `required` 时，模型缺失直接报错。
+- 索引状态分别核对全文、发现和图投影；只补齐关系图不能冒充检索就绪。检索页解释缺口并提供用户点击的索引补偿入口，调用 `index.reconcile` 后重试原查询，不改变查询的隐式预算或规范记录。
 - 图路线默认关闭（`index.graph_route.enabled`）。打开后在材料查询和阅读会话的召回中作为一路参与 RRF，按查询预算的 graph_nodes / graph_edges 限制扩展，超出时报告缺口。
 - 中枢路线默认关闭（`index.hub_route.connectors` 为空）。打开后材料查询并行调用外部检索，命中映射回本地并经同样过滤后参与 RRF；外部超时或出错时只报告缺口，结果仍来自本地。
 
@@ -160,7 +161,7 @@ handle 分配和正文链接解析发生在第 1 步（`MemoryService.prepare`�
 
 ### 安装与迁移
 
-- 离线安装包按版本安装，用 `current` 联接切换和回滚版本。
+- 离线安装包按版本安装，用 `current` 联接切换和回滚版本。同版本重装同步包内文件；源码开发可用 `packaging/build.py --install` 完整构建后直接调用同一安装器，不生成 zip。`BUILD_INFO.json` 标识构建的提交、修改状态和时间，不代替知识记录。文件安装与运行进程分开：已有工作台及 MCP 须重启后加载新代码。
 - 整个数据目录的备份、迁移用 burrowl-bundle（逐文件 sha256；不含可重建的索引）。默认连同数据目录外的已登记原件一起打包；恢复时按 `--map` 或默认规则放置原件，并自动改写来源登记。
 - 接入方式（数据目录、工作目录、运行模式 auto/manual）是宿主 MCP 配置里的启动参数，不写进数据目录；`burrowl mcp-config` 输出标准 MCP 配置、`burrowl skills install / pack` 提供 Skill，登记到哪里由各客户端里的 agent 按其规范决定（`interfaces/agents.py`）。Skill 安装目录记入安装根目录的 `burrowl-install.json`，升级时 `burrowl upgrade` 只替换未被用户修改的文件。项目开关 `.burrowl.json` 优先于模式；工作流说明另由 `system.guide` 提供给不支持 Skill 的客户端。
 - 不提供源项目旧数据（v1–v3）的迁移。

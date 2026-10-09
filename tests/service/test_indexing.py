@@ -121,3 +121,68 @@ def test_query_over_model_limit_reports_gap(sample_workspace):
     hits = index.search("浮点求和在大数抵消时为什么会丢失小量", channels=("dense",))
     assert {"channel": "dense", "reason": "query_truncated"} in hits["gaps"]
     assert hits["items"]
+
+
+def test_schema_reset_then_graph_only_requires_reconcile(tmp_path):
+    """R12 D-01/T-P1.5：升级后关系页只补图；不能把丢失的检索水位报告为已就绪。"""
+    from burrowl.core.config import BurrowlConfig
+    from burrowl.services.query.models import QueryRequest
+    from burrowl.services.query.service import QueryService
+
+    storage = Storage.open(tmp_path)
+    index = open_index(storage)
+    memory = MemoryService(storage, index=index)
+    owners = {}
+    for slug, title in (("python-environment", "虚拟环境"), ("retrieval", "存储与检索")):
+        owner_id = storage.owners.create("research", slug, title).owner_id
+        owners[title] = owner_id
+        draft = {"owner_id": owner_id, "kind": "overview", "title": title, "body_markdown": title,
+                 "record_reason": "保存主题概览", "sensitivity": "internal", "sources": [],
+                 "provenance_gap": "仅测试材料，不代表已验证结论", "discovery": "workspace_summary",
+                 "payload": {"question": title, "methods": [], "results": [], "current_stage": "测试",
+                             "limitations": [], "open_questions": [], "claims": [],
+                             "experience_refs": [], "process_refs": [], "technical_refs": []}}
+        receipt = memory.commit(request(owner_id, None, {"op": "put_record", "client_key": slug, "draft": draft}))
+        assert receipt["index"]["index_status"] == "indexed"
+
+    # 模拟上一个安装版本的派生库，重新打开触发代码中真实的结构升级清空流程。
+    with index.db.connect() as db:
+        db.execute("UPDATE meta SET value='old-version' WHERE key='schema_version'")
+    upgraded = open_index(storage)
+    assert upgraded.db.rebuilt_from is not None
+    upgraded.ensure_graph()
+    for owner_id in owners.values():
+        status = upgraded.status(owner_id)
+        assert status["index_status"] == "pending"
+        assert status["details"]["graph.edges"] == "indexed"
+        assert {status["details"][key] for key in ("fulltext.lexical", "fulltext.vector",
+                                                   "discovery.lexical", "discovery.vector")} == {"not_indexed"}
+
+    # 一项主题先被补齐时，另一项仍须有明确缺口，不能因图水位已存在而宣布完整。
+    upgraded.reconcile(owners["存储与检索"])
+    query = QueryService(storage, upgraded, lambda: BurrowlConfig())
+    missing = query.search(QueryRequest(question="虚拟环境", channels=["lexical"]))
+    assert not missing.items
+    assert any(g["owner_id"] == owners["虚拟环境"] and g["reason"] == "not_indexed" for g in missing.gaps)
+
+    recovered = upgraded.reconcile()
+    assert recovered["writes_to_memory"] == 0
+    for title, owner_id in owners.items():
+        assert upgraded.status(owner_id)["index_status"] == "indexed"
+        page = query.search(QueryRequest(question=title, channels=["lexical"]))
+        assert page.items and page.items[0].owner_id == owner_id
+        assert not page.gaps
+
+
+def test_disabled_vector_is_ready_only_without_model(sample_workspace):
+    """关键词可在无模型时完整使用；随后装上模型，旧 disabled 水位必须变为待补齐。"""
+    storage = Storage.open(sample_workspace)
+    index = IndexService.open(storage, IndexConfig())
+    index.reconcile()
+    assert index.status(OWNER)["index_status"] == "indexed"
+    assert index.status(OWNER)["details"]["fulltext.vector"] == "disabled"
+    with_model = open_index(storage)
+    assert with_model.status(OWNER)["index_status"] == "pending"
+    assert with_model.status(OWNER)["details"]["fulltext.vector"] == "stale"
+    with_model.reconcile()
+    assert with_model.status(OWNER)["index_status"] == "indexed"

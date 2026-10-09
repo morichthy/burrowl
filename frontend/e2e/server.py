@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT))
 from burrowl.app import App  # noqa: E402
 from burrowl.interfaces.api import create_api  # noqa: E402
 from burrowl.interfaces.ops.registry import Ctx, call  # noqa: E402
+from burrowl.services.memory.service import MemoryService  # noqa: E402
 from tests.service.helpers import narrative_draft, register_source, request  # noqa: E402
 
 TOKEN = "e2e"
@@ -41,6 +42,17 @@ def seed(base: Path) -> dict:
     call(agent, "config.update", {"expected_revision": current["revision"], "patch": {"connectors": [
         {"id": "vault", "type": "mdvault", "options": {"path": str(vault)},
          "publish": {"levels": ["L2", "L3", "L4"], "include_documents": False}}]}})
+    # 故障种子只在临时库：模拟旧内容已保存，但升级清空派生索引后尚未 reconcile。
+    # 使用没有 IndexSink 的记忆服务保存，避免更改真实数据库或伪造 HTTP 返回。
+    missing = app.storage.owners.create("research", "venv-demo", "虚拟环境验证")
+    MemoryService(app.storage).commit(request(missing.owner_id, None, {"op": "put_record", "client_key": "overview",
+        "draft": {"owner_id": missing.owner_id, "kind": "overview", "title": "虚拟环境验证概览",
+                  "body_markdown": "虚拟环境：隔离 Python 依赖，检查解释器与安装位置。",
+                  "record_reason": "检索故障回归种子", "sensitivity": "internal", "discovery": "workspace_summary", "sources": [],
+                  "provenance_gap": "端到端测试构造材料", "payload": {
+                      "question": "如何验证虚拟环境", "methods": ["检查解释器"], "results": ["依赖已隔离"],
+                      "current_stage": "完成", "limitations": ["测试构造"], "open_questions": [],
+                      "claims": [], "experience_refs": [], "process_refs": [], "technical_refs": []}}}))
     return {"data": str(data), "vault": str(vault), "session_id": session["session_id"], "owner_id": owner.owner_id}
 
 
