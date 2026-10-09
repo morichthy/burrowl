@@ -117,7 +117,7 @@ class RefResolver:
         for check in {canonical_hash(c): c for c in self.checks}.values():
             if check["kind"] == "head":
                 owner = fresh.index.get(check["owner_id"]).require_readable()
-                if self.storage.store.read_snapshot(owner).head != check["head"]:
+                if self.storage.store.read_head(owner).head != check["head"]:
                     raise BurrowlError("STALE_BASIS", "引用对象在提交期间发生变化", {"owner_id": check["owner_id"]})
             elif check["kind"] == "owner_access":
                 fresh.index.get(check["owner_id"]).require_readable()

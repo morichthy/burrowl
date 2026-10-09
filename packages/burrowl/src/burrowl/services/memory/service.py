@@ -349,7 +349,7 @@ class MemoryService:
         receipt = self.storage.store.commit(
             owner, expected_head=request["expected_head"], request_id=request["request_id"], request_hash=digest,
             prepare=prepare, prepublish=lambda: holder["resolver"].recheck(),
-            source_checks=lambda: deepcopy(holder["resolver"].checks))
+            source_checks=lambda: deepcopy(holder["resolver"].checks), attribution=request.get("attribution"))
         return self._with_index(receipt, notify=receipt["save_status"] == "committed")
 
     def _with_index(self, receipt: dict, *, notify: bool) -> dict:

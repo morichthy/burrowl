@@ -1,7 +1,7 @@
 ---
 name: burrowl-work
 description: 在研发工作区开展需要归属、留痕、复用或续接的工作时使用：选对象、续接上下文、导入已有资料、执行 Run、按 L0–L4 保存成果与交接。简单的源码/配置/状态检查不要使用。
-requires_tools: [memory_owners, memory_owner_create, memory_owner_adopt, memory_resume, memory_inspect, memory_records, memory_contract, memory_commit, runs_create, runs_execute, runs_register, runs_update, sources_register, sources_register_many, sources_add_root, sources_list, index_status, index_reconcile, relations_decide]
+requires_tools: [memory_owner_route, memory_owners, memory_owner_create, memory_owner_adopt, memory_resume, memory_inspect, memory_records, memory_contract, memory_commit, runs_create, runs_execute, runs_register, runs_update, sources_register, sources_register_many, sources_add_root, sources_list, index_status, index_reconcile, relations_decide]
 ---
 # 工作与记录
 
@@ -18,8 +18,9 @@ requires_tools: [memory_owners, memory_owner_create, memory_owner_adopt, memory_
 
 ## 步骤
 
-1. **定归属**：用 `memory_owners` 找候选，按 RULES 第 2 节决定沿用、引用或新建，理由写进工作清单。
-2. **续接**：持续任务先读工作清单，再用 `memory_resume`。它按 目标 → 检查点 → 概览/经过/技术单元 → 路线/问题/经验 的顺序给出固定材料，只读，不执行任何下一步。工作清单与新回执冲突时，以新回执为准并更新清单。
+0. **定档**：按 RULES 第 1 节判断是档 1 还是档 2。档 1 不做下面的第 1、2 步，结束时做沉淀检查，有内容才从第 1 步开始保存。
+1. **定归属**：用 `memory_owner_route` 取得候选和证据，按 RULES 第 2 节选出暂定对象（或新建），理由写进工作清单。需要浏览全部对象时用 `memory_owners`。
+2. **续接与确认**：持续任务先读工作清单，再用 `memory_resume` 完整阅读暂定对象；不相关就回到第 1 步换候选或新建（确认前不向暂定对象写入）。它按 目标 → 检查点 → 概览/经过/技术单元 → 路线/问题/经验 的顺序给出固定材料，只读，不执行任何下一步。工作清单与新回执冲突时，以新回执为准并更新清单。
 3. **维护工作清单**：位置、内容和更新时机见 RULES 第 5 节。
 4. **执行**：
    - 独立的执行建 Run：新 Python 脚本用 `runs_execute`，它会固定脚本和输入的指纹，捕获输出与日志，失败也完整登记；已有产物或其他工具的结果用 `runs_register`。
@@ -28,7 +29,7 @@ requires_tools: [memory_owners, memory_owner_create, memory_owner_adopt, memory_
    - 没有执行的分析直接写记录，不虚构 Run。
 5. **保存**：
    - 有用内容按 L0–L4 职责写草案，先调用 `memory_contract(kind)` 查字段和示例。
-   - 用 `memory_commit` 提交，可以先 `dry_run`。
+   - 用 `memory_commit` 提交，可以先 `dry_run`。本任务第一次往该对象保存时带 `attribution`（RULES 第 2 节）。
    - 新文件依据先 `sources_register`。
    - 保存顺序：先被引用的，再引用它的。
 6. **回读**：
@@ -45,7 +46,7 @@ requires_tools: [memory_owners, memory_owner_create, memory_owner_adopt, memory_
 
 用户给出资料路径、用途和授权范围时：
 
-1. 用 `memory_owners` 找已有对象。资料缺稳定身份时：
+1. 用 `memory_owner_route` 找已有对象（资料路径放进 `paths`）。资料缺稳定身份时：
    - 已有说明文档：用 `memory_owner_adopt` 采用（原文不改）；
    - 否则新建对象；
    - 公司核心算法要先核对文档依据。

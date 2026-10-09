@@ -191,6 +191,9 @@ textarea { width: 100%; min-height: 64px; line-height: 1.55; }
 .facts { display: grid; grid-template-columns: 100px 1fr; gap: 8px 14px; margin: 0; }
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; overflow-wrap: anywhere; }
+.activity { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
+.activity time { color: var(--muted); font-size: 12px; margin-right: 4px; }
+.activity a { overflow-wrap: anywhere; }
 
 .claims, .results, .owners, .problems, .sources { list-style: none; padding: 0; margin: 0; }
 .claims li, .results li { display: flex; gap: 12px; padding: 12px 4px; border-bottom: 1px solid var(--line); align-items: flex-start; }

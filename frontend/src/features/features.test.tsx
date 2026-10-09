@@ -52,12 +52,31 @@ describe("阅读会话列表刷新", () => {
     handlers["reading.list"] = () => (created ? [listedSession] : []);
     handlers["review.queue"] = () => ({ counts: {} });
     handlers["system.capabilities"] = () => ({ data_dir: "data", vector: { backend: "sqlite", embedder: null, ready: false }, reranker: { ready: false }, connectors: [] });
+    handlers["memory.activity"] = () => ({ items: [], next_before: null });
     vi.useFakeTimers();
     render(<Home />);
     await act(async () => Promise.resolve());
     created = true;
     await act(async () => vi.advanceTimersByTimeAsync(5_000));
     expect(screen.getByText("存储与检索演进讨论")).toBeInTheDocument();
+  });
+
+  it("首页列出最近关键操作并链接到来源", async () => {
+    handlers["reading.list"] = () => [];
+    handlers["review.queue"] = () => ({ counts: {} });
+    handlers["system.capabilities"] = () => ({ data_dir: "data", vector: { backend: "sqlite", embedder: null, ready: false }, reranker: { ready: false }, connectors: [] });
+    handlers["memory.activity"] = () => ({
+      items: [
+        { at: "2026-10-10T02:00:00Z", kind: "attribution", actor: "AI", owner_id: "RES-X", summary: "归属：新建 RES-X（放弃 RES-SUM）：目标不同", cursor: "c1", ref: { kind: "commit", owner_id: "RES-X", commit_id: "COM-1" } },
+        { at: "2026-10-10T01:00:00Z", kind: "publish", actor: "用户", owner_id: null, summary: "发布到 mdvault：新增 2", cursor: "c2", ref: { kind: "hub_run", connector_id: "mdvault", run_id: 1 } },
+      ],
+      next_before: null,
+    });
+    render(<Home />);
+    const link = await screen.findByText("归属：新建 RES-X（放弃 RES-SUM）：目标不同");
+    expect(link.closest("a")?.getAttribute("href")).toBe("#/memory/RES-X");
+    expect(screen.getByText("发布到 mdvault：新增 2").closest("a")?.getAttribute("href")).toBe("#/hub");
+    expect(calls.some((c) => c.name === "memory.activity" && c.args.limit === 20)).toBe(true);
   });
 
   it("阅读会话页在会话创建后自动更新列表", async () => {

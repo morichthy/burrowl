@@ -7,7 +7,7 @@ from typing import Annotated
 from pydantic import Field
 
 from ....core.config import ReviewFilter
-from ....services import exchange, render
+from ....services import activity, exchange, render
 from ..registry import Ctx, op
 
 
@@ -34,7 +34,8 @@ def hub_apply(ctx: Ctx, connector_id: str,
               plan_hash: Annotated[str, Field(description="hub.plan 返回的 plan_hash；数据变化后需重新预览")],
               force_wiki: Annotated[bool, Field(description="覆盖外部已被修改的 Wiki 页面")] = False) -> dict:
     """执行发布。逐条记录结果，单条失败不影响其他条目。"""
-    return ctx.app.hub.apply(connector_id, plan_hash, force_wiki=force_wiki)
+    result = ctx.app.hub.apply(connector_id, plan_hash, force_wiki=force_wiki)
+    return activity.with_activity(result, [activity.publish_line(connector_id, result.get("summary"))])
 
 
 @op("hub.status")

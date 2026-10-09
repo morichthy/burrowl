@@ -1966,6 +1966,97 @@
   }
  },
  {
+  "name": "memory.owner_route",
+  "group": "memory",
+  "effect": "read",
+  "summary": "归属判定（只读）：与 reading_start 第一轮相同的召回和筛选包，附上候选的当前目标、最新检查点与来源重叠证据。 只在需要读历史或需要保存时调用（简单问答、无复用价值的小任务不调用）。不给建议动作，由你判断： 选出暂定对象后用 memory_resume 完整阅读，确认是同一目标再第一次保存（memory_commit 带 attribution）； 不相关就换下一个候选或新建。gaps 有索引缺口时，不要因为\"没有候选\"就新建对象。不建立阅读会话。",
+  "input": {
+   "additionalProperties": false,
+   "description": "归属判定（只读）：与 reading_start 第一轮相同的召回和筛选包，附上候选的当前目标、最新检查点与来源重叠证据。",
+   "properties": {
+    "task": {
+     "description": "一两句话写清本次任务的目标和交付物，保留型号与数值原文",
+     "title": "Task",
+     "type": "string"
+    },
+    "variants": {
+     "anyOf": [
+      {
+       "items": {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "最多 2 条等义改写 [{language: zh|en, question, lexical_terms?}]，与 reading_start 相同",
+     "title": "Variants"
+    },
+    "protected_terms": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "必须原样出现的词（型号、编号）",
+     "title": "Protected Terms"
+    },
+    "paths": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "本次任务涉及的文件：绝对路径或 SRC- ID",
+     "title": "Paths"
+    },
+    "owner_hint": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "用户指定的对象 ID",
+     "title": "Owner Hint"
+    },
+    "limit": {
+     "default": 5,
+     "maximum": 10,
+     "minimum": 1,
+     "title": "Limit",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "task"
+   ],
+   "title": "memory_owner_route_input",
+   "type": "object"
+  }
+ },
+ {
   "name": "memory.owner_create",
   "group": "memory",
   "effect": "write",
@@ -2162,6 +2253,77 @@
   }
  },
  {
+  "name": "memory.activity",
+  "group": "memory",
+  "effect": "read",
+  "summary": "关键操作记录（只读，按时间倒序）：建立对象、归属确认、保存、复核、Run 结束、发布，每条一行，带可追溯的引用。 检索、阅读、来源登记等不改变资产的操作不在其中。",
+  "input": {
+   "additionalProperties": false,
+   "description": "关键操作记录（只读，按时间倒序）：建立对象、归属确认、保存、复核、Run 结束、发布，每条一行，带可追溯的引用。\n检索、阅读、来源登记等不改变资产的操作不在其中。",
+   "properties": {
+    "owner_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "只看这个对象（含其 Run）",
+     "title": "Owner Id"
+    },
+    "kinds": {
+     "anyOf": [
+      {
+       "items": {
+        "enum": [
+         "owner",
+         "attribution",
+         "save",
+         "review",
+         "run",
+         "publish"
+        ],
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "只看这些类型；默认全部",
+     "title": "Kinds"
+    },
+    "limit": {
+     "default": 50,
+     "maximum": 200,
+     "minimum": 1,
+     "title": "Limit",
+     "type": "integer"
+    },
+    "before": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "上一页返回的 next_before",
+     "title": "Before"
+    }
+   },
+   "title": "memory_activity_input",
+   "type": "object"
+  }
+ },
+ {
   "name": "memory.kinds",
   "group": "memory",
   "effect": "read",
@@ -2294,6 +2456,20 @@
      "default": false,
      "title": "Dry Run",
      "type": "boolean"
+    },
+    "attribution": {
+     "anyOf": [
+      {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "归属确认点（本任务第一次往该对象保存）时必填：{action: continue|create, decided_by: user|ai, reason, rejected?: [{owner_id, reason}]}；rejected 写完整阅读后放弃的对象。之后的保存不再填写",
+     "title": "Attribution"
     }
    },
    "required": [

@@ -6,7 +6,7 @@
 - 模块关系与变化影响只维护在 [ARCHITECTURE](../ARCHITECTURE.md)。
 - 术语见 [GLOSSARY](GLOSSARY.md)。
 
-核对日期：2026-10-09，依据当前工作树（含 R12 的 P0–P2）。相关实现变化时同步维护本页；当前没有自动同步文档的服务。
+核对日期：2026-10-10，依据当前工作树（含 R12 的 P0–P4 与 R13 的 P1–P2）。相关实现变化时同步维护本页；当前没有自动同步文档的服务。
 
 ## 功能块、定义与边界
 
@@ -54,7 +54,8 @@ AI 按任务选择 Skill：
     检索与完整阅读             → read
     阶段收口、来源变化、发布   → consolidate
 
-先找对象（沿用 / 引用 / 新建），维护一份 Markdown 工作清单
+先定投入档位（直接回答 / 一次性小任务 / 持续工作，见第 12 节）
+需要时判定归属（沿用 / 引用 / 新建），维护一份 Markdown 工作清单
 读取已有目标、检查点、概览和固定依据
     → 核对输入、方法、实际结果、失败和缺口
     → 区分事实、计算、推断、建议
@@ -280,3 +281,24 @@ wiki：外部被人修改（漂移）时不覆盖，除非显式 force
 ```
 
 实现：`storage/sources.py`、`portable/bundle.py`、`interfaces/cli.py`（`mcp-config`、`mcp`、`backup`、`restore`）与 `interfaces/agents.py`（Skill 安装与升级）。
+
+## 12. 投入分级、归属判定与关键操作记录
+
+```text
+定档：档 0 直接回答（不调用）| 档 1 一次性小任务（结束时沉淀检查，有内容才往下走）| 档 2 持续工作
+memory.owner_route(task, variants?, protected_terms?, paths?, owner_hint?)：只读
+    召回 + 筛选包 = ReadingService.preview（与 reading.start 第一轮同一实现，不建会话）
+    补充：前 limit 个候选的目标 objective、最新检查点 next_step；paths → 来源重叠 / 同目录
+          用户指定与有路径证据的对象即使不在召回前列也补入
+    → 候选与证据（不给建议动作）
+AI：选暂定对象 → memory.resume 完整阅读 → 同一目标：第一次 memory.commit 带 attribution（确认点）
+                                         → 不相关：换候选或新建（确认前不写入暂定对象）
+确认后放错：在正确对象重新保存并引用原记录，原结论 superseded 或建关联（consolidate Skill）
+关键操作记录 memory.activity：业务卡创建 | 回执 attribution | 提交（按层级计数一行）| 复核记录 |
+    Run 结束（ended_at）| 中枢执行记录 → 时间倒序归并、分页；写操作返回值附同样的一行摘要
+```
+
+- `attribution` 只存在提交回执里，进入请求指纹（同一 request_id 改了理由视为不同请求），不进记录内容指纹。
+- 关键操作记录不另存日志；受限记录不计入摘要；检索、阅读、归属判定调用、来源登记不在其中。
+
+实现：`services/routing.py`、`services/activity.py`、`services/reading/service.py`（`preview`、`screen`）、`storage/memory_store.py`（`read_head`、`commit_records`、`read_receipt`）。

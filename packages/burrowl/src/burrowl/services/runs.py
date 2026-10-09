@@ -28,6 +28,7 @@ from ..storage.owners import Owner
 from .memory.context import Storage
 
 STATUSES = ("planned", "running", "succeeded", "failed", "abandoned")
+FINISHED = {"succeeded", "failed", "abandoned"}
 
 
 def _json_bytes(value: Any) -> bytes:
@@ -97,7 +98,15 @@ class RunService:
             raise BurrowlError("INVALID_ARGUMENT", "只能修改：" + "、".join(sorted(allowed)))
         if "status" in fields and fields["status"] not in STATUSES:
             raise BurrowlError("INVALID_ARGUMENT", "未知 Run 状态", {"status": fields["status"]})
-        return self._mutate(run_id, lambda card: {**card, **deepcopy(fields)}, expected_sha256=expected_sha256)
+
+        def change(card: dict) -> dict:
+            after = {**card, **deepcopy(fields)}
+            # 手动标记结束时补记结束时间（R13：关键操作记录按 ended_at 排序；runs.execute 自己会写）
+            if after.get("status") in FINISHED and not after.get("ended_at"):
+                after["ended_at"] = utc_now()
+            return after
+
+        return self._mutate(run_id, change, expected_sha256=expected_sha256)
 
     # ---------- 材料登记 ----------
     def _entry(self, reference: str, role: str) -> dict:

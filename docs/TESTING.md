@@ -52,6 +52,11 @@
 - 工作根：工作目录内的来源自动归根；整体搬家必须指纹一致；备份带外部原件，恢复按映射/原位/默认目录重定向，冲突时不写任何文件（`tests/service/test_work_roots.py`）。
 - 来源内容变化后，引用它的结论显示依据失效。
 
+**归属判定与关键操作记录（R13）**
+
+- 归属候选与阅读会话第一轮的对象次序、筛选包一致；判定不读任何对象的全部记录（`tests/service/test_routing.py`）。
+- `attribution` 存进回执、参与幂等、结构校验；关键操作记录只列改变资产的操作、分页不重不漏、受限记录不外泄、读取操作不产生条目（`tests/service/test_activity.py`）。
+
 **记录契约与链接**
 
 - 契约只做增量：浮点样例全部记录的 content_hash、record_hash、结论指纹不变（`tests/service/test_links.py`）。

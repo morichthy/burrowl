@@ -159,7 +159,7 @@ class Reader:
             before, after = self.index.get(owner_id), fresh.find(owner_id)
             if after is None or after.fingerprint != before.fingerprint or not after.readable:
                 raise BurrowlError("STALE_BASIS", "读取期间对象登记发生变化", {"owner_id": owner_id})
-            if owner_id in self.states and self.storage.store.read_snapshot(after).head != self.states[owner_id].head:
+            if owner_id in self.states and self.storage.store.read_head(after).head != self.states[owner_id].head:
                 raise BurrowlError("STALE_BASIS", "读取期间对象有新提交", {"owner_id": owner_id})
         for ref, digest in self.file_checks.values():
             if sha256_file(self.storage.sources.resolve(ref["target_id"]).path) != digest:

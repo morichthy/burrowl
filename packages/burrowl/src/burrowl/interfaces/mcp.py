@@ -29,7 +29,8 @@ COMMON = """工作流说明（burrowl-work / burrowl-read / burrowl-consolidate 
 写记忆记录前读 recording，并用 memory_contract(kind) 查该类记录的字段与示例。
 用户查询某主题的相关知识、找已有经验，默认先 reading_start 建立可见阅读会话：简查用 strategy=quick，完整阅读用 standard。
 只有用户明确只要片段/候选列表，或直接查看已知源码、配置、开发状态时，才直接使用低层查询或读取工具。
-query_*、memory_owners、memory_resume 不会建立阅读会话，不会出现在工作台的当前阅读或阅读会话中。
+query_*、memory_owners、memory_owner_route、memory_resume 不会建立阅读会话，不会出现在工作台的当前阅读或阅读会话中。
+写操作返回 activity 行时，在回复末尾以"关键操作"为题原样逐行列出（不展开）。
 要点：候选不是已读正文；保存≠复核≠索引就绪；引用一律用固定版本（提交回执给出 fixed_ref）；
 AI 自查不能登记为已确认；全文补偿必须先 reading_ask_user 获得用户批准。"""
 
@@ -39,8 +40,12 @@ AUTO = """burrowl 已为本对话启用（{why}）：AI 研发工作区的版本
   需要引用时用 sources_register 登记其绝对路径（只记路径和指纹），记录里以 SRC- ID 引用。
 本对话中的研究、分析、实验、资料整理、方案讨论等实质工作，默认按工作流进行，不必等用户点名：
   续接或保存成果 → work；查找已有经验、阅读材料 → read；阶段收口、来源变化、复核整理 → consolidate。
-  开工前先查有没有可续接的对象（memory_owners / memory_resume），有用的中间成果主动保存。
-不进入工作流：简单问答、读源码/配置/命令状态、闲聊；修改 burrowl 框架本身的代码（那是 burrowl-dev-check）。
+按投入分档，取能完成任务的最低一档（规则第 1 节）：
+  档 0 简单问答、读源码/配置/命令状态、闲聊：不调用本服务的工具，不记录；
+  档 1 一次性小任务：开工不召回、不判定归属；结束时做沉淀检查，有可复用的内容才 memory_owner_route 后保存，否则不写；
+  档 2 持续工作（继续/续接、多步研究或实验、导入资料、用户要求留痕）：先 memory_owner_route 选出暂定对象，memory_resume 完整阅读，
+  确认是同一目标才第一次保存（带 attribution），不相关就换候选或新建；有用的中间成果主动保存。用户说"不用记"时按档 0/1 处理。
+修改 burrowl 框架本身的代码不进入工作流（那是 burrowl-dev-check）。
 """ + COMMON
 
 MANUAL = """burrowl：AI 研发工作区的版本化记忆、材料阅读、复核与知识中枢（{why}）。

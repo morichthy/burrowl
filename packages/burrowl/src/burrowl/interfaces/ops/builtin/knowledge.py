@@ -5,7 +5,7 @@ from typing import Annotated, Literal
 from pydantic import Field
 
 from ....core.errors import BurrowlError
-from ....services import relations
+from ....services import activity, relations
 from ....services.memory import associations, provenance
 from ..registry import Ctx, op
 
@@ -38,17 +38,17 @@ def review_submit(ctx: Ctx, target_claim_id: str, state: ReviewState,
                   dry_run: bool = False) -> dict:
     """复核一条结论。accepted 需要适用范围与支持性证据；superseded 需要替代结论。dry_run 只预检。
     成熟度与复核状态分开：可以在 not-reviewed 时登记 conjecture/preliminary；established 必须 accepted。"""
-    return ctx.app.review.submit({"target_claim_id": target_claim_id, "state": state, "reason": reason,
+    return activity.annotate(ctx.app.storage, ctx.app.review.submit({"target_claim_id": target_claim_id, "state": state, "reason": reason,
                                   "scope": scope, "evidence_refs": evidence_refs or [],
                                   "replacement_claim_id": replacement_claim_id, "actor": ctx.actor,
                                   "maturity": maturity, "evidence_basis": evidence_basis,
-                                  "requested_maturity": requested_maturity, "dry_run": dry_run})
+                                  "requested_maturity": requested_maturity, "dry_run": dry_run}))
 
 
 @op("review.batch", effect="write")
 def review_batch(ctx: Ctx, items: list[dict], dry_run: bool = False) -> dict:
     """批量复核（逐条串行；单条失败不影响其他）。每项字段同 review.submit。"""
-    return ctx.app.review.batch(items, actor=ctx.actor, dry_run=dry_run)
+    return activity.annotate(ctx.app.storage, ctx.app.review.batch(items, actor=ctx.actor, dry_run=dry_run))
 
 
 @op("review.history")
@@ -121,7 +121,7 @@ def association_decide(ctx: Ctx, owner_id: str, payload: Annotated[dict, Field(d
         reason: str, dry_run: bool = False) -> dict:
     """保存关联判断（candidate/accepted/rejected/withdrawn）；只能是导航关系。
     "A 会影响 B"这类可以验证的判断写成结论（inference），不要写成关联。"""
-    return associations.decide(ctx.app.memory, owner_id, payload, actor=ctx.actor, reason=reason, dry_run=dry_run)
+    return activity.annotate(ctx.app.storage, associations.decide(ctx.app.memory, owner_id, payload, actor=ctx.actor, reason=reason, dry_run=dry_run))
 
 
 @op("relations.candidates")
@@ -182,7 +182,7 @@ def maintenance_review(ctx: Ctx, plan_id: str, decisions: Annotated[list[dict], 
 @op("maintenance.apply", effect="write")
 def maintenance_apply(ctx: Ctx, plan_id: str, expected_revision: int) -> dict:
     """按对象逐个提交计划中的修订与撤回；可重试，部分完成会如实报告。"""
-    return ctx.app.maintenance.apply(plan_id, actor=ctx.actor, expected_revision=expected_revision)
+    return activity.annotate(ctx.app.storage, ctx.app.maintenance.apply(plan_id, actor=ctx.actor, expected_revision=expected_revision))
 
 
 @op("maintenance.status")
@@ -235,8 +235,9 @@ def run_register(ctx: Ctx, run_id: str, inputs: list[str] | None = None, artifac
 def run_execute(ctx: Ctx, run_id: str, script: str, inputs: list[str] | None = None, args: list[str] | None = None,
                 timeout_seconds: float = 3600, preview: bool = False) -> dict:
     """前台运行 Python 脚本并登记输入、输出与日志（失败也登记）。参数可用 {input0}、{output_dir} 占位。"""
-    return ctx.app.runs.execute(run_id, script=script, inputs=inputs or [], args=args or [],
-                                timeout_seconds=timeout_seconds, preview=preview)
+    result = ctx.app.runs.execute(run_id, script=script, inputs=inputs or [], args=args or [],
+                                  timeout_seconds=timeout_seconds, preview=preview)
+    return activity.with_activity(result, activity.run_lines(ctx.app.storage, run_id))
 
 
 @op("runs.update", effect="write")
@@ -245,7 +246,9 @@ def run_update(ctx: Ctx, run_id: str, fields: Annotated[dict, Field(description=
                expected_sha256: Annotated[str | None, Field(description=(
                    "读取时 run.json 的指纹（上次修改返回的 sha256）；不一致说明别人改过，拒绝覆盖"))] = None) -> dict:
     """修改 Run 的结论、限制、状态等（不改输入/产物登记）。"""
-    return ctx.app.runs.update(run_id, fields, expected_sha256=expected_sha256)
+    result = ctx.app.runs.update(run_id, fields, expected_sha256=expected_sha256)
+    changed = result.get("status") == "updated" and "status" in fields
+    return activity.with_activity(result, activity.run_lines(ctx.app.storage, run_id) if changed else [])
 
 
 @op("runs.rollback", effect="write")

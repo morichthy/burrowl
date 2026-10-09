@@ -966,6 +966,9 @@
        "type": "null"
       }
      ]
+    },
+    "attribution": {
+     "$ref": "#/$defs/Attribution"
     }
    },
    "required": [
@@ -1024,6 +1027,9 @@
     },
     "dry_run": {
      "type": "boolean"
+    },
+    "attribution": {
+     "$ref": "#/$defs/Attribution"
     }
    },
    "required": [
@@ -7950,6 +7956,54 @@
     "text",
     "ref",
     "status"
+   ],
+   "additionalProperties": false
+  },
+  "Attribution": {
+   "type": "object",
+   "properties": {
+    "action": {
+     "enum": [
+      "continue",
+      "create"
+     ]
+    },
+    "decided_by": {
+     "enum": [
+      "user",
+      "ai"
+     ]
+    },
+    "reason": {
+     "type": "string",
+     "minLength": 1
+    },
+    "rejected": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "properties": {
+       "owner_id": {
+        "type": "string",
+        "minLength": 1
+       },
+       "reason": {
+        "type": "string",
+        "minLength": 1
+       }
+      },
+      "required": [
+       "owner_id",
+       "reason"
+      ],
+      "additionalProperties": false
+     }
+    }
+   },
+   "required": [
+    "action",
+    "decided_by",
+    "reason"
    ],
    "additionalProperties": false
   }

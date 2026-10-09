@@ -633,6 +633,39 @@ export declare namespace MemoryOwners {
   }
 }
 
+export declare namespace MemoryOwnerRoute {
+  /**
+   * 归属判定（只读）：与 reading_start 第一轮相同的召回和筛选包，附上候选的当前目标、最新检查点与来源重叠证据。
+   */
+  export interface Args {
+    /**
+     * 一两句话写清本次任务的目标和交付物，保留型号与数值原文
+     */
+    task: string;
+    /**
+     * 最多 2 条等义改写 [{language: zh|en, question, lexical_terms?}]，与 reading_start 相同
+     */
+    variants?:
+      | {
+          [k: string]: unknown;
+        }[]
+      | null;
+    /**
+     * 必须原样出现的词（型号、编号）
+     */
+    protected_terms?: string[] | null;
+    /**
+     * 本次任务涉及的文件：绝对路径或 SRC- ID
+     */
+    paths?: string[] | null;
+    /**
+     * 用户指定的对象 ID
+     */
+    owner_hint?: string | null;
+    limit?: number;
+  }
+}
+
 export declare namespace MemoryOwnerCreate {
   /**
    * 新建对象（写入业务卡；首次提交记忆时才建立记忆目录）。Run 用 runs.create 建立。
@@ -683,6 +716,28 @@ export declare namespace MemoryRecords {
     main_only?: boolean;
     offset?: number;
     limit?: number;
+  }
+}
+
+export declare namespace MemoryActivity {
+  /**
+   * 关键操作记录（只读，按时间倒序）：建立对象、归属确认、保存、复核、Run 结束、发布，每条一行，带可追溯的引用。
+   * 检索、阅读、来源登记等不改变资产的操作不在其中。
+   */
+  export interface Args {
+    /**
+     * 只看这个对象（含其 Run）
+     */
+    owner_id?: string | null;
+    /**
+     * 只看这些类型；默认全部
+     */
+    kinds?: ("owner" | "attribution" | "save" | "review" | "run" | "publish")[] | null;
+    limit?: number;
+    /**
+     * 上一页返回的 next_before
+     */
+    before?: string | null;
   }
 }
 
@@ -743,6 +798,12 @@ export declare namespace MemoryCommit {
      */
     request_id?: string | null;
     dry_run?: boolean;
+    /**
+     * 归属确认点（本任务第一次往该对象保存）时必填：{action: continue|create, decided_by: user|ai, reason, rejected?: [{owner_id, reason}]}；rejected 写完整阅读后放弃的对象。之后的保存不再填写
+     */
+    attribution?: {
+      [k: string]: unknown;
+    } | null;
   }
 }
 
@@ -1641,9 +1702,11 @@ export interface OpArgs {
   "sources.relocate": SourcesRelocate.Args;
   "sources.update": SourcesUpdate.Args;
   "memory.owners": MemoryOwners.Args;
+  "memory.owner_route": MemoryOwnerRoute.Args;
   "memory.owner_create": MemoryOwnerCreate.Args;
   "memory.owner_adopt": MemoryOwnerAdopt.Args;
   "memory.records": MemoryRecords.Args;
+  "memory.activity": MemoryActivity.Args;
   "memory.kinds": MemoryKinds.Args;
   "memory.contract": MemoryContract.Args;
   "memory.inspect": MemoryInspect.Args;
@@ -1757,9 +1820,11 @@ export const OP_EFFECTS: Record<OpName, string> = {
   "sources.relocate": "write",
   "sources.update": "user",
   "memory.owners": "read",
+  "memory.owner_route": "read",
   "memory.owner_create": "write",
   "memory.owner_adopt": "write",
   "memory.records": "read",
+  "memory.activity": "read",
   "memory.kinds": "read",
   "memory.contract": "read",
   "memory.inspect": "read",

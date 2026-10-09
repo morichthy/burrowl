@@ -52,7 +52,8 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 
 | 操作 | 类型 | 说明 | 参数 |
 |---|---|---|---|
-| `memory.commit` | 写入 | 保存一批记录（同一对象内原子提交）。dry_run=true 只预检不写入。 | `owner_id`*: string，`operations`*: array，`expected_head`*: string|null，`request_id`: string|null，`dry_run`: boolean |
+| `memory.activity` | 只读 | 关键操作记录（只读，按时间倒序）：建立对象、归属确认、保存、复核、Run 结束、发布，每条一行，带可追溯的引用。 检索、阅读、来源登记等不改变资产的操作不在其中。 | `owner_id`: string|null，`kinds`: array|null，`limit`: integer，`before`: string|null |
+| `memory.commit` | 写入 | 保存一批记录（同一对象内原子提交）。dry_run=true 只预检不写入。 | `owner_id`*: string，`operations`*: array，`expected_head`*: string|null，`request_id`: string|null，`dry_run`: boolean，`attribution`: object|null |
 | `memory.consolidate_apply` | 写入 | 保存巩固处置（retain/revise/retract/defer…），可与本批实际修订一起提交。 | `owner_id`*: string，`basis`*: object，`decisions`*: array，`reason`*: string，`operations`: array|null，`dry_run`: boolean |
 | `memory.consolidate_prepare` | 只读 | 阶段巩固的待处理清单：自上次巩固以来的变化、受影响下游与合并/冲突候选。 | `owner_id`*: string，`since_commit`: string|null |
 | `memory.contract` | 只读 | 某类记录的草案契约：必填字段、payload 结构、写作要点和一份经校验的示例草案。写草案前先调用。 | `kind`*: string |
@@ -64,6 +65,7 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | `memory.kinds` | 只读 | 全部记录类型：层级、版本、由哪个操作写入、一句话用途。 | 无 |
 | `memory.owner_adopt` | 写入 | 把内容树中已有的文档登记为对象（原件不修改；须给出你看到的字节指纹）。 | `path`*: string，`expected_sha256`*: string |
 | `memory.owner_create` | 写入 | 新建对象（写入业务卡；首次提交记忆时才建立记忆目录）。Run 用 runs.create 建立。 先用 memory.owners 查找：同一目标的继续或子任务沿用已有对象；主题相似只引用；独立交付目标才新建。 core-algorithm 只用于公司文档定义的关键算法，普通脚本/模块/工具不要建算法卡。 knowledge 用于全库唯一的概念库（建好后把 owner_id 填进配置 graph.concept_owner_id）。 | `owner_type`*: string，`slug`*: string，`title`*: string，`description`: string，`keywords`: array|null，`source_document`: string|null，`short_name`: string|null，`sensitivity`: string |
+| `memory.owner_route` | 只读 | 归属判定（只读）：与 reading_start 第一轮相同的召回和筛选包，附上候选的当前目标、最新检查点与来源重叠证据。 只在需要读历史或需要保存时调用（简单问答、无复用价值的小任务不调用）。不给建议动作，由你判断： 选出暂定对象后用 memory_resume 完整阅读，确认是同一目标再第一次保存（memory_commit 带 attribution）； 不相关就换下一个候选或新建。gaps 有索引缺口时，不要因为"没有候选"就新建对象。不建立阅读会话。 | `task`*: string，`variants`: array|null，`protected_terms`: array|null，`paths`: array|null，`owner_hint`: string|null，`limit`: integer |
 | `memory.owners` | 只读 | 列出可读对象（按类型分组，带各层记录数）。 | `owner_types`: array|null，`query`: string |
 | `memory.raw_material` | 只读 | 回读一个原始材料（按清单中的 ID；核对固定字节）。 | `owner_id`*: string，`material_id`*: string，`max_chars`: integer |
 | `memory.raw_materials` | 只读 | L0 原始材料清单（不读原件正文）。 | `owner_id`*: string |

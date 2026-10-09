@@ -87,6 +87,15 @@ requires_tools: [memory_inspect, memory_document, memory_timeline, memory_contra
   - source_refs 写固定引用。
 - 随第 9 步发布。外部被人改过的页面不会被覆盖。
 
+## 归属纠错
+
+确认归属（RULES 第 2 节）之后才发现一些记录放错了对象。一次提交只属于一个对象，不能撤销，也不能把记录跨对象搬走：
+
+1. 在正确的对象里重新保存这些内容：新记录要脱离上下文也能读懂，`sources` 引用原记录的固定版本（relation=references）。这是本任务第一次往该对象保存时，带 `attribution`，`reason` 写明"从某对象纠错迁入"。
+2. 原记录里的结论用 `review_submit(state=superseded)` 指向新结论；没有结论的记录用 `relations_decide` 建关联，说明内容已迁到哪里。
+3. 原对象的概览、文稿如果引用了这些记录，按上面的步骤修订。
+4. 不删除原记录。
+
 ## 跨对象总结
 
 需要把多个对象的成果汇总成一条 L3/L4 时：

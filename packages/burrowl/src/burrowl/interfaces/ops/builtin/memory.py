@@ -6,7 +6,7 @@ from pydantic import Field
 
 from ....core import contract as record_contract
 from ....core.errors import BurrowlError
-from ....services import workflow
+from ....services import activity, routing, workflow
 from ....services.memory import consolidation, documents, export, history, raw_materials, structure
 from ....storage import recovery
 from ..registry import Ctx, op
@@ -19,6 +19,24 @@ DocType = Literal["research_process", "research_report"]
 def owners(ctx: Ctx, owner_types: list[str] | None = None, query: str = "") -> dict:
     """列出可读对象（按类型分组，带各层记录数）。"""
     return structure.owners(ctx.app.storage, owner_types=owner_types, query=query)
+
+
+@op("memory.owner_route")
+def owner_route(ctx: Ctx,
+                task: Annotated[str, Field(description="一两句话写清本次任务的目标和交付物，保留型号与数值原文")],
+                variants: Annotated[list[dict] | None, Field(description=(
+                    "最多 2 条等义改写 [{language: zh|en, question, lexical_terms?}]，与 reading_start 相同"))] = None,
+                protected_terms: Annotated[list[str] | None, Field(description="必须原样出现的词（型号、编号）")] = None,
+                paths: Annotated[list[str] | None, Field(description="本次任务涉及的文件：绝对路径或 SRC- ID")] = None,
+                owner_hint: Annotated[str | None, Field(description="用户指定的对象 ID")] = None,
+                limit: Annotated[int, Field(ge=1, le=10)] = 5) -> dict:
+    """归属判定（只读）：与 reading_start 第一轮相同的召回和筛选包，附上候选的当前目标、最新检查点与来源重叠证据。
+
+    只在需要读历史或需要保存时调用（简单问答、无复用价值的小任务不调用）。不给建议动作，由你判断：
+    选出暂定对象后用 memory_resume 完整阅读，确认是同一目标再第一次保存（memory_commit 带 attribution）；
+    不相关就换下一个候选或新建。gaps 有索引缺口时，不要因为"没有候选"就新建对象。不建立阅读会话。"""
+    return routing.route(ctx.app.storage, ctx.app.index, ctx.app.reading, task=task, variants=variants,
+                         protected_terms=protected_terms, paths=paths, owner_hint=owner_hint, limit=limit)
 
 
 @op("memory.owner_create", effect="write")
@@ -41,13 +59,15 @@ def owner_create(ctx: Ctx, owner_type: Literal["research", "project", "core-algo
         fields["source_document"] = source_document
     if short_name:
         fields["short_name"] = short_name
-    return ctx.app.storage.owners.create(owner_type, slug, title, fields).summary()
+    owner = ctx.app.storage.owners.create(owner_type, slug, title, fields)
+    return activity.with_activity(owner.summary(), [activity.owner_line(owner)])
 
 
 @op("memory.owner_adopt", effect="write")
 def owner_adopt(ctx: Ctx, path: str, expected_sha256: str) -> dict:
     """把内容树中已有的文档登记为对象（原件不修改；须给出你看到的字节指纹）。"""
-    return ctx.app.storage.owners.adopt(path, expected_sha256, ctx.actor).summary()
+    owner = ctx.app.storage.owners.adopt(path, expected_sha256, ctx.actor)
+    return activity.with_activity(owner.summary(), [activity.owner_line(owner, adopted=True)])
 
 
 @op("memory.records")
@@ -56,6 +76,18 @@ def records(ctx: Ctx, owner_id: OwnerId, levels: list[str] | None = None, kinds:
     """对象内的记录目录（按层级，分页；不含正文）。kinds 按类型筛选，query 匹配标题或 ID；kind_counts 是类型筛选前的计数。"""
     return structure.records(ctx.app.storage, owner_id, levels=levels, kinds=kinds, query=query, main_only=main_only,
                              offset=offset, limit=limit)
+
+
+@op("memory.activity")
+def activity_list(ctx: Ctx, owner_id: Annotated[str | None, Field(description="只看这个对象（含其 Run）")] = None,
+                  kinds: Annotated[list[Literal["owner", "attribution", "save", "review", "run", "publish"]] | None,
+                                   Field(description="只看这些类型；默认全部")] = None,
+                  limit: Annotated[int, Field(ge=1, le=200)] = 50,
+                  before: Annotated[str | None, Field(description="上一页返回的 next_before")] = None) -> dict:
+    """关键操作记录（只读，按时间倒序）：建立对象、归属确认、保存、复核、Run 结束、发布，每条一行，带可追溯的引用。
+    检索、阅读、来源登记等不改变资产的操作不在其中。"""
+    return activity.ActivityLog(ctx.app.storage, ctx.app.hub.state).list(owner_id=owner_id, kinds=kinds,
+                                                                       limit=limit, before=before)
 
 
 @op("memory.kinds")
@@ -83,11 +115,17 @@ def commit(ctx: Ctx, owner_id: OwnerId,
                "expected_revision, draft}。draft 的字段与示例用 memory.contract(kind) 查询；批内引用可写 {client_key: 'x'}"))],
            expected_head: Annotated[str | None, Field(description="提交前看到的 HEAD commit_id；新对象为 null")],
            request_id: Annotated[str | None, Field(description="UUID；重试时用同一个保证幂等")] = None,
-           dry_run: bool = False) -> dict:
+           dry_run: bool = False,
+           attribution: Annotated[dict[str, Any] | None, Field(description=(
+               "归属确认点（本任务第一次往该对象保存）时必填："
+               "{action: continue|create, decided_by: user|ai, reason, rejected?: [{owner_id, reason}]}；"
+               "rejected 写完整阅读后放弃的对象。之后的保存不再填写"))] = None) -> dict:
     """保存一批记录（同一对象内原子提交）。dry_run=true 只预检不写入。"""
-    return ctx.app.memory.commit({"schema_version": 3, "request_id": request_id or str(uuid.uuid4()),
-                                  "actor": ctx.actor, "owner_id": owner_id, "expected_head": expected_head,
-                                  "operations": operations, "dry_run": dry_run})
+    request = {"schema_version": 3, "request_id": request_id or str(uuid.uuid4()), "actor": ctx.actor,
+               "owner_id": owner_id, "expected_head": expected_head, "operations": operations, "dry_run": dry_run}
+    if attribution is not None:
+        request["attribution"] = attribution
+    return activity.annotate(ctx.app.storage, ctx.app.memory.commit(request))
 
 
 @op("memory.document")
@@ -157,8 +195,8 @@ def consolidate_prepare(ctx: Ctx, owner_id: OwnerId, since_commit: str | None = 
 def consolidate_apply(ctx: Ctx, owner_id: OwnerId, basis: dict, decisions: list[dict], reason: str,
                       operations: list[dict] | None = None, dry_run: bool = False) -> dict:
     """保存巩固处置（retain/revise/retract/defer…），可与本批实际修订一起提交。"""
-    return consolidation.apply(ctx.app.memory, owner_id, basis, decisions, actor=ctx.actor, reason=reason,
-                               operations=operations, dry_run=dry_run)
+    return activity.annotate(ctx.app.storage, consolidation.apply(ctx.app.memory, owner_id, basis, decisions, actor=ctx.actor, reason=reason,
+                               operations=operations, dry_run=dry_run))
 
 
 @op("memory.summary_materials")
@@ -171,8 +209,8 @@ def summary_materials(ctx: Ctx, owner_ids: list[str], exclude_ids: list[str] | N
 def summary_save(ctx: Ctx, owner_id: OwnerId, draft: dict, basis_heads: dict[str, str | None],
                  record_id: str | None = None, expected_revision: int | None = None, dry_run: bool = False) -> dict:
     """把写好的总结保存为本对象的 L3/L4；依据对象有新提交则拒绝。"""
-    return workflow.save_summary(ctx.app.memory, owner_id, draft, actor=ctx.actor, basis_heads=basis_heads,
-                                 record_id=record_id, expected_revision=expected_revision, dry_run=dry_run)
+    return activity.annotate(ctx.app.storage, workflow.save_summary(ctx.app.memory, owner_id, draft, actor=ctx.actor, basis_heads=basis_heads,
+                                 record_id=record_id, expected_revision=expected_revision, dry_run=dry_run))
 
 
 @op("memory.feedback", effect="write")

@@ -117,7 +117,7 @@ class ReadingService:
         owner = self.storage.owners.scan().find(owner_id)
         if owner is None or not owner.readable or not owner.persisted:
             return None
-        return self.storage.store.read_snapshot(owner).commit_id
+        return self.storage.store.read_head(owner).commit_id
 
     def _heads(self, session: dict) -> dict[str, str | None]:
         return {o: self._head(o) for o, s in session["owners"].items() if s.get("note")}
@@ -133,30 +133,47 @@ class ReadingService:
             raise BurrowlError("BUDGET_EXCEEDED", "本会话的召回预算已用完（可在设置中调高阅读预算后新开会话）",
                            {"exhausted": over, "consumed": used, "limits": {k: limits[k] for k in over}})
 
+    def screen(self, plan: dict, *, corpus: str = "discovery", owner_ids: list[str] | None = None,
+               review_filter: str, exclude: set[str] | frozenset = frozenset(), screening_cfg: dict, reranking: str,
+               conditions: list[dict] | None = None) -> dict:
+        """一轮召回 + 筛选包，不读写会话。阅读会话的每一轮与归属判定（R13 D-03）共用这一个实现。"""
+        started = time.monotonic()
+        owners, gaps = screening.recall(self.index, plan, corpus=corpus, owner_ids=owner_ids,
+                                        review_filter=review_filter, exclude=set(exclude),
+                                        graph_route=self.config().index.graph_route)
+        packets, diagnostics = screening.packets(self.index, plan, owners, regular=screening_cfg["regular_windows"],
+                                                 maximum=screening_cfg["max_windows"], reranking=reranking,
+                                                 reranker_path=self.reranker_dir, conditions=conditions)
+        ordered = sorted((o["owner_id"] for o in owners), key=lambda o: screening.condition_rank(packets[o]))
+        return {"owners": ordered, "packets": packets, "gaps": gaps, "diagnostics": diagnostics,
+                "cost": {"candidates": len(owners), "rerank_items": diagnostics.get("rerank_items", 0),
+                         "wall_ms": round((time.monotonic() - started) * 1000)}}
+
+    def preview(self, question: str, *, variants: list[dict] | None = None,
+                protected_terms: list[str] | None = None, domains: list[str] | None = None) -> dict:
+        """按工作区阅读配置做一次与 reading.start 第一轮相同的发现召回和筛选，不建立会话。"""
+        cfg = self.config().reading
+        plan = self._plan(question, variants=variants, protected_terms=protected_terms, domains=domains)
+        return {"plan_id": plan["plan_id"]} | self.screen(
+            plan, review_filter=cfg.review_filter, screening_cfg=cfg.screening.model_dump(),
+            reranking=cfg.reranking.mode)
+
     def _round(self, session: dict, plan: dict, kind: str, *, corpus: str = "discovery") -> dict:
         """执行一轮召回，把新对象加入队列并生成筛选包（在会话锁外计算）。"""
-        started = time.monotonic()
-        owner_scope = session.get("scope_owner_ids")
-        owners, gaps = screening.recall(self.index, plan, corpus=corpus, owner_ids=owner_scope,
-                                        review_filter=session["review_filter"], exclude=set(session["owners"]),
-                                        graph_route=self.config().index.graph_route)
-        cfg = session["screening"]
-        packets, diagnostics = screening.packets(self.index, plan, owners, regular=cfg["regular_windows"],
-                                                 maximum=cfg["max_windows"], reranking=session["reranking"],
-                                                 reranker_path=self.reranker_dir,
-                                                 conditions=session.get("field_conditions") or None)
-        ordered = sorted((o["owner_id"] for o in owners), key=lambda o: screening.condition_rank(packets[o]))
+        result = self.screen(plan, corpus=corpus, owner_ids=session.get("scope_owner_ids"),
+                             review_filter=session["review_filter"], exclude=set(session["owners"]),
+                             screening_cfg=session["screening"], reranking=session["reranking"],
+                             conditions=session.get("field_conditions") or None)
+        gaps = result["gaps"]
         if kind == "discovery":
             # 发现召回不可用、不完整或不足时，才允许向用户申请全文补偿
             reasons = [g.get("code", "GAP") for g in gaps] + (
-                ["FEW_RESULTS"] if len(owners) < session["screening"]["batch_owners"] else [])
+                ["FEW_RESULTS"] if result["cost"]["candidates"] < session["screening"]["batch_owners"] else [])
         else:
             reasons = []
         return {"id": f"R{len(session['rounds']) + 1}", "kind": kind, "plan_id": plan["plan_id"], "corpus": corpus,
-                "at": utc_now(), "owners": ordered, "packets": packets, "gaps": gaps,
-                "fulltext_reasons": reasons, "diagnostics": diagnostics,
-                "cost": {"candidates": len(owners), "rerank_items": diagnostics.get("rerank_items", 0),
-                         "wall_ms": round((time.monotonic() - started) * 1000)}}
+                "at": utc_now(), "owners": result["owners"], "packets": result["packets"], "gaps": gaps,
+                "fulltext_reasons": reasons, "diagnostics": result["diagnostics"], "cost": result["cost"]}
 
     @staticmethod
     def _apply_round(session: dict, round_: dict) -> None:

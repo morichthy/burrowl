@@ -73,6 +73,22 @@ class MemoryStore:
         scope.recheck()
         return Snapshot(head, manifest, records)
 
+    def read_head(self, owner: Owner, pointers: tuple[str, ...] = ()) -> Snapshot:
+        """只读 HEAD 与提交清单，外加 pointers 指定的指针记录（如 goal、checkpoint）。
+
+        R13 D-07：判断水位新鲜度、列出续接线索时不需要全部记录；read_snapshot 会读入并校验每一条记录，
+        成本随记录总数增长。返回的 Snapshot.records 只含请求的指针记录，不能当作完整快照使用。"""
+        scope = ReadScope()
+        head, manifest = self._head(owner, scope)
+        records: dict[str, dict] = {}
+        for kind in pointers if manifest else ():
+            ref = manifest.get("pointers", {}).get(kind)
+            entry = manifest["record_heads"].get(ref["record_id"]) if ref else None
+            if entry is not None:
+                records[ref["record_id"]] = self._record(owner, ref["record_id"], entry, scope)
+        scope.recheck()
+        return Snapshot(head, manifest, records)
+
     def _head(self, owner: Owner, scope: ReadScope) -> tuple[dict | None, dict | None]:
         """HEAD 与其提交清单（不读记录正文）。"""
         head_path = self.path(owner, "HEAD.json", scope)
@@ -127,6 +143,17 @@ class MemoryStore:
             parent = manifest["parent_commit_id"]
             manifest = self._manifest(owner, parent, manifest["parent_manifest_hash"], scope) if parent else None
 
+    def commit_records(self, owner: Owner, manifest: dict) -> list[dict]:
+        """某次提交写入的记录（manifest.changed_ids 在该提交中的修订）。供历史类派生视图逐提交读取。"""
+        scope = ReadScope()
+        records = [self._record(owner, rid, manifest["record_heads"][rid], scope)
+                   for rid in manifest.get("changed_ids", []) if rid in manifest["record_heads"]]
+        scope.recheck()
+        return records
+
+    def read_receipt(self, owner: Owner, commit_id: str) -> dict:
+        return read_json(self.path(owner, f"commits/{safe_segment(commit_id)}/receipt.json"))
+
     def read_record(self, owner: Owner, record_id: str, revision: int | None = None) -> dict:
         """读取当前或指定修订；旧修订沿提交链查找（同一次查找复用目录枚举，返回前统一复核父目录）。"""
         scope = ReadScope()
@@ -177,7 +204,7 @@ class MemoryStore:
     # ---------- 写入 ----------
     def commit(self, owner: Owner, *, expected_head: str | None, request_id: str, request_hash: str,
                prepare: Prepare, prepublish: Callable[[], None] = lambda: None,
-               source_checks: Callable[[], list] = list) -> dict:
+               source_checks: Callable[[], list] = list, attribution: dict | None = None) -> dict:
         """持锁后：幂等检查 → HEAD 比较 → prepare → 暂存回读 → 改名 → 原子替换 HEAD。
 
         prepare 在锁内运行，必须是纯计算（不调用模型、网络或子进程）。
@@ -201,6 +228,8 @@ class MemoryStore:
                        "generation": generation, "save_status": "committed" if changed else "no_change",
                        "record_results": [{**r, "status": {"would_create": "created", "would_update": "updated"}
                                            .get(r["status"], r["status"])} for r in results]}
+            if attribution is not None:  # R13 D-06：归属确认点的说明随本次提交的回执保存
+                receipt["attribution"] = deepcopy(attribution)
             prepublish()
             if not changed:
                 self._write_no_change(owner, request_id, request_hash, receipt)

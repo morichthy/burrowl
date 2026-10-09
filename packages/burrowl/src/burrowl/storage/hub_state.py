@@ -97,6 +97,13 @@ class HubState:
             db.execute("UPDATE runs SET finished_at=?, summary=? WHERE run_id=?",
                        (utc_now(), json.dumps(summary, ensure_ascii=False), run_id))
 
+    def finished_runs(self, limit: int = 200) -> list[dict]:
+        """所有连接器已结束的执行记录，按结束时间倒序（关键操作记录用）。"""
+        with self.connect() as db:
+            rows = db.execute("SELECT * FROM runs WHERE finished_at IS NOT NULL ORDER BY finished_at DESC LIMIT ?",
+                              (limit,)).fetchall()
+        return [{**dict(r), "summary": json.loads(r["summary"]) if r["summary"] else None} for r in rows]
+
     def runs(self, connector_id: str, limit: int = 10) -> list[dict]:
         with self.connect() as db:
             rows = db.execute("SELECT * FROM runs WHERE connector_id=? ORDER BY run_id DESC LIMIT ?",

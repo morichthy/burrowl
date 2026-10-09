@@ -76,7 +76,7 @@ class IndexService:
 
     def status(self, owner_id: str) -> dict[str, Any]:
         owner = self.storage.owners.scan().find(owner_id)
-        head = self.storage.store.read_snapshot(owner).head if owner and owner.persisted else None
+        head = self.storage.store.read_head(owner).head if owner and owner.persisted else None
         states = {(s["corpus"], s["channel"]): s for s in self.db.states([owner_id])}
         details = {}
         ready = True
@@ -133,7 +133,7 @@ class IndexService:
                 if owner.owner_id in states:
                     self.db.drop_owner(owner.owner_id)
                 continue
-            head = self.storage.store.read_snapshot(owner).head if owner.persisted else None
+            head = self.storage.store.read_head(owner).head if owner.persisted else None
             state = states.get(owner.owner_id)
             if state and self._fresh(state, owner, head):
                 continue
@@ -223,7 +223,7 @@ class IndexService:
         targets = [index.get(owner_id)] if owner_id else index.owners
         results = []
         for owner in targets:
-            head = self.storage.store.read_snapshot(owner).head if owner.persisted else None
+            head = self.storage.store.read_head(owner).head if owner.persisted else None
             states = self.db.states([owner.owner_id])
             fresh = states and all(self._fresh(s, owner, head) or self._disabled_ok(s) for s in states)
             if force or not fresh or not REQUIRED_STATES <= {(s["corpus"], s["channel"]) for s in states}:
@@ -361,9 +361,20 @@ class IndexService:
         return ready, gaps
 
     # ---------- 检索 ----------
-    def ready_owners(self, corpus: Corpus, channel: Literal["lexical", "vector"],
-                     owner_ids: list[str] | None = None) -> tuple[list[str], list[dict]]:
-        """返回 (可检索的对象, 缺口)。只有水位与当前 HEAD 一致的对象才参与该通道。"""
+    def heads(self, owner_ids: list[str] | None = None) -> dict[str, dict | None]:
+        """可读对象的当前 HEAD（只读 HEAD 与提交清单）。同一请求内多次判断就绪时传给 ready_owners 复用。"""
+        index = self.storage.owners.scan()
+        owners = [index.get(o) for o in owner_ids] if owner_ids else index.readable()
+        return {o.owner_id: self.storage.store.read_head(o).head if o.persisted else None
+                for o in owners if o.readable}
+
+    def ready_owners(self, corpus: Corpus | Literal["graph"], channel: Literal["lexical", "vector", "edges"],
+                     owner_ids: list[str] | None = None,
+                     heads: dict[str, dict | None] | None = None) -> tuple[list[str], list[dict]]:
+        """返回 (可检索的对象, 缺口)。只有水位与当前 HEAD 一致的对象才参与该通道。
+
+        heads：调用方在同一请求内已读的 HEAD（见 heads()）；缺少的对象照常读取。
+        corpus="graph", channel="edges" 判断图投影是否新鲜（R13 归属判定用来源重叠时需要）。"""
         if corpus == "source":
             return self._ready_sources(channel, owner_ids)
         index = self.storage.owners.scan()
@@ -374,7 +385,10 @@ class IndexService:
             if not owner.readable:
                 gaps.append({"owner_id": owner.owner_id, "channel": channel, "reason": "access_denied"})
                 continue
-            head = self.storage.store.read_snapshot(owner).head if owner.persisted else None
+            if heads is not None and owner.owner_id in heads:
+                head = heads[owner.owner_id]
+            else:
+                head = self.storage.store.read_head(owner).head if owner.persisted else None
             state = states.get(owner.owner_id)
             if state and self._fresh(state, owner, head):
                 ready.append(owner.owner_id)
@@ -419,7 +433,8 @@ class IndexService:
                     explicit_owners: bool | None = None,
                     channels: tuple[Channel, ...] = ("identity", "lexical", "dense"),
                     graph_route: GraphRoute | None = None, graph_limits: tuple[int, int] | None = None,
-                    hub_hits: list[dict] | None = None, hub_weight: float = 0.5) -> dict:
+                    hub_hits: list[dict] | None = None, hub_weight: float = 0.5,
+                    heads: dict[str, dict | None] | None = None) -> dict:
         """按冻结的查询计划并行执行各路线并融合。按 Owner 汇总时每个信号族只投一票。
 
         explicit_owners：调用方是否"显式指定了对象"（决定 owner_only 记录是否可见）；
@@ -428,6 +443,7 @@ class IndexService:
         graph_limits：(最多节点数, 最多边数)，来自调用方的预算；达到上限即停止扩展并在 gaps 中报告。
         hub_hits：中枢路线（R12 T-P4.2）的外部命中（按外部名次排列，含 record_id）；映射回当前投影中通过同样过滤的
         记录级条目后作为一路参与融合。对不上本地的命中不进入融合（调用方作为 external_only 提示）。
+        heads：调用方已读的 HEAD（见 heads()）；未给出时本次只读一遍，供关键词与向量两个通道的就绪判断共用。
         """
         if review_filter not in REVIEW_FILTERS:
             raise BurrowlError("INVALID_ARGUMENT", "未知的复核过滤", {"review_filter": review_filter})
@@ -435,10 +451,12 @@ class IndexService:
         common = {"levels": levels, "kinds": kinds, "review": REVIEW_FILTERS[review_filter],
                   "explicit_owners": explicit}
         dense = dense and "dense" in channels
-        lexical_owners, gaps = self.ready_owners(corpus, "lexical", owner_ids)
+        if heads is None and corpus != "source":
+            heads = self.heads(owner_ids)
+        lexical_owners, gaps = self.ready_owners(corpus, "lexical", owner_ids, heads)
         vector_owners: list[str] = []
         if dense and self.db.embedder is not None:
-            vector_owners, vector_gaps = self.ready_owners(corpus, "vector", owner_ids)
+            vector_owners, vector_gaps = self.ready_owners(corpus, "vector", owner_ids, heads)
             gaps = gaps + vector_gaps
         elif dense:
             gaps = gaps + [{"channel": "dense", "reason": "embedder_unavailable"}]
