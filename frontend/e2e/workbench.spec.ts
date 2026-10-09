@@ -19,6 +19,56 @@ async function op(request: APIRequestContext, name: string, args: object) {
 
 test.describe.configure({ mode: "serial" });
 
+test("关系图筛选：分类不重复，节点可见性、空选与保存重载一致", async ({ page, request }) => {
+  await page.goto("#/relations");
+  const types = page.getByRole("group", { name: "节点类型" });
+  const kinds = page.getByRole("group", { name: "记录分类" });
+  await expect(types.getByRole("checkbox")).toHaveCount(6);
+  await expect(kinds.getByRole("checkbox")).toHaveCount(7);
+  await expect(types.getByRole("checkbox", { name: "内容块（L1）" })).not.toBeChecked();
+  await expect(page.getByText("记录分类仅筛选记录，其他节点由节点类型控制。")).toBeVisible();
+  await page.screenshot({ path: "test-results/relations-filters.png", fullPage: true });
+
+  // 浏览器请求走真实服务；检查分类只限制记录，结论仍保留导航上下文。
+  const [classified] = await Promise.all([
+    page.waitForResponse((response) => response.url().endsWith("/relations.graph") && response.request().postDataJSON().kinds?.includes("experience")),
+    kinds.getByRole("checkbox", { name: "经验（L3）" }).check(),
+  ]);
+  const classifiedNodes = (await classified.json()).nodes as { type: string; kind: string }[];
+  expect(classifiedNodes.some((node) => node.type === "claim")).toBeTruthy();
+  expect(classifiedNodes.filter((node) => node.type === "record").every((node) => node.kind === "experience")).toBeTruthy();
+  expect(classified.request().postDataJSON()).not.toHaveProperty("levels");
+
+  // 选块后再全部取消，最后一个请求必须保留 []，不能变成代表全选的 null。
+  await types.getByRole("checkbox", { name: "内容块（L1）" }).check();
+  for (const name of ["对象", "记录", "内容块（L1）", "结论（Claim）", "概念"]) {
+    await types.getByRole("checkbox", { name, exact: true }).uncheck();
+  }
+  const [empty] = await Promise.all([
+    page.waitForResponse((response) => response.url().endsWith("/relations.graph") && response.request().postDataJSON().node_types?.length === 0),
+    types.getByRole("checkbox", { name: "来源", exact: true }).uncheck(),
+  ]);
+  expect((await empty.json()).nodes).toEqual([]);
+  await expect(page.getByText(/0 个节点、0 条关系/)).toBeVisible();
+  const [saved] = await Promise.all([
+    page.waitForResponse((response) => response.url().endsWith("/relations.view_save")),
+    page.getByRole("button", { name: "保存视图" }).click(),
+  ]);
+  expect(saved.ok()).toBeTruthy();
+  expect(saved.request().postDataJSON().view.filters).toMatchObject({ nodeTypes: [], kinds: ["experience"] });
+  expect((await op(request, "relations.view", {})).filters.nodeTypes).toEqual([]);
+  await page.reload();
+  await expect(types.getByRole("checkbox", { checked: true })).toHaveCount(0);
+  await expect(page.getByText(/0 个节点、0 条关系/)).toBeVisible();
+  const [reset] = await Promise.all([
+    page.waitForResponse((response) => response.url().endsWith("/relations.graph") && response.request().postDataJSON().node_types?.length === 5),
+    page.getByRole("button", { name: "重置", exact: true }).click(),
+  ]);
+  expect(reset.request().postDataJSON()).toMatchObject({ node_types: ["owner", "record", "claim", "concept", "source"], kinds: null });
+  await expect(types.getByRole("checkbox", { checked: true })).toHaveCount(5);
+  expect((await reset.json()).nodes.some((node: { type: string }) => node.type === "block")).toBeFalsy();
+});
+
 test("检索：未索引材料显示非空提示，补齐后原问题恢复命中", async ({ page }) => {
   await page.goto("#/search");
   await page.getByRole("textbox", { name: "问题" }).fill("虚拟环境");

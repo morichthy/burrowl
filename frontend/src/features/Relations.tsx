@@ -7,7 +7,7 @@ import Graph from "graphology";
 import louvain from "graphology-communities-louvain";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAction, useOp } from "../api";
-import { KINDS, label, LEVELS } from "../labels";
+import { KINDS, label } from "../labels";
 import { Empty, ErrorBox, href, Loading, Panel, Tag, Time } from "../ui";
 
 interface GraphNode {
@@ -73,7 +73,7 @@ const TYPE_COLORS: Record<string, string> = {
   concept: "#e0664a",
   block: "#8f9bab",
 };
-const NODE_TYPE_LABELS: Record<string, string> = { owner: "对象", record: "记录", claim: "结论", concept: "概念", source: "来源", block: "L1 块" };
+const NODE_TYPE_LABELS: Record<string, string> = { owner: "对象", record: "记录", claim: "结论（Claim）", concept: "概念", source: "来源", block: "内容块（L1）" };
 const CATEGORIES: { value: string; label: string; color: string }[] = [
   { value: "structure", label: "结构", color: "#c8c8c8" },
   { value: "evidence", label: "证据", color: "#3d8b5a" },
@@ -83,10 +83,19 @@ const CATEGORIES: { value: string; label: string; color: string }[] = [
   { value: "claim_relation", label: "结论关系", color: "#a05195" },
 ];
 const LINE_STYLE: Record<string, string> = { supported: "solid", plausible: "dashed", speculative: "dotted" };
-const NODE_TYPES = ["owner", "record", "claim", "concept", "source"];
+const NODE_TYPES = ["owner", "record", "block", "claim", "concept", "source"];
+// 默认隐藏内容块以免图过密；空数组则明确表示不显示任何节点。
+const DEFAULT_NODE_TYPES = NODE_TYPES.filter((type) => type !== "block");
 const PALETTE = ["#4e79a7", "#f28e2b", "#e15759", "#76b7b2", "#59a14f", "#edc948", "#b07aa1", "#ff9da7", "#9c755f", "#bab0ac"];
-const KIND_FILTERS = ["overview", "experience", "narrative", "detail", "source", "document", "document_section"];
-const LEVEL_FILTERS = ["L0", "L1", "L2", "L3", "L4"];
+const KIND_FILTERS = [
+  { value: "overview", label: "概览（L4）" },
+  { value: "experience", label: "经验（L3）" },
+  { value: "narrative", label: "经过（L2）" },
+  { value: "detail", label: "技术单元（L1）" },
+  { value: "source", label: "原始依据（L0）" },
+  { value: "document", label: "文稿" },
+  { value: "document_section", label: "章节" },
+];
 const RELATIONS = [
   { value: "same_problem", label: "同一问题" },
   { value: "same_failure_mode", label: "同一失败模式" },
@@ -100,16 +109,17 @@ interface View {
   hops?: number;
   query?: string;
   kinds?: string[];
-  levels?: string[];
+  nodeTypes?: string[];
   excluded?: string[];
   communities?: boolean;
   categories?: string[];
-  showBlocks?: boolean;
 }
+
+const defaultView = (): View => ({ hops: 2, query: "", kinds: [], nodeTypes: [...DEFAULT_NODE_TYPES], excluded: [], communities: false, categories: [] });
 
 export function Relations() {
   const saved = useOp<View>("relations.view");
-  const [view, setView] = useState<View>({ hops: 2, query: "", kinds: [], levels: [], excluded: [], communities: false });
+  const [view, setView] = useState<View>(defaultView);
   const [history, setHistory] = useState<string[]>([]);
   const [focus, setFocus] = useState<GraphNode>();
   const [linkFrom, setLinkFrom] = useState<GraphNode>();
@@ -117,7 +127,14 @@ export function Relations() {
   useEffect(() => {
     if (saved.data && !loadedSaved) {
       const stored = saved.data as { center?: string | null; excluded?: string[]; filters?: View };
-      setView((v) => ({ ...v, ...(stored.filters ?? {}), center: stored.center ?? null, excluded: stored.excluded ?? [] }));
+      const filters = stored.filters;
+      // 只读取当前界面的字段，旧 levels/showBlocks 不得成为看不见的筛选条件。
+      setView({
+        center: stored.center ?? null, excluded: stored.excluded ?? [],
+        hops: filters?.hops ?? 2, query: filters?.query ?? "", kinds: filters?.kinds ?? [],
+        nodeTypes: filters?.nodeTypes ?? [...DEFAULT_NODE_TYPES],
+        communities: filters?.communities ?? false, categories: filters?.categories ?? [],
+      });
       setLoadedSaved(true);
     }
   }, [saved.data, loadedSaved]);
@@ -126,10 +143,9 @@ export function Relations() {
     center: view.center ?? null,
     hops: view.hops ?? 2,
     kinds: view.kinds?.length ? view.kinds : null,
-    levels: view.levels?.length ? view.levels : null,
     excluded: view.excluded?.length ? view.excluded : null,
     categories: view.categories?.length ? view.categories : null,
-    node_types: view.showBlocks ? null : NODE_TYPES,
+    node_types: view.nodeTypes ?? DEFAULT_NODE_TYPES,
     limit: 400,
   });
   const candidates = useOp<{ candidates: CandidateLink[] }>(
@@ -144,7 +160,7 @@ export function Relations() {
     if (view.center) setHistory((h) => [...h, view.center!]);
     setView({ ...view, center: id });
   };
-  const toggle = (key: "kinds" | "levels" | "categories", value: string) => {
+  const toggle = (key: "kinds" | "nodeTypes" | "categories", value: string) => {
     const current = view[key] ?? [];
     setView({ ...view, [key]: current.includes(value) ? current.filter((v) => v !== value) : [...current, value] });
   };
@@ -161,7 +177,7 @@ export function Relations() {
             }}>
               保存视图
             </button>
-            <button type="button" onClick={() => setView({ hops: 2, query: "", kinds: [], levels: [], excluded: [], communities: false })}>
+            <button type="button" onClick={() => setView(defaultView())}>
               重置
             </button>
           </>
@@ -176,10 +192,6 @@ export function Relations() {
           <label className="check">
             <input type="checkbox" checked={!!view.communities} onChange={(e) => setView({ ...view, communities: e.target.checked })} />
             按社区着色
-          </label>
-          <label className="check">
-            <input type="checkbox" checked={!!view.showBlocks} onChange={(e) => setView({ ...view, showBlocks: e.target.checked })} />
-            显示 L1 块
           </label>
           {view.center ? (
             <>
@@ -198,17 +210,21 @@ export function Relations() {
             </>
           ) : null}
         </div>
-        <div className="chips">
+        <p className="hint">记录分类仅筛选记录，其他节点由节点类型控制。</p>
+        <div className="chips" role="group" aria-label="记录分类">
           {KIND_FILTERS.map((k) => (
-            <label key={k} className={view.kinds?.includes(k) ? "on" : ""}>
-              <input type="checkbox" checked={!!view.kinds?.includes(k)} onChange={() => toggle("kinds", k)} />
-              {label(KINDS, k)}
+            <label key={k.value} className={view.kinds?.includes(k.value) ? "on" : ""}>
+              <input type="checkbox" checked={!!view.kinds?.includes(k.value)} onChange={() => toggle("kinds", k.value)} />
+              {k.label}
             </label>
           ))}
-          {LEVEL_FILTERS.map((l) => (
-            <label key={l} className={view.levels?.includes(l) ? "on" : ""}>
-              <input type="checkbox" checked={!!view.levels?.includes(l)} onChange={() => toggle("levels", l)} />
-              {label(LEVELS, l)}
+        </div>
+        <p className="hint">节点类型控制图中实际显示的节点；结论（Claim）是可以单独引用和复核的判断。</p>
+        <div className="chips" role="group" aria-label="节点类型">
+          {NODE_TYPES.map((type) => (
+            <label key={type} className={view.nodeTypes?.includes(type) ? "on" : ""}>
+              <input type="checkbox" checked={!!view.nodeTypes?.includes(type)} onChange={() => toggle("nodeTypes", type)} />
+              {NODE_TYPE_LABELS[type]}
             </label>
           ))}
         </div>
