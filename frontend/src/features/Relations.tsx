@@ -9,7 +9,7 @@ import louvain from "graphology-communities-louvain";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useAction, useOp } from "../api";
 import { KINDS, label, MATURITY, REVIEW_BADGES } from "../labels";
-import { Empty, ErrorBox, href, Loading, Panel, Tag, Time } from "../ui";
+import { Empty, ErrorBox, href, Loading, Panel, Tag, Time, useDebounced } from "../ui";
 
 interface GraphNode {
   id: string;
@@ -181,6 +181,9 @@ const rank = (e: GraphEdge) => {
 };
 /** 连线的代表边：失效的边排在后面，其余按类别优先级。 */
 const mainEdge = (link: Link) => [...link.edges].sort((x, y) => rank(x) - rank(y))[0];
+/** 节点颜色：按社区着色时取社区色，否则取节点类型色。 */
+const nodeColor = (n: GraphNode, communities: Record<string, number> | null) =>
+  communities ? PALETTE[(communities[n.id] ?? 0) % PALETTE.length] : (TYPE_COLORS[n.type] ?? "#888");
 const edgeTypeLabel = (type: string) => EDGE_TYPE_LABELS[type] ?? type;
 /** 连线上各种关系类型的中文名，去重后按代表性排序。 */
 const linkLabel = (link: Link) => [...new Set([...link.edges].sort((x, y) => rank(x) - rank(y)).map((e) => edgeTypeLabel(e.type)))].join("、");
@@ -206,8 +209,10 @@ export function Relations() {
       setLoadedSaved(true);
     }
   }, [saved.data, loadedSaved]);
+  // 标题筛选按停顿后的输入查询：每个按键都重取整张图并重新布局，既慢又会让画面来回跳
+  const query = useDebounced(view.query ?? "", 300);
   const graph = useOp<GraphData>("relations.graph", {
-    query: view.query ?? "",
+    query,
     center: view.center ?? null,
     hops: view.hops ?? 2,
     kinds: view.kinds?.length ? view.kinds : null,
@@ -222,6 +227,8 @@ export function Relations() {
     !!focus && focus.type === "record",
   );
   const saveView = useAction("relations.view_save");
+  // 只显示属于当前选中记录的候选：切换节点后、新结果到达前，旧节点的候选既不画在图上，也不能被"采纳"到新节点名下
+  const suggestions = candidates.stale ? [] : (candidates.data?.candidates ?? []);
   const communities = useMemo(() => (view.communities && graph.data ? detect(graph.data) : null), [view.communities, graph.data]);
   const links = useMemo(() => mergeEdges(graph.data), [graph.data]);
 
@@ -343,7 +350,7 @@ export function Relations() {
           data={graph.data}
           links={links}
           communities={communities}
-          suggestions={candidates.data?.candidates ?? []}
+          suggestions={suggestions}
           selectedId={focus?.id}
           onSelect={setFocus}
           onCenter={(id) => setCenter(id)}
@@ -357,10 +364,11 @@ export function Relations() {
       <aside>
         <Focus
           node={focus}
-          candidates={candidates.data?.candidates ?? []}
+          candidates={suggestions}
           onCenter={(id) => setCenter(id)}
           onHide={(id) => setView({ ...view, excluded: [...(view.excluded ?? []), id] })}
           reloadCandidates={candidates.reload}
+          candidatesLoading={candidates.stale && candidates.loading}
           linkFrom={linkFrom}
           setLinkFrom={setLinkFrom}
           reloadGraph={graph.reload}
@@ -656,7 +664,13 @@ function GraphCanvas(props: {
       for (const n of data.nodes) {
         const d = degree.get(n.id) ?? 0;
         // 节点大小随连接数增长（开方压缩，避免枢纽节点过大）；内容块本身更小
-        const fields = { label: n.title.slice(0, 28), size: (n.type === "block" ? 10 : 14) + Math.min(30, Math.sqrt(d) * 5), shape: NODE_SHAPES[n.type] ?? "ellipse" };
+        // 颜色在加入时就给出（与下方社区着色 effect 同一规则），否则样式里的 data(color) 映射会在首帧缺值告警
+        const fields = {
+          label: n.title.slice(0, 28),
+          size: (n.type === "block" ? 10 : 14) + Math.min(30, Math.sqrt(d) * 5),
+          shape: NODE_SHAPES[n.type] ?? "ellipse",
+          color: nodeColor(n, communities),
+        };
         const existing = cy.getElementById(n.id);
         if (existing.nonempty()) existing.data(fields);
         else {
@@ -734,7 +748,7 @@ function GraphCanvas(props: {
     if (!cy || !data) return;
     cy.batch(() =>
       data.nodes.forEach((n) =>
-        cy.getElementById(n.id).data("color", communities ? PALETTE[(communities[n.id] ?? 0) % PALETTE.length] : (TYPE_COLORS[n.type] ?? "#888")),
+        cy.getElementById(n.id).data("color", nodeColor(n, communities)),
       ),
     );
   }, [data, communities]);
@@ -847,6 +861,7 @@ function Focus(props: {
   onCenter: (id: string) => void;
   onHide: (id: string) => void;
   reloadCandidates: () => void;
+  candidatesLoading: boolean;
   linkFrom: GraphNode | undefined;
   setLinkFrom: (node: GraphNode | undefined) => void;
   reloadGraph: () => void;
@@ -930,7 +945,7 @@ function Focus(props: {
         <>
           <h4>关联候选（关键词重合）</h4>
           <ErrorBox error={decide.error} />
-          {!candidates.length ? <Empty>没有候选。</Empty> : null}
+          {props.candidatesLoading ? <Loading show /> : !candidates.length ? <Empty>没有候选。</Empty> : null}
           <label className="hint">
             采纳为{" "}
             <select value={relation} onChange={(e) => setRelation(e.target.value)}>

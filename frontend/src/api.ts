@@ -32,6 +32,11 @@ export interface OpState<T> {
   data: T | undefined;
   error: Problem | undefined;
   loading: boolean;
+  /**
+   * data 不属于当前参数：参数已变而新结果未到，或 enabled 为 false。
+   * 列表筛选可以照常显示旧数据避免闪烁；但按对象执行操作的地方（如对某个节点的候选做判断）必须先看它。
+   */
+  stale: boolean;
   reload: () => void;
 }
 
@@ -39,6 +44,7 @@ export interface OpState<T> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function useOp<T = any>(name: OpName, args?: OpArgs[OpName], enabled = true): OpState<T> {
   const [data, setData] = useState<T>();
+  const [dataKey, setDataKey] = useState<string>();
   const [error, setError] = useState<Problem>();
   const [loading, setLoading] = useState(false);
   const [tick, setTick] = useState(0);
@@ -48,7 +54,7 @@ export function useOp<T = any>(name: OpName, args?: OpArgs[OpName], enabled = tr
     let alive = true;
     setLoading(true);
     op<T>(name, JSON.parse(key))
-      .then((value) => alive && (setData(value), setError(undefined)))
+      .then((value) => alive && (setData(value), setDataKey(key), setError(undefined)))
       .catch((exc) => alive && setError(exc instanceof OpError ? exc.problem : { code: "NETWORK", message: String(exc) }))
       .finally(() => alive && setLoading(false));
     return () => {
@@ -56,7 +62,7 @@ export function useOp<T = any>(name: OpName, args?: OpArgs[OpName], enabled = tr
     };
   }, [name, key, tick, enabled]);
   const reload = useCallback(() => setTick((t) => t + 1), []);
-  return { data, error, loading, reload };
+  return { data, error, loading, stale: !enabled || dataKey !== key, reload };
 }
 
 /** 写操作：返回 [run, 状态]；run 失败时把 Problem 放进 error，不抛出。 */

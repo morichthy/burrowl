@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useAction, useOp } from "../api";
 import { EVIDENCE_BASIS, label, KINDS, MATURITY, REVIEW_BADGES } from "../labels";
-import { Empty, ErrorBox, href, Loading, Panel, ReviewBadge, Time } from "../ui";
+import { Empty, ErrorBox, href, Loading, Panel, ReviewBadge, Time, useDebounced } from "../ui";
 
 interface FixedRef {
   target_kind: string;
@@ -79,10 +79,13 @@ export function Review() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [draft, setDraft] = useState<Draft>();
   const [historyOf, setHistoryOf] = useState<string>();
+  // 文本框停顿后再查询，避免每个按键都重新取一次队列
+  const ownerFilter = useDebounced(owner.trim(), 300);
+  const queryFilter = useDebounced(query, 300);
   const queue = useOp<Queue>("review.queue", {
     states: states as never,
-    owner_id: owner.trim() || null,
-    query,
+    owner_id: ownerFilter || null,
+    query: queryFilter,
     limit: 200,
   });
   const submit = useAction("review.submit");
@@ -111,8 +114,9 @@ export function Review() {
     submit.clear();
     if (state === "accepted") {
       // 一键确认：先自动预检，显示依据与适用范围后再提交。
+      // 预检返回前用户可能已改开另一条或关闭对话框：只把结果放回同一条、同一动作的草稿
       const preview = await submit.run(argsOf(next, true));
-      setDraft({ ...next, preview });
+      setDraft((current) => (current?.item.claim_id === next.item.claim_id && current.state === next.state ? { ...current, preview } : current));
     }
   };
 
@@ -127,14 +131,13 @@ export function Review() {
   const runBatch = async (state: Action) => {
     const reason = window.prompt(`批量"${ACTIONS.find((a) => a.state === state)?.label}"的理由`, TEMPLATES[state][0]);
     if (!reason) return;
-    const items = (queue.data?.items ?? [])
-      .filter((i) => selected.has(i.claim_id))
-      .map((i) => ({
-        target_claim_id: i.claim_id,
-        state,
-        reason,
-        ...(state === "accepted" ? { scope: i.scope, evidence_refs: i.evidence_refs } : {}),
-      }));
+    // 与单条确认一致：依据含上次复核补充的依据
+    const items = chosen.map((i) => ({
+      target_claim_id: i.claim_id,
+      state,
+      reason,
+      ...(state === "accepted" ? { scope: i.scope, evidence_refs: evidenceOf(i) } : {}),
+    }));
     const result = await batch.run({ items, dry_run: false });
     if (result) {
       setBatchResult(`成功 ${result.succeeded} 条，失败 ${result.failed} 条`);
@@ -144,6 +147,8 @@ export function Review() {
   };
 
   const items = queue.data?.items ?? [];
+  // 批量只作用于当前列表中可见的已选项；改筛选后被隐藏的选择不计数、也不会被提交
+  const chosen = items.filter((i) => selected.has(i.claim_id));
   return (
     <>
       <Panel
@@ -169,9 +174,9 @@ export function Review() {
           <input placeholder="对象 ID" value={owner} onChange={(e) => setOwner(e.target.value)} />
           <input placeholder="搜索结论或记录标题" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
-        {selected.size ? (
+        {chosen.length ? (
           <div className="batchbar">
-            已选 {selected.size} 条：
+            已选 {chosen.length} 条：
             {ACTIONS.filter((a) => a.state !== "superseded").map((a) => (
               <button key={a.state} type="button" className={a.tone} disabled={batch.busy} onClick={() => runBatch(a.state)}>
                 批量{a.label}

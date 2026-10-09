@@ -73,6 +73,16 @@ export function Time({ value }: { value: string | null | undefined }) {
   return <time title={value}>{Number.isNaN(date.getTime()) ? value : date.toLocaleString("zh-CN")}</time>;
 }
 
+/** 输入停顿 delay 毫秒后才更新的值：文本框驱动查询时用，避免每个按键都发一次请求。 */
+export function useDebounced<T>(value: T, delay: number): T {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSettled(value), delay);
+    return () => window.clearTimeout(timer);
+  }, [value, delay]);
+  return settled;
+}
+
 /** 哈希路由：#/reading/RS-1 → ["reading", "RS-1"]。 */
 export function useRoute(): string[] {
   const read = () => window.location.hash.replace(/^#\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useOp } from "./api";
 import { Home } from "./features/Home";
 import { Hub } from "./features/Hub";
@@ -78,6 +79,15 @@ function Page({ route }: { route: string[] }) {
 export function App() {
   const route = useRoute();
   const waiting = useOp<{ pending_requests: number }[]>("reading.list", { status: "waiting_user", limit: 50 });
+  // 待处理数字要跟上 AI 新发起或用户刚处理完的请求：与阅读列表同样每 5 秒、以及窗口回到前台时刷新
+  useEffect(() => {
+    const timer = window.setInterval(waiting.reload, 5_000);
+    window.addEventListener("focus", waiting.reload);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", waiting.reload);
+    };
+  }, [waiting.reload]);
   const pending = waiting.data?.reduce((sum, s) => sum + s.pending_requests, 0) ?? 0;
   const current = route[0] ?? "";
   return (

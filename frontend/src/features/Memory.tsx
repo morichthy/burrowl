@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import { useAction, useOp } from "../api";
 import { KINDS, label, LEVELS, OWNER_TYPES } from "../labels";
-import { Empty, ErrorBox, href, Loading, Markdown, Panel, ReviewBadge, Tag, Time } from "../ui";
+import { Empty, ErrorBox, href, Loading, Markdown, Panel, ReviewBadge, Tag, Time, useDebounced } from "../ui";
 import type { QueueItem } from "./Review";
 
 interface OwnerSummary {
@@ -19,7 +19,7 @@ export function Owners() {
   // 对象类型多选取并集；空数组表示全部。在已分组的结果上筛选，类型计数不随勾选变化。
   const [types, setTypes] = useState<string[]>([]);
   const [persistedOnly, setPersistedOnly] = useState(false);
-  const owners = useOp<{ groups: { owner_type: string; owners: OwnerSummary[] }[] }>("memory.owners", { query });
+  const owners = useOp<{ groups: { owner_type: string; owners: OwnerSummary[] }[] }>("memory.owners", { query: useDebounced(query, 300) });
   const groups = (owners.data?.groups ?? [])
     .filter((g) => !types.length || types.includes(g.owner_type))
     .map((g) => ({ ...g, owners: persistedOnly ? g.owners.filter((o) => o.persisted) : g.owners }))
@@ -138,13 +138,14 @@ export function OwnerView({ ownerId }: { ownerId: string }) {
   const [query, setQuery] = useState("");
   // 多选取并集；空数组表示不按类型筛选（全部）
   const [kinds, setKinds] = useState<string[]>([]);
+  const recordQuery = useDebounced(query, 300); // 停顿后再查，避免每个按键都重取记录列表
   const records = useOp<{
     owner: OwnerSummary;
     head: { generation: number } | null;
     items: RecordRow[];
     total: number;
     kind_counts: Record<string, number>;
-  }>("memory.records", { owner_id: ownerId, main_only: mainOnly, kinds: kinds.length ? kinds : null, query, limit: 500 });
+  }>("memory.records", { owner_id: ownerId, main_only: mainOnly, kinds: kinds.length ? kinds : null, query: recordQuery, limit: 500 });
   const kindOptions = Object.entries(records.data?.kind_counts ?? {}).sort(([a], [b]) => kindOrder(a) - kindOrder(b));
   const toggleKind = (kind: string) => setKinds((now) => (now.includes(kind) ? now.filter((k) => k !== kind) : [...now, kind]));
   const badges = useClaimBadges(ownerId);

@@ -168,6 +168,31 @@ describe("知识复核", () => {
       { target_claim_id: "CLM-2", state: "disputed", reason: "样本不足" },
     ]);
   });
+
+  it("改筛选后被隐藏的已选结论不计数、不提交；搜索框停顿后才查询", async () => {
+    const other = { ...claim, claim_id: "CLM-2", statement: "另一条" };
+    handlers["review.queue"] = (args) => {
+      const items = [claim, other].filter((i) => !args.query || i.statement.includes(String(args.query)));
+      return { items, total: items.length, counts: {} };
+    };
+    handlers["review.batch"] = (args) => ({ succeeded: (args.items as unknown[]).length, failed: 0 });
+    vi.spyOn(window, "prompt").mockReturnValue("样本不足");
+    render(<Review />);
+    await screen.findByText("另一条");
+    fireEvent.click(screen.getByLabelText("选择 CLM-1"));
+    fireEvent.click(screen.getByLabelText("选择 CLM-2"));
+    expect(screen.getByText(/已选 2 条/)).toBeInTheDocument();
+    const before = calls.filter((c) => c.name === "review.queue").length;
+    const box = screen.getByPlaceholderText("搜索结论或记录标题");
+    for (const text of ["另", "另一", "另一条"]) fireEvent.change(box, { target: { value: text } });
+    await waitFor(() => expect(screen.queryByText(claim.statement)).not.toBeInTheDocument());
+    // 连续三次输入只在停顿后查询一次
+    expect(calls.filter((c) => c.name === "review.queue").length).toBe(before + 1);
+    expect(screen.getByText(/已选 1 条/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "批量质疑" }));
+    expect(await screen.findByText("成功 1 条，失败 0 条")).toBeInTheDocument();
+    expect(calls.find((c) => c.name === "review.batch")!.args.items).toEqual([{ target_claim_id: "CLM-2", state: "disputed", reason: "样本不足" }]);
+  });
 });
 
 const session = {
