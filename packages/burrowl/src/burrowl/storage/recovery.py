@@ -10,7 +10,7 @@ from .owners import Owner
 
 
 def inspect(store: MemoryStore, owner: Owner) -> dict[str, Any]:
-    snapshot = store.read_snapshot(owner)
+    snapshot = store.read_snapshot(owner, fresh=True)  # 健康检查逐条重读校验，不用已校验缓存
     reachable = {m["commit_id"] for m in store.iter_manifests(owner, snapshot)}
     lock_path = store.path(owner, "write.lock")
     lock, lock_state = None, "absent"

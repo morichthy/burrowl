@@ -77,8 +77,8 @@ class MemoryService:
         return policy.resolve(owner.owner_type, record["payload"] if record else None)
 
     def inspect(self, owner_id: str, *, record_id: str | None = None, revision: int | None = None) -> dict:
-        owner = self.owners().get(owner_id).require_readable()
         index = self.owners()
+        owner = index.get(owner_id).require_readable()
         if record_id:
             record = self.storage.store.read_record(owner, record_id, revision)
             if record["sensitivity"] == "restricted":
@@ -88,12 +88,13 @@ class MemoryService:
             return {"owner": owner.summary(), "record": record}
         snapshot = self.snapshot(owner)
         readable = [rid for rid, r in snapshot.records.items() if r["sensitivity"] != "restricted"]
-        blocked = blocked_records(self.storage, readable, index)
+        # 依据链过滤与结论徽标共用一张复核图：每建一张都要读入全部对象
+        graph = ClaimGraph(self.storage, index)
+        blocked = blocked_records(self.storage, readable, index, graph)
         records = {rid: snapshot.records[rid] for rid in readable if rid not in blocked}
         omitted = [{"record_id": rid, "reason": "依据链包含受限或不可用的来源", "problems": problems}
                    for rid, problems in blocked.items()]
         # R12 T-P2.6：每条结论的复核徽标、有效成熟度与派生统计（派生数据，随时可重算）
-        graph = ClaimGraph(self.storage, index)
         claims = {cid: {"record_id": record["record_id"], "badge": graph.badge(cid), **graph.maturity(cid),
                         "stats": graph.stats(cid)}
                   for cid, (_claim, record) in sorted(graph.claims.items()) if record["record_id"] in records}

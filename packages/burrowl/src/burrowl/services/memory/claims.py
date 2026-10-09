@@ -28,12 +28,15 @@ CLAIM_KINDS = {"detail", "narrative", "experience", "overview"}  # detail：R12 
 BLOCKING = {"ACCESS_DENIED", "UNSAFE_PATH"}  # 依据链上出现这些问题时，派生内容也不能交付
 
 
-def blocked_records(storage: Storage, record_ids, index: OwnerIndex | None = None) -> dict[str, list[dict]]:
-    """依据链上有受限或不安全来源的记录（record_id → 问题列表）。用于读取路径过滤，防止派生文本外泄。"""
+def blocked_records(storage: Storage, record_ids, index: OwnerIndex | None = None,
+                    graph: "ClaimGraph | None" = None) -> dict[str, list[dict]]:
+    """依据链上有受限或不安全来源的记录（record_id → 问题列表）。用于读取路径过滤，防止派生文本外泄。
+
+    graph：调用方本次请求已建好的复核图；传入可避免再次读取全部对象。"""
     ids = list(record_ids)
     if not ids:
         return {}
-    graph = ClaimGraph(storage, index)
+    graph = graph or ClaimGraph(storage, index)
     found = {}
     for rid in ids:
         problems = [e for e in graph.access_errors(rid) if e["code"] in BLOCKING]

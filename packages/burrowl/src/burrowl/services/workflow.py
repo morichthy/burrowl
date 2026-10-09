@@ -65,7 +65,7 @@ def summary_materials(memory: MemoryService, owner_ids: list[str], *, budget: Bu
             continue
         records = [r for r in reader.state(owner_id).records.values()
                    if r["kind"] in SUMMARY_KINDS and r["record_id"] not in excluded and r["sensitivity"] != "restricted"]
-        blocked = blocked_records(memory.storage, [r["record_id"] for r in records])
+        blocked = blocked_records(memory.storage, [r["record_id"] for r in records], graph=reader.claims())
         records = [r for r in records if r["record_id"] not in blocked]
         for rid in blocked:
             packet.gap("ACCESS_DENIED", "依据链包含受限或不可用的来源，未加入", {"target_kind": "record", "target_id": rid})
