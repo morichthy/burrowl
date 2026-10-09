@@ -1,5 +1,7 @@
 """单 Owner 的不可变记忆提交。HEAD.json 的原子替换是唯一可见性边界。
 
+读取时 HEAD 与提交清单每次重读；记录正文按清单中的指纹走进程内已校验缓存（VerifiedRecords）。
+
 目录（<memory_home>/）：
     owner.json                            对象描述
     HEAD.json                             {commit_id, generation, manifest_hash}
@@ -10,6 +12,9 @@
     staging/                              发布前的暂存（崩溃残留由 recovery 检查）
     write.lock                            写锁
 """
+import json
+import threading
+from collections import OrderedDict
 from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import dataclass, field
@@ -18,7 +23,7 @@ from pathlib import Path
 from ..core.atomic import Fault, exclusive_lock, no_fault, read_json, write_json_atomic, write_new_json
 from ..core.clock import Clock, utc_now
 from ..core.errors import BurrowlError
-from ..core.hashing import canonical_hash
+from ..core.hashing import canonical_bytes, canonical_hash
 from ..core.ids import new_id, safe_segment
 from ..core.pathsafe import ReadScope, safe_path
 from ..core.records import CONTENT_FIELDS, OPTIONAL_CONTENT_FIELDS, content_hash, record_hash
@@ -48,27 +53,72 @@ class Snapshot:
         return self.records.get(ref["record_id"]) if ref else None
 
 
+RECORD_CACHE_SIZE = 20_000  # 已校验记录缓存的条目上限；单条通常几 KB，满载约几十 MB
+
+
+class VerifiedRecords:
+    """进程内的已校验记录缓存（派生状态，丢了只是变慢）。
+
+    键是 (memory_home, 记录文件相对路径, record_hash)。记录文件不可变，路径里含提交号；命中前提是本次
+    重新读取（并做过路径检查）的提交清单仍指向同一指纹，所以返回的内容与重新读盘逐字节等价，其他进程
+    的新提交会换掉清单里的指针，自然不命中。
+    不覆盖的情形：首次读取之后磁盘上的记录文件被篡改或损坏，在进程重启前不会被发现。完整性检查
+    （recovery、system.validate）用 fresh=True 绕过缓存。
+    存规范化 JSON 文本、命中时重新解析：调用方拿到的是独立对象，修改它不会污染缓存。
+    """
+
+    def __init__(self, max_entries: int):
+        self.max_entries = max_entries
+        self._items: OrderedDict[tuple[str, str, str], str] = OrderedDict()
+        self._lock = threading.Lock()  # 工作台用线程池处理请求
+
+    def get(self, key: tuple[str, str, str]) -> dict | None:
+        with self._lock:
+            text = self._items.get(key)
+            if text is None:
+                return None
+            self._items.move_to_end(key)
+        return json.loads(text)
+
+    def put(self, key: tuple[str, str, str], value: dict) -> None:
+        if self.max_entries <= 0:
+            return
+        text = canonical_bytes(value).decode("utf-8")
+        with self._lock:
+            self._items[key] = text
+            self._items.move_to_end(key)
+            while len(self._items) > self.max_entries:
+                self._items.popitem(last=False)
+
+    def __len__(self) -> int:
+        return len(self._items)
+
+
 # prepare(snapshot) → (变化的完整记录列表, 逐条结果)
 Prepare = Callable[[Snapshot], tuple[list[dict], list[dict]]]
 
 
 class MemoryStore:
     def __init__(self, root: Path, *, clock: Clock = utc_now, id_factory: Callable[[], str] | None = None,
-                 fault: Fault | None = None):
+                 fault: Fault | None = None, record_cache_size: int = RECORD_CACHE_SIZE):
         self.root = Path(root).resolve()
         self.clock = clock
         self.new_commit_id = id_factory or (lambda: new_id("COM"))
         self.fault = fault or no_fault
+        self.verified = VerifiedRecords(record_cache_size)
 
     def path(self, owner: Owner, relative: str = "", scope: ReadScope | None = None) -> Path:
         locator = owner.memory_home + ("/" + relative if relative else "")
         return safe_path(self.root, locator, scope)
 
     # ---------- 读取 ----------
-    def read_snapshot(self, owner: Owner) -> Snapshot:
+    def read_snapshot(self, owner: Owner, *, fresh: bool = False) -> Snapshot:
+        """HEAD、提交清单与全部当前记录。HEAD 与清单每次重新读取并做路径检查；记录正文命中已校验缓存时
+        不再读盘（见 VerifiedRecords）。fresh=True 跳过缓存、逐条重读校验，供完整性检查使用。"""
         scope = ReadScope()
         head, manifest = self._head(owner, scope)
-        records = ({rid: self._record(owner, rid, entry, scope) for rid, entry in manifest["record_heads"].items()}
+        records = ({rid: self._record(owner, rid, entry, scope, fresh=fresh)
+                    for rid, entry in manifest["record_heads"].items()}
                    if manifest else {})
         scope.recheck()
         return Snapshot(head, manifest, records)
@@ -113,19 +163,24 @@ class MemoryStore:
             raise BurrowlError("INTEGRITY_ERROR", "提交清单结构、版本或归属损坏", {"commit_id": commit_id})
         return value
 
-    def _record(self, owner: Owner, rid: str, entry: dict, scope: ReadScope | None = None) -> dict:
+    def _record(self, owner: Owner, rid: str, entry: dict, scope: ReadScope | None = None, *,
+                fresh: bool = False) -> dict:
         rid = safe_segment(rid)
         if not isinstance(entry, dict) or not {"commit_id", "path", "revision", "record_hash"} <= entry.keys():
             raise BurrowlError("INTEGRITY_ERROR", "记录指针结构损坏", {"record_id": rid})
         expected = f"commits/{safe_segment(entry['commit_id'])}/records/{rid}.json"
         if entry["path"] != expected:
             raise BurrowlError("INTEGRITY_ERROR", "记录定位与身份不一致", {"record_id": rid})
+        key = (owner.memory_home, expected, entry["record_hash"])
+        if not fresh and (cached := self.verified.get(key)) is not None:
+            return cached
         value = read_json(self.path(owner, expected, scope))
         if (not isinstance(value, dict) or not set(CONTENT_FIELDS) - OPTIONAL_CONTENT_FIELDS <= value.keys()
                 or value.get("record_id") != rid or value.get("owner_id") != owner.owner_id
                 or value.get("revision") != entry["revision"] or value.get("record_hash") != entry["record_hash"]
                 or record_hash(value) != entry["record_hash"] or content_hash(value) != value.get("content_hash")):
             raise BurrowlError("INTEGRITY_ERROR", "记录身份、版本或指纹不匹配", {"record_id": rid})
+        self.verified.put(key, value)
         return value
 
     def iter_manifests(self, owner: Owner, snapshot: Snapshot | None = None, scope: ReadScope | None = None):

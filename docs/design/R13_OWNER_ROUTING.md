@@ -208,6 +208,7 @@ CORE（归属判定、投入分级、关键操作记录）、ARCHITECTURE（影�
 | 任务 | 状态 | 说明 |
 |---|---|---|
 | T-P1.1 | 已完成（2026-10-10） | `read_head` 只读 HEAD、提交清单和指定指针记录；`ready_owners`、`ensure_graph`、提交与读取的复核点改用它。实测 50 对象 × 100 记录：`ready_owners` 3668 ms → 248 ms，发现投影对象级关键词检索 3635 ms → 250 ms（假向量，本机）。剩余耗时主要在路径安全检查与对象扫描，随对象数线性增长 |
+| T-P1.1 补充 | 已完成（2026-10-10） | 复核时发现上一条只覆盖了就绪判断：提交后的索引同步与 inspect 仍通过 `ClaimGraph` 对每个对象 `read_snapshot`（读入并校验全部记录），inspect 还建了两次。改为：`MemoryStore` 增加按记录指纹的已校验缓存（`fresh=True` 供完整性检查绕过）；inspect 与总结材料在一次请求内共用一张复核图。实测每对象 6 条记录：inspect N=20 999 → 237 ms、N=50 586 ms；提交 N=20 1814 → 1192 ms，剩余主要是 `owners.scan`（一次提交约 12 次），未处理。测试 `tests/service/test_record_cache.py` |
 | T-P1.2 | 已完成（2026-10-10） | 第一版（fast/full、决策表）按 D-03、D-04 重做：`ReadingService` 抽出 `screen`（阅读每一轮与归属判定共用）和 `preview`；`memory.owner_route` 补充目标、检查点、来源重叠与目录亲和；用户指定与有路径证据的对象补入候选 |
 | T-P1.3 | 已完成 | `memory.commit` 请求增加可选 `attribution`（schema 增量 `Attribution`），存进回执；参与请求指纹 |
 | T-P1.4 | 已完成 | RULES 第 1、2、7 节；burrowl-work 第 0–2、5 步；burrowl-consolidate 新增"归属纠错"；MCP 服务说明 |

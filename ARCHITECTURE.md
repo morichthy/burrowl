@@ -71,7 +71,7 @@ core         记录模型与校验、契约说明、哈希、原子写与锁、�
 | 模块 | 职责与代码入口 | 变化时检查的关联 |
 |---|---|---|
 | CORE 记录契约 | `core/records.py`（校验与领域规则）、`core/schema/`（memory.schema.json 与草案示例）、`core/contract.py`（给 AI 的契约说明）、`core/links.py`（链接语法与 handle 生成） | 所有读写记录的服务、`memory.contract`、草案示例测试、前端类型、Skill 与 RECORDING；契约只做增量，已有指纹必须不变（`tests/service/test_links.py`） |
-| STORE 规范存储 | `storage/memory_store.py`（提交、CAS、幂等、暂存回读、恢复；`read_head` 只读 HEAD、提交清单与指定指针记录）、`storage/owners.py`（对象发现、业务卡、核心算法准入）、`storage/sources.py`（来源登记）、`core/atomic.py`（锁） | 所有服务；备份恢复；validate |
+| STORE 规范存储 | `storage/memory_store.py`（提交、CAS、幂等、暂存回读、恢复；`read_head` 只读 HEAD、提交清单与指定指针记录；`VerifiedRecords` 已校验记录缓存）、`storage/owners.py`（对象发现、业务卡、核心算法准入）、`storage/sources.py`（来源登记）、`core/atomic.py`（锁） | 所有服务；备份恢复；validate |
 | MEM 记忆服务 | `services/memory/`：service（提交与读取过滤、handle）、links（链接解析与重新固定）、concepts（概念库约束与术语扩展）、claims（结论、复核图、成熟度与派生统计）、documents（文稿）、history、raw_materials、provenance（影响与血缘）、associations、consolidation、export | REVIEW、QUERY、READ、HUB 的读取者；工作台记忆页；work 与 consolidate Skill |
 | REVIEW 复核 | `services/review.py`、`services/memory/claims.py` | 检索的复核类别、正式用途、中枢发布策略、复核页 |
 | IDX 检索 | `index/`（db、projections（含上下文信封）、graph（图投影）、fusion、query_plan、rerank、conditions、extract、embed、model_store）、`services/indexing.py`（同步、图路线、关联候选、缺口） | QUERY、READ 的召回；关系图页；模型安装；索引重建；发现可见性语义；评估脚本 `tools/eval_retrieval.py` |
@@ -97,6 +97,7 @@ core         记录模型与校验、契约说明、哈希、原子写与锁、�
 | 关键操作记录 | 无独立状态：每次请求从上面各权威来源实时汇总（`memory.activity`） | 可随时重算；Run 结束时间来自业务卡 `ended_at`，发布来自中枢执行记录 |
 | 来源授权 | `.burrowl/sources.json`（工作根 roots + 来源 sources；工作目录里的来源记为"根 + 相对路径"） | 搬家只改位置且必须指纹一致；登记不能被 agent 改写，只有用户能停用或降低敏感级别。文件内容变化后，引用它的结论显示依据失效 |
 | 复核 | 各 Owner 中的 review 记录 | 绑定内容指纹；内容变化即失效 |
+| 已校验记录缓存 | 无独立权威：`MemoryStore.verified`，进程内，键为（记忆目录, 记录文件, record_hash） | 派生状态，进程退出即丢失，丢了只是变慢；有条目上限。HEAD 与提交清单每次重读并做路径检查，只有清单仍指向同一指纹才命中，所以其他进程的新提交自然可见。首次读取后磁盘上的记录被篡改，普通读取在重启前发现不了；recovery 与 `system.validate` 用 `fresh=True` 逐条重读校验 |
 | 检索投影 | `.burrowl/index/index.sqlite3`：每个 (Owner, 投影, 通道) 的水位绑定 HEAD、投影版本和模型指纹；图投影（corpus=graph）与关联候选也在这里 | 可删除重建；结构版本不符时整库清空重建；pending/stale 的投影如实报告。边由声明它的对象负责，另一端缺失时查询排除并计入悬空数 |
 | 概念库 | 全库唯一的 knowledge 对象（`knowledge/<slug>/knowledge.json`），由配置 `graph.concept_owner_id` 指定 | 概念页是普通 wiki_page 记录；名称唯一性只在概念库内检查；未配置时概念链接都记为未解析 |
 | 成熟度 | review 记录的 `maturity` 等字段 | 不写进结论或记录正文；随复核失效；派生统计不持久化 |
@@ -187,5 +188,9 @@ handle 分配和正文链接解析发生在第 1 步（`MemoryService.prepare`�
 - LightRAG 连接器只有自动测试（假实现 + 真实 1.5.7 断网运行），尚未在本机做"发布 → 检索 → 核验"的人工验收（R12 AC-P4）。中枢路线（`index.hub_route`）默认关闭。
 - WeKnora 连接器只用模拟接口测试，尚未连真实服务实测。
 - 宿主 token 用量不由本项目保证。
-- 只读路径的就绪判断仍随对象数线性增长（每个对象读 HEAD 与提交清单，并做路径安全检查）：50 个对象约 0.25 s（R13 §8）。关键操作记录每次请求都要为每个对象读最新提交，对象很多时需要可重建的派生缓存。
+- 读取与提交的固定成本仍随对象总数线性增长：
+  - 复核图（`ClaimGraph`）需要全库的结论、复核与引用，每建一张都要对每个对象读 HEAD 与提交清单；记录正文走已校验缓存，不再重读。提交后的索引同步、inspect、总结材料都要建一张。
+  - 对象扫描（`owners.scan`）在一次提交里被调用约 12 次，是现在提交耗时的主要部分（20 个对象时约占 70%）。
+  - 实测（每对象 6 条记录，假向量，本机）：提交 N=20 约 1.2 s、N=50 约 2.5 s；inspect N=20 约 0.24 s、N=50 约 0.59 s。就绪判断 50 个对象约 0.25 s（R13 §8）。
+  - 关键操作记录每次请求都要为每个对象读最新提交，对象很多时需要可重建的派生缓存。
 - 第二台物理机安装与真实业务验收尚未进行。
