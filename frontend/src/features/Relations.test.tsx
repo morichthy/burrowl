@@ -73,6 +73,37 @@ describe("关系图筛选（R12 T-P2.8）", () => {
     expect(latestGraph()).toMatchObject({ node_types: defaults, kinds: null, categories: null, center: null });
   });
 
+  it("同一对节点之间的多条边合并为一条连线计数", async () => {
+    const edge = (source: string, target: string, type: string, category: string) => ({ source, target, type, category, origin: "x" });
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
+      const name = url.replace("api/v1/ops/", "");
+      calls.push({ name, args: JSON.parse(String(init.body)) });
+      const body = name !== "relations.graph" ? [] : {
+        nodes: ["a", "b", "c"].map((id) => ({ id, type: "record", kind: "detail", title: id, owner_id: null, level: null })),
+        // a-b 之间三条（含反向），b-c 一条：4 条关系、2 条连线
+        edges: [edge("a", "b", "references", "reference"), edge("a", "b", "references", "reference"), edge("b", "a", "input", "evidence"), edge("b", "c", "belongs_to", "structure")],
+        truncated: false,
+      };
+      return new Response(JSON.stringify(body), { status: 200 });
+    }));
+    render(<Relations />);
+    await screen.findByText(/3 个节点、4 条关系（合并为 2 条连线）/);
+  });
+
+  it("关系类别勾选即显示：默认全选不过滤，取消一类只请求其余类别，最后一类不能取消", async () => {
+    render(<Relations />);
+    await screen.findByText(/5 个节点、0 条关系/);
+    const cats = within(screen.getByRole("group", { name: "关系类别" }));
+    expect(cats.getAllByRole("checkbox", { checked: true })).toHaveLength(6);
+    fireEvent.click(cats.getByRole("checkbox", { name: "结构" }));
+    await waitFor(() => expect(latestGraph().categories).toEqual(["evidence", "reference", "navigation", "concept", "claim_relation"]));
+    fireEvent.click(cats.getByRole("checkbox", { name: "结构" }));
+    await waitFor(() => expect(latestGraph().categories).toBeNull());
+    for (const name of ["结构", "证据", "引用", "关联", "概念"]) fireEvent.click(cats.getByRole("checkbox", { name }));
+    await waitFor(() => expect(latestGraph().categories).toEqual(["claim_relation"]));
+    expect(cats.getByRole("checkbox", { name: "结论关系" })).toBeDisabled();
+  });
+
   it("只有旧筛选字段的已保存视图使用当前默认节点类型", async () => {
     stored = { filters: { levels: ["L0"], showBlocks: true } };
     render(<Relations />);

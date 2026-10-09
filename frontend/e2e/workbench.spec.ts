@@ -26,7 +26,9 @@ test("关系图筛选：分类不重复，节点可见性、空选与保存重�
   await expect(types.getByRole("checkbox")).toHaveCount(6);
   await expect(kinds.getByRole("checkbox")).toHaveCount(7);
   await expect(types.getByRole("checkbox", { name: "内容块（L1）" })).not.toBeChecked();
-  await expect(page.getByText("记录分类仅筛选记录，其他节点由节点类型控制。")).toBeVisible();
+  // 筛选区改为"组名＋选项"两列：分类只筛选记录的说明放在组名的悬停提示中，未选任何分类时提示"不选＝全部"
+  await expect(page.locator(".filter-label", { hasText: "记录分类" })).toHaveAttribute("title", /只筛选记录节点/);
+  await expect(kinds.getByText("不选＝全部")).toBeVisible();
   await page.screenshot({ path: "test-results/relations-filters.png", fullPage: true });
 
   // 浏览器请求走真实服务；检查分类只限制记录，结论仍保留导航上下文。

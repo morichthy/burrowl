@@ -244,15 +244,41 @@ textarea { width: 100%; min-height: 64px; line-height: 1.55; }
 .provenance summary { cursor: pointer; font-weight: 600; }
 .graph-wrap { position: relative; }
 .graph {
-  height: 620px; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden;
+  /* 画布随窗口高度伸展，保证在大屏上有足够空间看清结构 */
+  height: clamp(520px, calc(100vh - 330px), 900px); border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden;
   /* 点阵底纹，类似 Obsidian 图谱的画布质感 */
   background: radial-gradient(circle, color-mix(in srgb, var(--muted) 22%, transparent) 1px, transparent 1.2px) 0 0 / 22px 22px, var(--panel-2);
 }
 .graph-controls { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; }
 .graph-controls button { background: color-mix(in srgb, var(--panel) 85%, transparent); backdrop-filter: blur(4px); box-shadow: var(--shadow); }
-.graph-legend { position: absolute; left: 10px; bottom: 10px; display: flex; gap: 12px; flex-wrap: wrap; padding: 5px 10px; border-radius: 999px; font-size: 12px; color: var(--muted); background: color-mix(in srgb, var(--panel) 85%, transparent); backdrop-filter: blur(4px); border: 1px solid var(--line); }
-.graph-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: 0; }
-.graph-legend[hidden] { display: none; }
+.graph-legend { position: absolute; left: 10px; bottom: 10px; display: flex; gap: 12px; flex-wrap: wrap; padding: 5px 10px; border-radius: 999px; font-size: 12px; color: var(--muted); background: color-mix(in srgb, var(--panel) 85%, transparent); backdrop-filter: blur(4px); border: 1px solid var(--line); pointer-events: none; }
+.graph-legend i { margin-right: 5px; }
+/* 悬停说明卡：不拦截鼠标，避免在节点和卡片之间来回闪烁 */
+.graph-tip {
+  position: absolute; z-index: 2; max-width: 280px; padding: 7px 10px; border-radius: var(--radius-sm); pointer-events: none;
+  font-size: 12px; line-height: 1.5; color: var(--muted); background: color-mix(in srgb, var(--panel) 94%, transparent);
+  border: 1px solid var(--line); box-shadow: var(--shadow-lg); backdrop-filter: blur(4px);
+}
+.graph-tip strong { display: block; color: var(--text); font-size: 13px; margin-bottom: 2px; overflow-wrap: anywhere; }
+/* 节点类型的形状记号：与画布中的节点形状一致（圆=对象/记录/块，圆角方=来源，菱形=结论，六边形=概念） */
+i.shape { display: inline-block; width: 9px; height: 9px; border-radius: 50%; vertical-align: -1px; flex: none; }
+i.shape-owner { box-shadow: 0 0 0 1.5px var(--panel), 0 0 0 3px var(--line-strong); }
+i.shape-block { width: 7px; height: 7px; }
+i.shape-source { border-radius: 2px; }
+i.shape-claim { border-radius: 1.5px; transform: rotate(45deg) scale(0.85); }
+i.shape-concept { border-radius: 0; clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%); }
+i.swatch { display: inline-block; width: 12px; height: 3px; border-radius: 2px; vertical-align: 3px; }
+/* 筛选区：左列是组名，右列是选项，比每组前加一行说明更省纵向空间 */
+.filter-rows { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; align-items: center; margin: 10px 0 12px; }
+.filter-rows .chips { margin: 0; }
+.filter-rows .chips label { display: inline-flex; align-items: center; gap: 5px; }
+.filter-label { font-size: 12px; color: var(--muted); white-space: nowrap; cursor: help; }
+.chips label.on i.shape, .chips label.on i.swatch { box-shadow: 0 0 0 1.5px #fff; }
+/* 图标只是记号，不能挡住标签里隐藏的复选框 */
+.chips label i { pointer-events: none; }
+@media (max-width: 640px) {
+  .filter-rows { grid-template-columns: 1fr; }
+}
 
 /* ---------- 对话框与表单 ---------- */
 .dialog { position: fixed; inset: 0; background: rgba(15, 18, 26, 0.45); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; z-index: 10; animation: enter 0.15s ease-out; }
