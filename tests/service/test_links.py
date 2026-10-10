@@ -66,6 +66,62 @@ def test_handle_generated_unique_and_immutable(tmp_path):
     assert "已被使用" in caught.value.message
 
 
+def _reference_handles(operations, records):
+    """修复前的 O(B·N) 写法（每条新记录重新规范化全部已占用 handle），作为行为对照。"""
+    from burrowl.core import links
+    revising = {rid for _op, rid, _d, old in operations if old}
+    taken = {}
+    for rid, record in records.items():
+        if rid not in revising or record.get("handle"):
+            taken.setdefault(links.normalize(record.get("handle") or links.make_handle(record["title"])), rid)
+    for _op, rid, draft, old in operations:
+        if old and old.get("handle"):
+            draft.setdefault("handle", old["handle"])
+        elif "handle" not in draft:
+            draft["handle"] = links.unique_handle(links.make_handle(draft.get("title", "")),
+                                                  {k for k, v in taken.items() if v != rid})
+        taken[links.normalize(draft["handle"])] = rid
+    return [draft["handle"] for _op, _rid, draft, _old in operations]
+
+
+def _handle_batch(existing, new):
+    """existing 条已有记录（含无 handle 的旧记录）+ new 条无 handle 的新记录，标题大量重复。"""
+    records = {f"R-{i}": {"title": f"实验 {i % 50}", **({"handle": f"已有-{i}"} if i % 3 else {})}
+               for i in range(existing)}
+    titles = ["同名记录", "ＦＵＬＬ　Width", "实验 7", "x" * 80]
+    operations = [({}, f"N-{i}", {"title": titles[i % len(titles)] if i % 2 else f"新记录 {i}"}, None)
+                  for i in range(new)]
+    return records, operations
+
+
+def test_handle_assignment_is_linear_and_unchanged(monkeypatch):
+    """批量导入：handle 分配的规范化次数随记录数线性增长（评估项目 5183 条导入曾超过 4 小时），结果与旧写法一致。"""
+    import copy
+
+    from burrowl.core import links
+    from burrowl.storage.memory_store import Snapshot
+
+    records, operations = _handle_batch(300, 400)
+    expected = _reference_handles(copy.deepcopy(operations), records)
+    MemoryService._assign_handles(operations, Snapshot(None, None, records))
+    assert [draft["handle"] for _op, _rid, draft, _old in operations] == expected
+    assert len({links.normalize(h) for h in expected}) == len(expected)
+
+    calls = 0
+    original = links.normalize
+
+    def counting(name):
+        nonlocal calls
+        calls += 1
+        return original(name)
+
+    monkeypatch.setattr(links, "normalize", counting)
+    records, operations = _handle_batch(5000, 5000)
+    MemoryService._assign_handles(operations, Snapshot(None, None, records))
+    # 每条已有记录 1 次、每条新记录约 3 次（base、候选、写入 taken）；旧写法约 2.5×10^7 次
+    assert calls < 5 * (5000 + 5000)
+
+
 def _setup_links(tmp_path, concept_owner=None):
     storage, memory = _memory(tmp_path, concept_owner)
     owner = _new_owner(storage)

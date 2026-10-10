@@ -214,6 +214,7 @@ class MemoryService:
                 handle = record.get("handle") or link_syntax.make_handle(record["title"])
                 taken.setdefault(link_syntax.normalize(handle), rid)
         explicit = [(op, rid, draft, old) for op, rid, draft, old in operations if "handle" in draft]
+        counters: dict[str, int] = {}  # 生成 handle 的后缀续号，taken 在本循环中只增不减
         for _op, rid, draft, old in explicit + [x for x in operations if "handle" not in x[2]]:
             if old and old.get("handle"):
                 if draft.setdefault("handle", old["handle"]) != old["handle"]:
@@ -227,8 +228,10 @@ class MemoryService:
                                        {"handle": draft["handle"], "record_id": owner_of},
                                        errors=[{"path": "/handle", "message": "handle already used"}])
             else:
-                draft["handle"] = link_syntax.unique_handle(link_syntax.make_handle(draft.get("title", "")),
-                                                            {k for k, v in taken.items() if v != rid})
+                # taken 的键已是规范形：按需判断占用（排除本记录自己），批量导入时保持线性
+                draft["handle"] = link_syntax.pick_handle(link_syntax.make_handle(draft.get("title", "")),
+                                                          lambda key, rid=rid: taken.get(key, rid) != rid,
+                                                          counters)
             taken[link_syntax.normalize(draft["handle"])] = rid
 
     @staticmethod

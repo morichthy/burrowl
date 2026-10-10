@@ -14,6 +14,7 @@
 """
 import re
 import unicodedata
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -114,13 +115,24 @@ def make_handle(title: str) -> str:
 def unique_handle(base: str, taken: set[str]) -> str:
     """同一对象内冲突时追加 -2、-3……（比较时用规范形）。"""
     folded = {normalize(t) for t in taken}
-    if normalize(base) not in folded:
+    return pick_handle(base, folded.__contains__)
+
+
+def pick_handle(base: str, is_taken: Callable[[str], bool], counters: dict[str, int] | None = None) -> str:
+    """unique_handle 的批量版：is_taken 接收规范形，调用方维护已占用的规范形，不必每次重新规范化全部 handle。
+
+    counters 记录每个 base 上次用到的后缀编号，同一批里大量同名时从那里继续试，避免逐个重试 -2、-3……。
+    只有在占用集合只增不减时才可传入（批量分配 handle 时成立），结果与不传相同。
+    """
+    if not is_taken(normalize(base)):
         return base
-    number = 2
+    number = (counters or {}).get(base, 2)
     while True:
         suffix = f"-{number}"
         candidate = base[:HANDLE_MAX - len(suffix)] + suffix
-        if normalize(candidate) not in folded:
+        if not is_taken(normalize(candidate)):
+            if counters is not None:
+                counters[base] = number + 1
             return candidate
         number += 1
 
