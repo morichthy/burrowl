@@ -10,7 +10,7 @@ from collections.abc import Callable
 from typing import Any
 
 from .clock import is_utc
-from .errors import schema_error
+from .errors import BurrowlError, schema_error
 from .facets import validate_knowledge_facets
 from .hashing import canonical_hash, is_sha256
 from .jsonschema import pointer, validate
@@ -51,6 +51,18 @@ SourceReader = Callable[[dict], str]
 def content_hash(record: dict) -> str:
     return canonical_hash({key: record[key] for key in CONTENT_FIELDS
                            if key not in OPTIONAL_CONTENT_FIELDS or record.get(key)})
+
+
+REF_SHAPE = "{target_kind: record|file|owner|claim, target_id, revision, sha256, locator, relation}"
+
+
+def require_ref(value: Any, field: str) -> dict:
+    """入口参数里的固定引用必须是完整的引用对象；只写一个 ID 字符串时给出参数错误，而不是在深处报内部错误。"""
+    if not isinstance(value, dict) or value.get("target_kind") not in {"record", "file", "owner", "claim"}             or not isinstance(value.get("target_id"), str) or not value["target_id"]:
+        raise BurrowlError("INVALID_ARGUMENT", f"{field} 必须是固定引用对象，不能只写 ID",
+                           {"field": field, "expected": REF_SHAPE,
+                            "hint": "记录引用取 memory.inspect 中的 revision 与 record_hash；检索命中可直接用其 ref"})
+    return value
 
 
 def handle_errors(handle: object) -> str | None:

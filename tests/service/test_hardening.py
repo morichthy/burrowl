@@ -5,7 +5,7 @@ import uuid
 import pytest
 
 from burrowl.core.errors import BurrowlError
-from burrowl.services.memory import export
+from burrowl.services.memory import associations, export
 from burrowl.services.runs import RunService
 from tests.service.helpers import AI, narrative_draft, register_source, request, services
 
@@ -73,6 +73,20 @@ def test_feedback_is_idempotent_per_request_id(setup):
         export.feedback(memory, "RES-ORDER", query_id="Q-1", target=target, label="outcome", actor=AI,
                         adopted_in={"target_kind": "owner", "target_id": "RES-ORDER", "revision": None,
                                     "sha256": None, "locator": "", "relation": "used_in"})
+
+
+def test_bare_ids_where_refs_are_required_are_argument_errors(setup):
+    """关联两端、反馈目标只写 ID 字符串（或缺 target_id）时是参数错误，不是内部 TypeError/KeyError。"""
+    storage, memory, _runs = setup
+    storage.owners.create("knowledge", "notes", "笔记")
+    with pytest.raises(BurrowlError) as caught:
+        associations.decide(memory, "KNW-NOTES", {"from": "KNW-NOTES", "to": "RES-ORDER", "explanation": "相关"},
+                            actor=AI, reason="快速添加")
+    assert caught.value.code == "INVALID_ARGUMENT" and caught.value.details["field"] == "payload.from"
+    for target in ({"record_id": "MEM-x"}, "MEM-x"):
+        with pytest.raises(BurrowlError) as caught:
+            export.feedback(memory, "RES-ORDER", query_id="Q-1", target=target, label="adopted", actor=AI)
+        assert caught.value.code == "INVALID_ARGUMENT" and caught.value.details["field"] == "target"
 
 
 def test_export_includes_fixed_sources(setup):

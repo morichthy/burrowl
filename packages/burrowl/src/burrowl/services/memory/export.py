@@ -5,6 +5,7 @@ import uuid
 
 from ...core.errors import BurrowlError
 from ...core.hashing import canonical_hash
+from ...core.records import require_ref
 from ...core.technical import render_full
 from . import raw_materials
 from .context import RefResolver
@@ -73,6 +74,9 @@ def feedback(memory: MemoryService, owner_id: str, *, query_id: str, target: dic
 
     幂等：同一 request_id 的重试返回原回执（指纹绑定反馈内容，不受 HEAD 变化影响）。
     """
+    require_ref(target, "target")
+    if adopted_in is not None:
+        require_ref(adopted_in, "adopted_in")
     if label == "outcome":
         if not adopted_in:
             raise BurrowlError("INVALID_ARGUMENT", "实际应用结果需引用后续 Run 或记录")
