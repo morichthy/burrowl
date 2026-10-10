@@ -15,11 +15,12 @@
 import heapq
 from collections import Counter
 from collections.abc import Iterator
+from datetime import datetime
 from itertools import islice
 
 from ..core.errors import BurrowlError
 from ..storage.hub_state import HubState
-from ..storage.owners import Owner
+from ..storage.owners import Owner, OwnerIndex
 from .memory.context import Storage
 
 KINDS = ("owner", "attribution", "save", "review", "run", "publish")
@@ -147,30 +148,30 @@ class ActivityLog:
             raise BurrowlError("INVALID_ARGUMENT", "未知的操作类型", {"kinds": sorted(unknown), "allowed": list(KINDS)})
         wanted = set(kinds or KINDS)
         registry = self.storage.owners.scan()
-        owners = [o for o in registry.readable() if owner_id is None or o.owner_id == owner_id
-                  or (o.owner_type == "run" and o.native.get("owner_id") == owner_id)]
+        owners = [o for o in registry.readable() if owner_id is None or o.owner_id == owner_id]
         if owner_id and not owners:
             registry.get(owner_id).require_readable()
         streams = [self._owner_stream(o, wanted) for o in owners]
+        # R14：Run 不在对象列表中。指定对象时只列它位置下的 Run；全局时按目录修改时间惰性读取，页满即停
+        if "run" in wanted and owner_id:
+            streams += [self._run_stream(r, registry.run_parent(r)) for o in owners for r in registry.runs_under(o)
+                        if r.readable]
+        elif "run" in wanted:
+            streams.append(self._all_runs_stream(registry))
         if self.hub_state is not None and "publish" in wanted and owner_id is None:
             streams.append(self._publish_stream())
         merged = heapq.merge(*streams, key=_sort_key, reverse=True)
         if before:
             merged = (e for e in merged if _cursor(e) < before)
         page = list(islice(merged, limit + 1))
+        registry.recheck_runs()  # 惰性读 Run 卡共用了目录枚举，返回前复核
         items = [e | {"cursor": _cursor(e)} for e in page[:limit]]
         return {"items": items, "next_before": items[-1]["cursor"] if len(page) > limit else None}
 
     # ---------- 各来源（每个都按时间倒序产出）----------
     def _owner_stream(self, owner: Owner, wanted: set[str]) -> Iterator[dict]:
         events: list[dict] = []
-        if owner.owner_type == "run":
-            line = run_line(owner.native) if "run" in wanted else None
-            if line and owner.native.get("ended_at"):
-                events.append({"at": owner.native["ended_at"], "kind": "run", "actor": "—",
-                               "owner_id": owner.native.get("owner_id") or owner.owner_id, "summary": line,
-                               "ref": {"kind": "run", "run_id": owner.owner_id}})
-        elif "owner" in wanted:
+        if "owner" in wanted:
             adopted = owner.id_field is None
             at = owner.created_at if adopted else owner.native.get("created_at")
             if at:
@@ -180,6 +181,35 @@ class ActivityLog:
         commits = self._commit_stream(owner, wanted) if owner.persisted and wanted & {"attribution", "save",
                                                                                          "review"} else iter(())
         return heapq.merge(commits, iter(events), key=_sort_key, reverse=True)
+
+    @staticmethod
+    def _run_stream(run: Owner, parent: Owner | None) -> Iterator[dict]:
+        """Run 结束事件；归到上级对象（R14 D-04 按位置），独立 Run 归到它自己。"""
+        line = run_line(run.native)
+        if line and run.native.get("ended_at"):
+            yield {"at": run.native["ended_at"], "kind": "run", "actor": "—",
+                   "owner_id": parent.owner_id if parent else run.owner_id, "summary": line,
+                   "ref": {"kind": "run", "run_id": run.owner_id}}
+
+    @classmethod
+    def _all_runs_stream(cls, registry: OwnerIndex) -> Iterator[dict]:
+        """全部 Run 的结束事件，按 _sort_key 倒序惰性产出，不读全部 Run 卡。
+
+        Run 目录的修改时间不早于它最后一次改写 run.json，因而不早于 ended_at。按修改时间从新到旧读卡，
+        堆顶事件的时间不早于"下一个未读目录的修改时间 + 容差"时，剩下的 Run 都不可能排在它前面，即可产出。"""
+        pending = sorted(registry.run_entries(), key=lambda entry: entry[1], reverse=True)
+        heap: list[tuple[_Desc, int, dict]] = []
+        for position in range(len(pending) + 1):
+            bound = pending[position][1] + MTIME_SLACK if position < len(pending) else None
+            while heap and (bound is None or _timestamp(heap[0][2]["at"]) >= bound):
+                yield heapq.heappop(heap)[2]
+            if position == len(pending):
+                return
+            run = registry.load_run(pending[position][0])
+            if run is None or not run.readable:
+                continue
+            for event in cls._run_stream(run, registry.run_parent(run)):
+                heapq.heappush(heap, (_Desc(_sort_key(event)), position, event))
 
     def _commit_stream(self, owner: Owner, wanted: set[str]) -> Iterator[dict]:
         store = self.storage.store
@@ -201,6 +231,27 @@ class ActivityLog:
                  "ref": {"kind": "hub_run", "connector_id": run["connector_id"], "run_id": run["run_id"]}}
                 for run in self.hub_state.finished_runs()]
         yield from sorted(rows, key=_sort_key, reverse=True)
+
+
+MTIME_SLACK = 2.0  # 秒：目录修改时间的精度与时钟误差容差
+
+
+class _Desc:
+    """让 heapq（最小堆）按 _sort_key 倒序弹出。"""
+    __slots__ = ("key",)
+
+    def __init__(self, key: tuple):
+        self.key = key
+
+    def __lt__(self, other: "_Desc") -> bool:
+        return self.key > other.key
+
+
+def _timestamp(at: str | None) -> float:
+    try:
+        return datetime.fromisoformat(str(at).replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return float("-inf")  # 无法解析的时间排在最后
 
 
 def _sort_key(event: dict) -> tuple:

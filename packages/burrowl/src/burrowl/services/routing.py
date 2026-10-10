@@ -28,12 +28,14 @@ def route(storage: Storage, index: IndexService, reading: ReadingService, *, tas
         raise BurrowlError("INVALID_ARGUMENT", "limit 范围 1..10", {"limit": limit})
     registry = storage.owners.scan()
     concept_owner = index.concept_owner()
-    # Run 不是工作目标，证据归到父对象；概念库不承接任务成果。
-    parent_of = {o.owner_id: o.native.get("owner_id") for o in registry.readable("run")}
-    routable = {o.owner_id: o for o in registry.readable() if o.owner_type != "run" and o.owner_id != concept_owner}
+    # Run 不是工作目标，证据归到上级对象（R14 D-04 按位置）；概念库不承接任务成果。
+    routable = {o.owner_id: o for o in registry.readable() if o.owner_id != concept_owner}
 
     def target(owner_id: str | None) -> str | None:
-        owner_id = parent_of.get(owner_id, owner_id) if owner_id else None
+        if owner_id and owner_id.casefold().startswith("run-"):
+            run = registry.find(owner_id)
+            parent = registry.run_parent(run) if run is not None and run.owner_type == "run" else None
+            owner_id = parent.owner_id if parent else None
         return owner_id if owner_id in routable else None
 
     evidence: dict[str, list[dict]] = {}

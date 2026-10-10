@@ -53,6 +53,7 @@ export function Maintenance() {
     <>
       <MonitorPanel />
       <PlanPanel />
+      <RunsPanel />
       <RootsPanel />
       <SourcesPanel />
     </>
@@ -279,6 +280,122 @@ interface WorkRoot {
   path: string;
   title: string;
   relocated_from?: string[];
+}
+
+interface RunRow {
+  run_id: string;
+  title: string;
+  status: string | null;
+  owner_id: string | null;
+  ended_at: string | null;
+  path: string;
+}
+
+interface TrashedRun {
+  run_id: string;
+  original_path: string;
+  reason: string;
+  discarded_at: string;
+}
+
+// R14：Run 是执行证据，不进检索。这里列出还没被任何 L1–L4 记录引用的 Run（知识尚未写成记录），
+// 以及回收站里已丢弃的 Run。丢弃与恢复可撤销；清空回收站是永久删除，只能在这里由用户执行。
+function RunsPanel() {
+  const unfixed = useOp<RunRow[]>("runs.search", { unfixed_only: true, limit: 200 });
+  const trash = useOp<TrashedRun[]>("runs.trash");
+  const discard = useAction("runs.discard");
+  const restore = useAction("runs.restore");
+  const empty = useAction("runs.empty_trash");
+  const reload = () => {
+    unfixed.reload();
+    trash.reload();
+  };
+  const rows = unfixed.data ?? [];
+  const trashed = trash.data ?? [];
+  return (
+    <Panel title={`未写成记录的 Run（${rows.length}）`}>
+      <p className="hint">
+        Run 只是执行证据：执行得到的知识要写进对象的记录并引用它。下面的 Run 还没被任何 L1–L4 记录引用；没有知识的可以丢弃到回收站（可恢复）。
+      </p>
+      <ErrorBox error={unfixed.error ?? trash.error ?? discard.error ?? restore.error ?? empty.error} />
+      <Loading show={unfixed.loading} />
+      {!unfixed.loading && unfixed.data && rows.length === 0 ? <Empty>所有 Run 都已被记录引用。</Empty> : null}
+      <table className="table">
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.run_id}>
+              <td>
+                <code>{r.run_id}</code>
+                <div>{r.title}</div>
+              </td>
+              <td className="hint">
+                {r.owner_id ? <a href={href("memory", r.owner_id)}>{r.owner_id}</a> : "独立 Run"} · {r.status ?? "—"}
+                {r.ended_at ? (
+                  <>
+                    {" "}
+                    · <Time value={r.ended_at} />
+                  </>
+                ) : null}
+              </td>
+              <td>
+                <button
+                  type="button"
+                  className="small"
+                  disabled={discard.busy}
+                  onClick={async () => {
+                    const reason = window.prompt(`丢弃 ${r.run_id} 的理由（例如：临时测试，没有可复用的内容）`);
+                    if (reason?.trim() && (await discard.run({ run_id: r.run_id, reason }))) reload();
+                  }}
+                >
+                  丢弃到回收站
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <h4>回收站（{trashed.length}）</h4>
+      {trashed.length === 0 ? <p className="hint">回收站是空的。</p> : null}
+      <table className="table">
+        <tbody>
+          {trashed.map((t) => (
+            <tr key={t.run_id}>
+              <td>
+                <code>{t.run_id}</code>
+                <div className="hint">{t.original_path}</div>
+              </td>
+              <td className="hint">
+                {t.reason} · <Time value={t.discarded_at} />
+              </td>
+              <td>
+                <button
+                  type="button"
+                  className="small"
+                  disabled={restore.busy}
+                  onClick={async () => (await restore.run({ run_id: t.run_id })) && reload()}
+                >
+                  恢复
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {trashed.length ? (
+        <button
+          type="button"
+          className="small danger"
+          disabled={empty.busy}
+          onClick={async () => {
+            if (window.confirm(`永久删除回收站中的 ${trashed.length} 个 Run？此操作不能撤销。`) && (await empty.run({})))
+              reload();
+          }}
+        >
+          清空回收站（永久删除）
+        </button>
+      ) : null}
+    </Panel>
+  );
 }
 
 function RootsPanel() {

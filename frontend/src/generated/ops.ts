@@ -457,7 +457,7 @@ export declare namespace MonitorObservations {
 
 export declare namespace RunsCreate {
   /**
-   * 新建 Run（一次实际分析/执行的记录容器），默认放在所属对象目录下。
+   * 新建 Run（一次实际执行的证据：输入、程序、输出与失败）。给 owner_id 时放在该对象目录下，否则是独立 Run。
    */
   export interface Args {
     title: string;
@@ -495,12 +495,12 @@ export declare namespace RunsExecute {
 
 export declare namespace RunsUpdate {
   /**
-   * 修改 Run 的结论、限制、状态等（不改输入/产物登记）。
+   * 修改 Run 的执行摘要、限制、状态等（不改输入/产物登记）。
    */
   export interface Args {
     run_id: string;
     /**
-     * 可改：title, question, conclusion, limitations, parameters, status, keywords, parent_run_ids
+     * 可改：title, question, conclusion, limitations, parameters, status, keywords, parent_run_ids。conclusion 只写执行摘要（成功或失败、产物、异常），知识写成记忆记录并引用本 Run
      */
     fields: {
       [k: string]: unknown;
@@ -524,13 +524,53 @@ export declare namespace RunsRollback {
 
 export declare namespace RunsSearch {
   /**
-   * 按标题/问题/关键词查找 Run。
+   * 按标题/问题/关键词查找 Run。Run 不进检索与阅读，这是显式查找 Run 的入口；给 owner_id 时只列该对象目录下的 Run。
    */
   export interface Args {
     query?: string;
     owner_id?: string | null;
     limit?: number;
+    /**
+     * 只列没有被任何 L1–L4 记录引用的 Run（执行知识尚未写成记录）
+     */
+    unfixed_only?: boolean;
   }
+}
+
+export declare namespace RunsDiscard {
+  /**
+   * 丢弃没有知识的 Run：当前没有任何记录引用时，把整个 Run 目录移入回收站（可用 runs.restore 恢复）。
+   */
+  export interface Args {
+    run_id: string;
+    /**
+     * 为什么没有可写成记录的内容，例如：临时测试，沉淀检查无可复用的方法、边界或失败教训
+     */
+    reason: string;
+  }
+}
+
+export declare namespace RunsTrash {
+  /**
+   * 回收站中已丢弃的 Run（原位置、理由、时间、执行者）。
+   */
+  export interface Args {}
+}
+
+export declare namespace RunsRestore {
+  /**
+   * 把回收站中的 Run 移回原位置（原位置已被占用时拒绝）。
+   */
+  export interface Args {
+    run_id: string;
+  }
+}
+
+export declare namespace RunsEmptyTrash {
+  /**
+   * 永久删除回收站中的全部 Run。用户专属，只在工作台与 CLI 提供。
+   */
+  export interface Args {}
 }
 
 export declare namespace SourcesList {
@@ -1693,6 +1733,10 @@ export interface OpArgs {
   "runs.update": RunsUpdate.Args;
   "runs.rollback": RunsRollback.Args;
   "runs.search": RunsSearch.Args;
+  "runs.discard": RunsDiscard.Args;
+  "runs.trash": RunsTrash.Args;
+  "runs.restore": RunsRestore.Args;
+  "runs.empty_trash": RunsEmptyTrash.Args;
   "sources.list": SourcesList.Args;
   "sources.roots": SourcesRoots.Args;
   "sources.add_root": SourcesAddRoot.Args;
@@ -1811,6 +1855,10 @@ export const OP_EFFECTS: Record<OpName, string> = {
   "runs.update": "write",
   "runs.rollback": "write",
   "runs.search": "read",
+  "runs.discard": "write",
+  "runs.trash": "read",
+  "runs.restore": "write",
+  "runs.empty_trash": "user",
   "sources.list": "read",
   "sources.roots": "read",
   "sources.add_root": "write",

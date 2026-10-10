@@ -17,6 +17,7 @@ from ...core.errors import BurrowlError
 from ...core.hashing import canonical_hash
 from ...index import query_plan
 from ...index.tokenize import tokens
+from ...storage.owners import require_knowledge_scope
 from ..indexing import IndexService
 from ..memory import documents as docs
 from ..memory.context import Storage
@@ -98,6 +99,7 @@ class QueryService:
     # ---------- 范围 ----------
     def _owners(self, request: QueryRequest) -> list[str]:
         scope, index = request.scope, self.storage.owners.scan()
+        require_knowledge_scope(scope.owner_ids)
         excluded = set(scope.exclude_ids)
         chosen = [index.get(o) for o in scope.owner_ids] if scope.owner_ids is not None else index.readable()
         return [o.owner_id for o in chosen if o.readable and o.owner_id not in excluded

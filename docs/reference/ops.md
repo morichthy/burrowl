@@ -64,7 +64,7 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | `memory.inspect` | 只读 | 读取对象的当前快照，或某条记录的当前/指定修订（含完整正文与固定引用）。 | `owner_id`*: string，`record_id`: string|null，`revision`: integer|null |
 | `memory.kinds` | 只读 | 全部记录类型：层级、版本、由哪个操作写入、一句话用途。 | 无 |
 | `memory.owner_adopt` | 写入 | 把内容树中已有的文档登记为对象（原件不修改；须给出你看到的字节指纹）。 | `path`*: string，`expected_sha256`*: string |
-| `memory.owner_create` | 写入 | 新建对象（写入业务卡；首次提交记忆时才建立记忆目录）。Run 用 runs.create 建立。 先用 memory.owners 查找：同一目标的继续或子任务沿用已有对象；主题相似只引用；独立交付目标才新建。 core-algorithm 只用于公司文档定义的关键算法，普通脚本/模块/工具不要建算法卡。 knowledge 用于全库唯一的概念库（建好后把 owner_id 填进配置 graph.concept_owner_id）。 | `owner_type`*: string，`slug`*: string，`title`*: string，`description`: string，`keywords`: array|null，`source_document`: string|null，`short_name`: string|null，`sensitivity`: string |
+| `memory.owner_create` | 写入 | 新建对象（写入业务卡；首次提交记忆时才建立记忆目录）。Run 用 runs.create 建立。 先用 memory.owners 查找：同一目标的继续或子任务沿用已有对象；主题相似只引用；独立交付目标才新建。 core-algorithm 只用于公司文档定义的关键算法，普通脚本/模块/工具不要建算法卡。 knowledge 有两种用途：配置 graph.concept_owner_id 指定的那一个是概念库（只放概念页，建好后把 owner_id 填进该配置）； 其他 knowledge 对象是通用知识对象，承接不属于任何具体研究、项目、工具、数据的知识，按主题复用，主题不同再新建。 | `owner_type`*: string，`slug`*: string，`title`*: string，`description`: string，`keywords`: array|null，`source_document`: string|null，`short_name`: string|null，`sensitivity`: string |
 | `memory.owner_route` | 只读 | 归属判定（只读）：与 reading_start 第一轮相同的召回和筛选包，附上候选的当前目标、最新检查点与来源重叠证据。 只在需要读历史或需要保存时调用（简单问答、无复用价值的小任务不调用）。不给建议动作，由你判断： 选出暂定对象后用 memory_resume 完整阅读，确认是同一目标再第一次保存（memory_commit 带 attribution）； 不相关就换下一个候选或新建。gaps 有索引缺口时，不要因为"没有候选"就新建对象。不建立阅读会话。 | `task`*: string，`variants`: array|null，`protected_terms`: array|null，`paths`: array|null，`owner_hint`: string|null，`limit`: integer |
 | `memory.owners` | 只读 | 列出可读对象（按类型分组，带各层记录数）。 | `owner_types`: array|null，`query`: string |
 | `memory.raw_material` | 只读 | 回读一个原始材料（按清单中的 ID；核对固定字节）。 | `owner_id`*: string，`material_id`*: string，`max_chars`: integer |
@@ -159,12 +159,16 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 
 | 操作 | 类型 | 说明 | 参数 |
 |---|---|---|---|
-| `runs.create` | 写入 | 新建 Run（一次实际分析/执行的记录容器），默认放在所属对象目录下。 | `title`*: string，`owner_id`: string|null，`question`: string，`keywords`: array|null |
+| `runs.create` | 写入 | 新建 Run（一次实际执行的证据：输入、程序、输出与失败）。给 owner_id 时放在该对象目录下，否则是独立 Run。 Run 不保存记忆记录、不进检索；执行得到的知识写进上级对象或合适的知识对象的记录，并引用该 Run。 一次性小任务默认不建 Run，只有执行结果要被记录引用时才建；没有知识的 Run 用 runs.discard 丢弃。 | `title`*: string，`owner_id`: string|null，`question`: string，`keywords`: array|null |
+| `runs.discard` | 写入 | 丢弃没有知识的 Run：当前没有任何记录引用时，把整个 Run 目录移入回收站（可用 runs.restore 恢复）。 失败本身有教训时不要丢弃，写成记录并引用它。被记录引用的 Run 不能丢弃。 | `run_id`*: string，`reason`*: string |
+| `runs.empty_trash` | 仅用户（不暴露给 agent） | 永久删除回收站中的全部 Run。用户专属，只在工作台与 CLI 提供。 | 无 |
 | `runs.execute` | 写入 | 前台运行 Python 脚本并登记输入、输出与日志（失败也登记）。参数可用 {input0}、{output_dir} 占位。 | `run_id`*: string，`script`*: string，`inputs`: array|null，`args`: array|null，`timeout_seconds`: number，`preview`: boolean |
 | `runs.register` | 写入 | 登记已有文件为 Run 的输入/产物（固定字节指纹，可回滚）。 | `run_id`*: string，`inputs`: array|null，`artifacts`: array|null，`preview`: boolean |
+| `runs.restore` | 写入 | 把回收站中的 Run 移回原位置（原位置已被占用时拒绝）。 | `run_id`*: string |
 | `runs.rollback` | 写入 | 按登记回执恢复 run.json（不删除任何文件）。 | `receipt`*: string，`preview`: boolean |
-| `runs.search` | 只读 | 按标题/问题/关键词查找 Run。 | `query`: string，`owner_id`: string|null，`limit`: integer |
-| `runs.update` | 写入 | 修改 Run 的结论、限制、状态等（不改输入/产物登记）。 | `run_id`*: string，`fields`*: object，`expected_sha256`: string|null |
+| `runs.search` | 只读 | 按标题/问题/关键词查找 Run。Run 不进检索与阅读，这是显式查找 Run 的入口；给 owner_id 时只列该对象目录下的 Run。 | `query`: string，`owner_id`: string|null，`limit`: integer，`unfixed_only`: boolean |
+| `runs.trash` | 只读 | 回收站中已丢弃的 Run（原位置、理由、时间、执行者）。 | 无 |
+| `runs.update` | 写入 | 修改 Run 的执行摘要、限制、状态等（不改输入/产物登记）。 | `run_id`*: string，`fields`*: object，`expected_sha256`: string|null |
 
 ## sources
 

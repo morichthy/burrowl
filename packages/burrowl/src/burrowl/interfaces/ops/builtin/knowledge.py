@@ -220,7 +220,10 @@ def monitor_observations(ctx: Ctx, limit: int = 50) -> list:
 @op("runs.create", effect="write")
 def run_create(ctx: Ctx, title: str, owner_id: str | None = None, question: str = "",
                keywords: list[str] | None = None) -> dict:
-    """新建 Run（一次实际分析/执行的记录容器），默认放在所属对象目录下。"""
+    """新建 Run（一次实际执行的证据：输入、程序、输出与失败）。给 owner_id 时放在该对象目录下，否则是独立 Run。
+
+    Run 不保存记忆记录、不进检索；执行得到的知识写进上级对象或合适的知识对象的记录，并引用该 Run。
+    一次性小任务默认不建 Run，只有执行结果要被记录引用时才建；没有知识的 Run 用 runs.discard 丢弃。"""
     return ctx.app.runs.create(title, owner_id=owner_id, question=question, keywords=keywords)
 
 
@@ -242,10 +245,11 @@ def run_execute(ctx: Ctx, run_id: str, script: str, inputs: list[str] | None = N
 
 @op("runs.update", effect="write")
 def run_update(ctx: Ctx, run_id: str, fields: Annotated[dict, Field(description=(
-        "可改：title, question, conclusion, limitations, parameters, status, keywords, parent_run_ids"))],
+        "可改：title, question, conclusion, limitations, parameters, status, keywords, parent_run_ids。"
+        "conclusion 只写执行摘要（成功或失败、产物、异常），知识写成记忆记录并引用本 Run"))],
                expected_sha256: Annotated[str | None, Field(description=(
                    "读取时 run.json 的指纹（上次修改返回的 sha256）；不一致说明别人改过，拒绝覆盖"))] = None) -> dict:
-    """修改 Run 的结论、限制、状态等（不改输入/产物登记）。"""
+    """修改 Run 的执行摘要、限制、状态等（不改输入/产物登记）。"""
     result = ctx.app.runs.update(run_id, fields, expected_sha256=expected_sha256)
     changed = result.get("status") == "updated" and "status" in fields
     return activity.with_activity(result, activity.run_lines(ctx.app.storage, run_id) if changed else [])
@@ -258,9 +262,38 @@ def run_rollback(ctx: Ctx, receipt: str, preview: bool = False) -> dict:
 
 
 @op("runs.search")
-def run_search(ctx: Ctx, query: str = "", owner_id: str | None = None, limit: int = 50) -> list:
-    """按标题/问题/关键词查找 Run。"""
-    return ctx.app.runs.search(query=query, owner_id=owner_id, limit=limit)
+def run_search(ctx: Ctx, query: str = "", owner_id: str | None = None, limit: int = 50,
+               unfixed_only: Annotated[bool, Field(description=(
+                   "只列没有被任何 L1–L4 记录引用的 Run（执行知识尚未写成记录）"))] = False) -> list:
+    """按标题/问题/关键词查找 Run。Run 不进检索与阅读，这是显式查找 Run 的入口；给 owner_id 时只列该对象目录下的 Run。"""
+    return ctx.app.runs.search(query=query, owner_id=owner_id, limit=limit, unfixed_only=unfixed_only)
+
+
+@op("runs.discard", effect="write")
+def run_discard(ctx: Ctx, run_id: str, reason: Annotated[str, Field(description=(
+        "为什么没有可写成记录的内容，例如：临时测试，沉淀检查无可复用的方法、边界或失败教训"))]) -> dict:
+    """丢弃没有知识的 Run：当前没有任何记录引用时，把整个 Run 目录移入回收站（可用 runs.restore 恢复）。
+
+    失败本身有教训时不要丢弃，写成记录并引用它。被记录引用的 Run 不能丢弃。"""
+    return ctx.app.runs.discard(run_id, reason=reason, actor=ctx.actor)
+
+
+@op("runs.trash")
+def run_trash(ctx: Ctx) -> list:
+    """回收站中已丢弃的 Run（原位置、理由、时间、执行者）。"""
+    return ctx.app.runs.trash()
+
+
+@op("runs.restore", effect="write")
+def run_restore(ctx: Ctx, run_id: str) -> dict:
+    """把回收站中的 Run 移回原位置（原位置已被占用时拒绝）。"""
+    return ctx.app.runs.restore(run_id)
+
+
+@op("runs.empty_trash", effect="user")
+def run_empty_trash(ctx: Ctx) -> dict:
+    """永久删除回收站中的全部 Run。用户专属，只在工作台与 CLI 提供。"""
+    return ctx.app.runs.empty_trash()
 
 
 # ---------- 来源登记 ----------

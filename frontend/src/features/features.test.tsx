@@ -79,6 +79,22 @@ describe("阅读会话列表刷新", () => {
     expect(calls.some((c) => c.name === "memory.activity" && c.args.limit === 20)).toBe(true);
   });
 
+  it("Run 结束：对象内 Run 链到上级对象，独立 Run 链到维护页（R14）", async () => {
+    handlers["reading.list"] = () => [];
+    handlers["review.queue"] = () => ({ counts: {} });
+    handlers["system.capabilities"] = () => ({ data_dir: "data", vector: { backend: "sqlite", embedder: null, ready: false }, reranker: { ready: false }, connectors: [] });
+    handlers["memory.activity"] = () => ({
+      items: [
+        { at: "2026-10-10T02:00:00Z", kind: "run", actor: "—", owner_id: "RES-X", summary: "RUN-1 完成「实验」", cursor: "c1", ref: { kind: "run", run_id: "RUN-1" } },
+        { at: "2026-10-10T01:00:00Z", kind: "run", actor: "—", owner_id: "RUN-2", summary: "RUN-2 失败「临时测试」", cursor: "c2", ref: { kind: "run", run_id: "RUN-2" } },
+      ],
+      next_before: null,
+    });
+    render(<Home />);
+    expect((await screen.findByText("RUN-1 完成「实验」")).closest("a")?.getAttribute("href")).toBe("#/memory/RES-X");
+    expect(screen.getByText("RUN-2 失败「临时测试」").closest("a")?.getAttribute("href")).toBe("#/maintenance");
+  });
+
   it("阅读会话页在会话创建后自动更新列表", async () => {
     let created = false;
     handlers["reading.list"] = () => (created ? [listedSession] : []);
@@ -135,7 +151,7 @@ describe("知识复核", () => {
       status: "maturity-requested",
       maturity: "preliminary",
       requested_maturity: "established",
-      stats: { supports: 2, contradicts: 0, open_counterexamples: 0, cited_by: 1, run_inputs: 0 },
+      stats: { supports: 2, contradicts: 0, open_counterexamples: 0, cited_by: 1 },
       review: { state: "not-reviewed", reason: "两次复算一致", scope: null, updated_at: "2026-10-09T00:00:00Z", revision: 1 },
     };
     handlers["review.queue"] = () => ({ items: [proposed], total: 1, counts: { "maturity-requested": 1 } });
@@ -283,5 +299,38 @@ describe("维护与监测", () => {
     fireEvent.click(await screen.findByRole("button", { name: "停用" }));
     await waitFor(() => expect(calls.some((c) => c.name === "sources.update")).toBe(true));
     expect(calls.find((c) => c.name === "sources.update")!.args).toEqual({ source_id: "SRC-1", enabled: false });
+  });
+});
+
+describe("维护页的 Run（R14）", () => {
+  it("列出未写成记录的 Run，丢弃需写理由，回收站可恢复与清空", async () => {
+    const { Maintenance } = await import("./Maintenance");
+    let trashed = false;
+    handlers["monitor.observations"] = () => [];
+    handlers["monitor.candidates"] = () => [];
+    handlers["sources.list"] = () => [];
+    handlers["sources.roots"] = () => ({ roots: [], work_dir: null });
+    handlers["runs.search"] = () =>
+      trashed ? [] : [{ run_id: "RUN-9", title: "临时测试", status: "succeeded", owner_id: null, ended_at: null, path: "runs/run-9/run.json" }];
+    handlers["runs.trash"] = () =>
+      trashed ? [{ run_id: "RUN-9", original_path: "runs/run-9", reason: "无可复用内容", discarded_at: "2026-10-10T00:00:00Z" }] : [];
+    handlers["runs.discard"] = () => {
+      trashed = true;
+      return { status: "discarded" };
+    };
+    handlers["runs.restore"] = () => ({ status: "restored" });
+    handlers["runs.empty_trash"] = () => ({ removed: ["run-9"] });
+    vi.stubGlobal("prompt", vi.fn(() => "无可复用内容"));
+    vi.stubGlobal("confirm", vi.fn(() => true));
+    render(<Maintenance />);
+    expect(await screen.findByText("临时测试")).toBeInTheDocument();
+    expect(calls.find((c) => c.name === "runs.search")!.args).toMatchObject({ unfixed_only: true });
+    fireEvent.click(screen.getByRole("button", { name: "丢弃到回收站" }));
+    await waitFor(() => expect(calls.some((c) => c.name === "runs.discard")).toBe(true));
+    expect(calls.find((c) => c.name === "runs.discard")!.args).toEqual({ run_id: "RUN-9", reason: "无可复用内容" });
+    fireEvent.click(await screen.findByRole("button", { name: "恢复" }));
+    await waitFor(() => expect(calls.find((c) => c.name === "runs.restore")?.args).toEqual({ run_id: "RUN-9" }));
+    fireEvent.click(screen.getByRole("button", { name: "清空回收站（永久删除）" }));
+    await waitFor(() => expect(calls.some((c) => c.name === "runs.empty_trash")).toBe(true));
   });
 });

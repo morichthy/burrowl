@@ -19,8 +19,10 @@ def test_sample_owners_and_fingerprints(sample_workspace):
     index = memory.owners()
     research = index.get("RES-FLOATING-POINT-SUMMATION")
     assert research.persisted and research.memory_home == "research/floating-point-summation/memory"
-    runs = index.readable("run")
-    assert len(runs) == 5
+    # R14 D-02 / D-04：Run 不在对象列表中，按位置找到；样例中 3 个 Run 的业务卡 owner_id 为空，仍归研究对象
+    assert index.readable("run") == []
+    runs = index.all_runs()
+    assert len(runs) == 5 and all(index.run_parent(r).owner_id == research.owner_id for r in runs)
     # 样例记录中 owner 引用的指纹必须等于新实现算出的业务卡指纹。
     records = memory.snapshot(research).records.values()
     owner_refs = [ref for r in records for ref in r["sources"] if ref["target_kind"] == "owner"]

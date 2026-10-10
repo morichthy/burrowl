@@ -53,7 +53,8 @@ def owner_create(ctx: Ctx, owner_type: Literal["research", "project", "core-algo
 
     先用 memory.owners 查找：同一目标的继续或子任务沿用已有对象；主题相似只引用；独立交付目标才新建。
     core-algorithm 只用于公司文档定义的关键算法，普通脚本/模块/工具不要建算法卡。
-    knowledge 用于全库唯一的概念库（建好后把 owner_id 填进配置 graph.concept_owner_id）。"""
+    knowledge 有两种用途：配置 graph.concept_owner_id 指定的那一个是概念库（只放概念页，建好后把 owner_id 填进该配置）；
+    其他 knowledge 对象是通用知识对象，承接不属于任何具体研究、项目、工具、数据的知识，按主题复用，主题不同再新建。"""
     fields = {"description": description, "keywords": keywords or [], "sensitivity": sensitivity}
     if source_document:
         fields["source_document"] = source_document

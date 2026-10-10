@@ -31,6 +31,7 @@ requires_tools: [memory_inspect, memory_document, memory_timeline, memory_contra
    - 用 `memory_document(view="impact")` 比较文稿固定的依据和当前修订；再用 `memory_timeline` 盘点上次文稿之后的新记录，特别是文稿没引用的新技术内容、经过、经验、反例和 Run。
    - 在工作清单里维护一张表，列：记录（旧 → 新版本）、受影响章节/概览/认识、实际阅读范围、处置（保留/修订/新增/撤回/暂缓）、理由。
    - 区分"引用旧版仍然适用"和"还没同步"。
+   - `memory_consolidate_prepare` 的 `unfixed_evidence` 列出本对象下没有被任何 L1–L4 引用的 Run 和 L0 记录：逐项补写记录并引用；确实没有知识的 Run 用 `runs_discard` 丢弃；L0 不需要时在处置说明里写明理由。
 3. **修订内容与文稿**：
    - 同一内容的演进沿用原记录 ID 修订，新的独立内容才新建；保留失败和适用边界。
    - 先保存被引用的技术内容、经过、经验，再更新概览和受影响章节，最后更新文稿根的 `section_refs`。未变化的内容沿用原修订，不为收口制造全量新版本。

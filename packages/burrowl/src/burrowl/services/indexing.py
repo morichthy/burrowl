@@ -21,7 +21,7 @@ from ..index.embed import Embedder, FakeEmbedder, FastEmbedEmbedder, query_trunc
 from ..index.fusion import fuse_routes, owner_key, record_key, rrf
 from ..storage.owners import Owner, OwnerIndex
 from .memory import concepts
-from .memory.claims import ClaimGraph
+from .memory.claims import ClaimGraph, iter_refs
 from .memory.context import Storage
 
 Corpus = Literal["fulltext", "discovery", "source"]
@@ -117,10 +117,14 @@ class IndexService:
                                      owner.fingerprint, tuple(owner.native.get("keywords", [])),
                                      str(owner.native.get("description") or owner.native.get("question") or ""))
         maturity = {cid: graph.maturity(cid)["maturity"] for cid in badges}
-        parent = owner.native.get("owner_id") if owner.owner_type == "run" else None
+        # R14 D-11：本对象记录引用的 Run 由本对象投影节点（Run 自己不再投影）
+        run_ids = {ref["target_id"] for r in records for ref in iter_refs([r["sources"], r["payload"]])
+                   if ref.get("target_kind") == "owner" and str(ref.get("target_id", "")).startswith("RUN-")}
+        run_titles = {rid: run.title for rid in sorted(run_ids)
+                      if (run := graph.index.find(rid)) is not None and run.owner_type == "run" and run.readable}
         return (snapshot.head if snapshot else None,
                 {} if graph_only else {corpus: build(info, records, badges, hidden) for corpus, build in BUILDERS.items()},
-                graph_projection.graph(info, records, badges, hidden, maturity, produced_by=parent))
+                graph_projection.graph(info, records, badges, hidden, maturity, run_titles))
 
     def ensure_graph(self) -> dict:
         """只补齐不新鲜的图投影（关系页和图路线用）；不重算检索条目、不调用嵌入模型。"""

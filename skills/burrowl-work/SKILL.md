@@ -25,7 +25,8 @@ requires_tools: [memory_owner_route, memory_owners, memory_owner_create, memory_
 4. **执行**：
    - 独立的执行建 Run：新 Python 脚本用 `runs_execute`，它会固定脚本和输入的指纹，捕获输出与日志，失败也完整登记；已有产物或其他工具的结果用 `runs_register`。
    - 工作目录里的脚本和输入先 `sources_register`，再把 SRC- ID 传给 Run（Run 只接受 SRC- ID 或数据目录内的相对路径）。Run 的输出与日志存在数据目录的 Run 目录下。
-   - 结束时用 `runs_update` 填写 conclusion 和 limitations；还没有结论就把 status 写成未完成，不把日志当总结。
+   - 结束时用 `runs_update` 写执行摘要（conclusion：成功或失败、产物、异常）和 limitations；还没跑完就把 status 写成未完成，不把日志当总结。
+   - Run 不保存记录：执行得到的知识在第 5 步写进上级对象（独立 Run 按 RULES 第 2 节选对象）并引用该 Run。没有可写成记录的内容时，用 `runs_discard` 丢弃。
    - 没有执行的分析直接写记录，不虚构 Run。
 5. **保存**：
    - 有用内容按 L0–L4 职责写草案，先调用 `memory_contract(kind)` 查字段和示例。

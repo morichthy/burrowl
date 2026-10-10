@@ -27,6 +27,7 @@ from ...core.hashing import canonical_hash
 from ...index import conditions as field_conditions
 from ...index import query_plan
 from ...storage import terms as term_store
+from ...storage.owners import require_knowledge_scope
 from ..indexing import IndexService
 from ..memory import concepts
 from ..memory.context import Storage
@@ -218,6 +219,7 @@ class ReadingService:
         if strategy not in STRATEGIES:
             raise BurrowlError("INVALID_ARGUMENT", "strategy 只能是 standard / associative / quick")
         checked = field_conditions.validate_conditions(field_conditions_)
+        require_knowledge_scope(scope_owner_ids)
         plan = self._plan(question, variants=variants, protected_terms=protected_terms, domains=domains)
         session = new_session(question=question, conditions=conditions or [], strategy=strategy,
                               review_filter=review_filter or cfg.review_filter, owner_id=owner_id,
