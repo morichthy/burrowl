@@ -1,0 +1,15 @@
+{
+  "command": [
+    "C:\\Users\\livky\\.codex\\worktrees\\cf08\\A_work_auto_flow\\services\\qdrant\\runtime\\python.exe",
+    "-X",
+    "utf8",
+    "C:\\Users\\livky\\.codex\\worktrees\\cf08\\A_work_auto_flow\\runs\\run-20260908t201228z-a0980824dc18\\reproduce.py",
+    "--input",
+    "C:\\Users\\livky\\.codex\\worktrees\\cf08\\A_work_auto_flow\\runs\\run-20260908t201228z-a0980824dc18\\inputs.json",
+    "--output",
+    "C:\\Users\\livky\\.codex\\worktrees\\cf08\\A_work_auto_flow\\runs\\run-20260908t201228z-a0980824dc18\\results.json"
+  ],
+  "started_at": "2026-09-08T20:12:29.088131+00:00",
+  "ended_at": "2026-09-08T20:12:29.365739+00:00",
+  "exit_code": 0
+}

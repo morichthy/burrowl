@@ -1,0 +1,27 @@
+{
+  "command": [
+    "D:\\共享桌面\\A_work\\A_work_auto_flow_plus\\.venv\\Scripts\\python.exe",
+    "C:\\Users\\livky\\AppData\\Local\\Temp\\burrowl-compat-n4w_hor7\\data\\research\\floating-point-summation\\compat_analyze.py",
+    "C:\\Users\\livky\\AppData\\Local\\Temp\\burrowl-compat-n4w_hor7\\work\\inputs\\samples.csv"
+  ],
+  "started_at": "2026-10-10T20:34:47.819633Z",
+  "python": "3.12.15 (main, Oct  3 2026, 01:05:37) [MSC v.1944 64 bit (AMD64)]",
+  "inputs": [
+    {
+      "path": "research/floating-point-summation/compat_analyze.py",
+      "sha256": "47ddf3ba24322f2e2ea5923bb14dfc95003b551bb2b85a9031739e0fb33e25b9",
+      "role": "script",
+      "registered_at": "2026-10-10T20:34:47.796850Z"
+    },
+    {
+      "path": "SRC-COMPAT-SAMPLES",
+      "sha256": "2a2b86e74ffd5e6a9b75e52a105cf9d02920837179f8e8961aa15411d380f7a3",
+      "role": "input",
+      "registered_at": "2026-10-10T20:34:47.805606Z"
+    }
+  ],
+  "exit_code": 0,
+  "status": "succeeded",
+  "errors": [],
+  "ended_at": "2026-10-10T20:34:47.949665Z"
+}

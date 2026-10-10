@@ -1,0 +1,61 @@
+{
+  "round": 2,
+  "question": "Kahan补偿能否修复三个数的所有排列？Neumaier与fsum如何？",
+  "methods": [
+    "sequential",
+    "kahan",
+    "neumaier",
+    "math.fsum"
+  ],
+  "cases": [
+    {
+      "name": "permutation-1",
+      "values": [
+        "1e16",
+        "1",
+        "-1e16"
+      ]
+    },
+    {
+      "name": "permutation-2",
+      "values": [
+        "1e16",
+        "-1e16",
+        "1"
+      ]
+    },
+    {
+      "name": "permutation-3",
+      "values": [
+        "1",
+        "1e16",
+        "-1e16"
+      ]
+    },
+    {
+      "name": "permutation-4",
+      "values": [
+        "1",
+        "-1e16",
+        "1e16"
+      ]
+    },
+    {
+      "name": "permutation-5",
+      "values": [
+        "-1e16",
+        "1e16",
+        "1"
+      ]
+    },
+    {
+      "name": "permutation-6",
+      "values": [
+        "-1e16",
+        "1",
+        "1e16"
+      ]
+    }
+  ],
+  "seed": null
+}

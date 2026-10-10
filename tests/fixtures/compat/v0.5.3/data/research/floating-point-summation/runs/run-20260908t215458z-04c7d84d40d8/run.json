@@ -1,0 +1,201 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-20260908T215458Z-04C7D84D40D8",
+  "owner_id": "RES-FLOATING-POINT-SUMMATION",
+  "project_id": null,
+  "title": "逐步误差轨迹复核：隔离绘图环境复试",
+  "keywords": [
+    "浮点求和",
+    "逐步误差",
+    "抵消",
+    "Kahan",
+    "Neumaier"
+  ],
+  "review_history": [],
+  "claims": [],
+  "dependencies": [],
+  "run_type": "analysis",
+  "status": "succeeded",
+  "created_at": "2026-09-08T21:54:58Z",
+  "started_at": "2026-09-08T21:55:16.948220Z",
+  "ended_at": "2026-09-08T22:02:41.768199Z",
+  "owner": "AI research assistant",
+  "question": "旧三轮的每个结果能否逐项复现，补偿变量如何产生抵消反例？",
+  "hypotheses": [],
+  "inputs": [
+    {
+      "path": "runs/run-20260908t201214z-d0ab308f66ad/inputs.json",
+      "sha256": "83d97bbfcf42bdbbe3780df71d202033bc8cede38f197913da5d0b77f5f7cf45"
+    },
+    {
+      "path": "runs/run-20260908t201214z-d0ab308f66ad/results.json",
+      "sha256": "cdb1f9e4f0580d5baaea4a09416f75801e6c5d01eab96c601ded00a28e31134d"
+    },
+    {
+      "path": "runs/run-20260908t201228z-a0980824dc18/inputs.json",
+      "sha256": "a48c045211280be1e1bb58524a8067598eea6d9d8e964a8b513b4b544e195cd6"
+    },
+    {
+      "path": "runs/run-20260908t201228z-a0980824dc18/results.json",
+      "sha256": "f5ef99109b146631abf1fc7256fc62287cbf125c6535ba097da4440570fc8247"
+    },
+    {
+      "path": "runs/run-20260908t201240z-90107a617cf8/inputs.json",
+      "sha256": "9da1f46663a569680b3e61e842f164880d24c047e0ab13ac0471df6683d32561"
+    },
+    {
+      "path": "runs/run-20260908t201240z-90107a617cf8/results.json",
+      "sha256": "693058d77bb3ed61e94535369bbfa4d74b6a2ed7f406a8af0b5782a0dc4fa7ef"
+    }
+  ],
+  "parameters": {
+    "reference": "exact rational sum of represented integer-valued floats",
+    "unit": "dimensionless",
+    "source_rounds": 3,
+    "saved_seed": 20260909
+  },
+  "code": {
+    "commit": null,
+    "dirty": true,
+    "source_snapshot_sha256": "9a640a9950a31e9e82fa68d428eaee0cbf37ef6c5cff058295fe225e1887315d",
+    "source_path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/reproduce.py"
+  },
+  "environment": {
+    "python": "3.12.10",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "lock_or_image_digest": null,
+    "plot_environment": {
+      "matplotlib": "3.10.8",
+      "packages": {
+        "matplotlib": "3.10.8",
+        "numpy": "2.5.3",
+        "pillow": "12.3.0",
+        "contourpy": "1.3.3",
+        "cycler": "0.12.1",
+        "fonttools": "4.64.0",
+        "kiwisolver": "1.5.1",
+        "packaging": "26.3",
+        "pyparsing": "3.3.2",
+        "python-dateutil": "2.9.0.post0",
+        "six": "1.17.0"
+      }
+    }
+  },
+  "random_seeds": [],
+  "quality_results": [
+    {
+      "check": "fixed input SHA and saved final value/error equality",
+      "required": true,
+      "status": "passed"
+    },
+    {
+      "check": "original sampling recipe exactly reproduces all 30 saved arrays",
+      "required": true,
+      "status": "passed"
+    }
+  ],
+  "metrics": {
+    "checked_results": 150,
+    "all_saved_results_match": true,
+    "ulp_at_1e16": 2.0,
+    "sampling_case_count": 30,
+    "sampling_exact_match": true
+  },
+  "artifacts": [
+    {
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/execution.json",
+      "sha256": "b8d5a8f0f7a75a7aed951494d2e07dbc86022fa07acb5738720a9fe7e43d8b23"
+    },
+    {
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/lineage.jsonl",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/operation-traces.json",
+      "sha256": "d7348aca67bf17dc4369a7b8d756b2193571b8c6f7010cc0efb6557ef409da8c"
+    },
+    {
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/round-1-summary.png",
+      "sha256": "043d9bc1c51b300a97a2b915b5c53af73553f1d726b9936c9315a074220fbea8"
+    },
+    {
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/round-2-summary.png",
+      "sha256": "1a7a01affa7bd299c9c0d1652018a5f2e15fa29df034fced669254733da694ad"
+    },
+    {
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/round-3-permutations.png",
+      "sha256": "0fdc0ea6ef408adaf2c7c5c2e56fd0f72e95db032a30d5fc344e3cf9e21bd456"
+    },
+    {
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/round-3-summary.png",
+      "sha256": "7759b89aa016be03e7f18169240dd308c28b21bfafac980c92cbce36bfeeaeee"
+    },
+    {
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/sampling-verification.json",
+      "sha256": "8fc77120e5495b853becd8d160ae84f8c135318eec5dda1f8108b68dd5dfc52d"
+    },
+    {
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/trace-results.json",
+      "sha256": "a09888d9b5c4a669dee0296acd9aa3788d2d73fefe413037ade9e7b29043cf6d"
+    },
+    {
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/verification.json",
+      "sha256": "739d2ce2c6922dc7ce74dfea9ac22d987dd6b8d353484e70c615fc96d2f22074"
+    },
+    {
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/plot-requirements.lock.txt",
+      "sha256": "17f0fde1ad8e3a8331127984b2d1b529ac4bee8fb0bbd402e6e175c8fb210068"
+    },
+    {
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/README.md",
+      "sha256": "5d7d2bd0208cb62b5aeac7d237232eb838b6cd501104fce9e21b1cd8c7091a88"
+    },
+    {
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/reproduce.py",
+      "sha256": "9a640a9950a31e9e82fa68d428eaee0cbf37ef6c5cff058295fe225e1887315d"
+    },
+    {
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/sampling_recipe.py",
+      "sha256": "66604f57648600c24a02cfcf03fb89e25a0e9a1667890b2d202270ac989d2973"
+    },
+    {
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/source-manifest.json",
+      "sha256": "d7958e2c0b086f312113c95b5b5cd242ad3a83e52d3c22ab67f46e1fa18429f2"
+    },
+    {
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/stdout.txt",
+      "sha256": "b6c1f889ffca58eafd5b16464335f096ed37f94f88814ed943cd936f5632c1af"
+    },
+    {
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/steps.jsonl",
+      "sha256": "3d62a72f385c94645b21d08bbf94ba03f5baf3981d1ba27a0dccb2e2bafa202e"
+    }
+  ],
+  "lineage_events": "lineage.jsonl",
+  "conclusion": "150个既有方法结果逐项一致；明确保存了顺序/Kahan/Neumaier的中间变量，math.fsum内部不可见未伪造轨迹。",
+  "limitations": [
+    "仅复核原三轮有限整数浮点输入，不证明任意输入准确。",
+    "本次新执行复核，旧三轮文件和时间未修改。",
+    "数值复算仅用标准库；图形生成使用独立Matplotlib作者环境，工作台阅读PNG无需安装绘图库。"
+  ],
+  "parent_run_ids": [
+    "RUN-20260908T201214Z-D0AB308F66AD",
+    "RUN-20260908T201228Z-A0980824DC18",
+    "RUN-20260908T201240Z-90107A617CF8"
+  ],
+  "related_module_ids": [],
+  "related_research_ids": [
+    "RES-FLOATING-POINT-SUMMATION"
+  ],
+  "related_dataset_ids": [],
+  "review": {
+    "status": "not-reviewed",
+    "reviewer": null,
+    "date": null
+  },
+  "sensitivity": "internal"
+}
