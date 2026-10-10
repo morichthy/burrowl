@@ -38,6 +38,8 @@ CARDS = {"research.json": ("research", "research_id", "RES"), "project.json": ("
          "dataset.json": ("data", "dataset_id", "DAT"), "tool.json": ("tool", "tool_id", "TOOL"),
          "report.json": ("report", "report_id", "RPT"), "knowledge.json": ("knowledge", "knowledge_id", "KNW")}
 CARD_BY_TYPE = {kind: name for name, (kind, _key, _prefix) in CARDS.items()}
+RUN_CARD = "run.json"
+RUNS_DIR = "runs"  # R14：Run 目录（顶层 runs/ 与 <对象目录>/runs/）不参与对象扫描，目录名是小写的 Run 编号
 EXCLUDED_DIRS = {".git", ".burrowl", ".run-captures", "node_modules", "__pycache__", "_template", "templates",
                  ".venv", "venv", ".pytest_cache", ".cache"}
 OWNER_TYPES = tuple(dict.fromkeys(CONTENT_ROOTS.values()))
@@ -109,6 +111,14 @@ class Owner:
                 "persisted": self.persisted, "sensitivity": self.sensitivity}
 
 
+def require_knowledge_scope(owner_ids) -> None:
+    """检索与阅读的对象范围不接受 Run（R14 D-07：Run 是执行证据，不进检索；显式查找用 runs.search）。"""
+    runs = [o for o in owner_ids or [] if str(o).casefold().startswith("run-")]
+    if runs:
+        raise BurrowlError("INVALID_ARGUMENT", "Run 不参与检索与阅读；查找 Run 用 runs.search，或从引用它的记录展开",
+                           {"run_ids": runs, "use": "runs.search"})
+
+
 def _memory_home(native_path: str, is_card: bool) -> str:
     path = PurePosixPath(native_path)
     return (path.parent / "memory").as_posix() if is_card else native_path + ".memory"
@@ -119,9 +129,13 @@ CARD_FIELDS = {"description", "keywords", "question", "source_document", "sensit
 
 
 class OwnerIndex:
-    """一次扫描得到的对象集合。服务在每个操作开始时扫描一次，操作内复用。"""
+    """一次扫描得到的对象集合。服务在每个操作开始时扫描一次，操作内复用。
 
-    def __init__(self, owners: list[Owner]):
+    R14 D-02：`owners` 与 `readable()` 只含知识对象，不含 Run。按编号取 Run（`get` / `find` 传入 RUN-…）
+    时经 RunLocator 按位置查找，结果在本索引内复用；枚举 Run 用 `runs_under` / `all_runs`。
+    """
+
+    def __init__(self, owners: list[Owner], runs: "RunLocator | None" = None):
         self._by_id: dict[str, Owner] = {}
         for owner in owners:
             for key in (owner.owner_id, *owner.aliases):
@@ -130,18 +144,58 @@ class OwnerIndex:
                     raise BurrowlError("INTEGRITY_ERROR", "重复的对象身份或别名", {"owner_id": key})
                 self._by_id[folded] = owner
         self.owners = sorted(owners, key=lambda o: o.owner_id)
+        self._runs = runs
+        self._run_cache: dict[str, Owner | None] = {}
+        self._all_runs: list[Owner] | None = None
 
     def get(self, owner_id: str) -> Owner:
-        owner = self._by_id.get(str(owner_id).casefold())
+        owner = self.find(owner_id)
         if owner is None:
             raise BurrowlError("NOT_FOUND", "对象不存在", {"owner_id": owner_id})
         return owner
 
     def find(self, owner_id: str) -> Owner | None:
-        return self._by_id.get(str(owner_id).casefold())
+        folded = str(owner_id).casefold()
+        owner = self._by_id.get(folded)
+        if owner is None and self._runs is not None and folded.startswith("run-"):
+            if folded not in self._run_cache:
+                self._run_cache[folded] = self._runs.find(str(owner_id), self)
+            owner = self._run_cache[folded]
+        return owner
 
     def readable(self, owner_type: str | None = None) -> list[Owner]:
         return [o for o in self.owners if o.readable and (owner_type is None or o.owner_type == owner_type)]
+
+    # ---------- Run（R14：不在 owners 中）----------
+    def runs_under(self, owner: Owner | None) -> list[Owner]:
+        """某对象位置下的 Run；None 表示顶层 runs/ 下的独立 Run。只列该位置，不枚举全部 Run。"""
+        return self._runs.list_under(owner, self) if self._runs else []
+
+    def all_runs(self) -> list[Owner]:
+        """全部 Run（显式全量：runs.search 无对象限定、维护、全局关键操作记录）。成本随 Run 数增长。"""
+        if self._all_runs is None:
+            self._all_runs = list(self._runs.iter_all(self)) if self._runs else []
+        return self._all_runs
+
+    def run_entries(self) -> list[tuple[str, float]]:
+        """全部 Run 目录（相对路径, 目录修改时间），只列目录、不读业务卡；用于按时间或编号惰性读取。"""
+        return self._runs.entries(self) if self._runs else []
+
+    def recheck_runs(self) -> None:
+        """批量读取（run_entries / load_run）结束、返回数据前调用：核对期间目录未被替换。"""
+        if self._runs is not None:
+            self._runs.recheck()
+
+    def load_run(self, folder: str) -> Owner | None:
+        """读取 run_entries 给出的某个 Run 目录的业务卡；读完后调用 recheck_runs()。"""
+        run = self._runs.load(folder) if self._runs else None
+        if run is not None:
+            self._run_cache.setdefault(run.owner_id.casefold(), run)
+        return run
+
+    def run_parent(self, run: Owner) -> Owner | None:
+        """Run 的上级对象（R14 D-04：按目录位置；None 表示独立 Run）。"""
+        return self._runs.parent_of(run, self) if self._runs else None
 
     def owner_of(self, relative_path: str) -> list[Owner]:
         """数据目录内某个文件所属的对象（由内到外；嵌套时如 Run 在研究目录下，都会列出）。"""
@@ -152,6 +206,8 @@ class OwnerIndex:
             home = native.parent if native.suffix == ".json" else native  # 业务卡所在目录，或被采用的文档本身
             if target == home or home in target.parents:
                 found.append(owner)
+        if self._runs is not None and (run := self._runs.of_path(target)) is not None:
+            found.append(run)  # Run 不在 owners 中，按路径单独找到（独立 Run 的敏感级别只在它自己的卡里）
         return sorted(found, key=lambda o: len(PurePosixPath(o.native_path).parts), reverse=True)
 
     def require_path_readable(self, relative_path: str) -> None:
@@ -206,13 +262,15 @@ class OwnerRegistry:
         cards: dict[str, Owner] = {}
         persisted: list[tuple[str, dict]] = []
         for base in CONTENT_ROOTS:
+            if base == RUNS_DIR:  # R14 D-02：顶层独立 Run 不参与对象扫描
+                continue
             start = safe_path(root, base, scope)
             if not start.is_dir():
                 continue
             for folder, dirs, files in os.walk(start, followlinks=False):
                 rel_folder = Path(folder).relative_to(root).as_posix()
                 for name in list(dirs):
-                    if name.casefold() in EXCLUDED_DIRS:
+                    if name.casefold() in EXCLUDED_DIRS or name == RUNS_DIR:  # R14 D-02：对象内 Run 也不扫描
                         dirs.remove(name)
                     elif name == "memory" or name.endswith(".memory"):
                         dirs.remove(name)  # 记忆目录只读 owner.json，不当作业务内容
@@ -220,7 +278,7 @@ class OwnerRegistry:
                         if descriptor.is_file():
                             persisted.append((f"{rel_folder}/{name}", read_json(descriptor)))
                 for name in files:
-                    if name in CARDS:
+                    if name in CARDS and name != RUN_CARD:  # Run 只经 RunLocator 按位置查找
                         rel = f"{rel_folder}/{name}"
                         owner = self._card_owner(rel, safe_path(root, rel, scope).read_bytes())
                         if owner.owner_id.casefold() in cards:
@@ -237,7 +295,7 @@ class OwnerRegistry:
             if owner.id_field is None:
                 owners.append(owner)
         scope.recheck()
-        return OwnerIndex(owners)
+        return OwnerIndex(owners, RunLocator(self))
 
     def _card_owner(self, rel: str, raw: bytes) -> Owner:
         kind, key, _prefix = CARDS[PurePosixPath(rel).name]
@@ -284,6 +342,8 @@ class OwnerRegistry:
             raise BurrowlError("INVALID_ARGUMENT", "不支持在此创建该类型对象", {"owner_type": owner_type})
         if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", slug):
             raise BurrowlError("INVALID_ARGUMENT", "slug 只能包含小写字母、数字和连字符")
+        if slug == RUNS_DIR:  # runs/ 目录不参与对象扫描（R14 D-02）
+            raise BurrowlError("INVALID_ARGUMENT", "slug 不能是 runs")
         fields = dict(fields or {})
         if set(fields) - CARD_FIELDS:
             raise BurrowlError("INVALID_ARGUMENT", "业务卡只能补充：" + "、".join(sorted(CARD_FIELDS)))
@@ -338,3 +398,129 @@ class OwnerRegistry:
             pass
         self.invalidate()
         return self.scan().get(owner.owner_id)
+
+
+class RunLocator:
+    """R14 D-03 / D-04：按编号与位置定位 Run。
+
+    Run 目录是 `runs/<编号小写>/`（独立 Run）或 `<上级对象目录>/runs/<编号小写>/`（对象内 Run）。按编号查找时只
+    检查这些候选位置（每个知识对象一次），成本与 Run 总数无关；目录名不规范的旧数据才走全量遍历。
+    Run 的上级按目录位置判断；同一目录有多个被采用文档时，才参考业务卡的 owner_id。
+    """
+
+    def __init__(self, registry: OwnerRegistry):
+        self.registry = registry
+        # 批量读取（entries + load）共用的目录枚举：runs/ 目录可能有上千项，逐张读卡时各自列一遍会变成平方级。
+        # 用完必须 recheck()，核对读取期间父目录没有被替换。按编号的单个查找不用它，每次独立做路径检查。
+        self._scope: ReadScope | None = None
+
+    def _bulk(self) -> ReadScope:
+        if self._scope is None:
+            self._scope = ReadScope()
+        return self._scope
+
+    def load(self, folder: str) -> Owner | None:
+        """批量读取中的一张 Run 卡（复用 entries 的目录枚举）。调用方读完后调用 recheck()。"""
+        return self._load(folder, self._bulk())
+
+    def recheck(self) -> None:
+        """核对批量读取期间用过的目录未被替换成链接或联接，然后丢弃枚举缓存。"""
+        if self._scope is not None:
+            scope, self._scope = self._scope, None
+            scope.recheck()
+
+    def entries(self, owners: OwnerIndex) -> list[tuple[str, float]]:
+        """全部 Run 目录与其修改时间（os.scandir 自带的元数据，不额外调用、不读业务卡）。
+
+        目录修改时间是 Run 最后一次改写 run.json 的上界：run.json 经临时文件替换写入，目录项随之变化。"""
+        found = []
+        for base in self._bases(owners):
+            rel = self._runs_dir(base)
+            directory = safe_path(self.registry.ws.root, rel, self._bulk())
+            if not directory.is_dir():
+                continue
+            with os.scandir(directory) as items:
+                for item in items:
+                    if item.is_dir(follow_symlinks=False) and not item.is_junction():
+                        found.append((f"{rel}/{item.name}", item.stat(follow_symlinks=False).st_mtime))
+        return found
+
+    def _load(self, folder: str, scope: ReadScope | None = None) -> Owner | None:
+        path = safe_path(self.registry.ws.root, f"{folder}/{RUN_CARD}", scope)
+        if not path.is_file():
+            return None
+        return self.registry._card_owner(f"{folder}/{RUN_CARD}", path.read_bytes())
+
+    @staticmethod
+    def _bases(owners: OwnerIndex) -> list[str]:
+        """可能放 Run 的位置：顶层，以及每个知识对象业务卡（或被采用文档）所在目录。"""
+        bases = {PurePosixPath(o.native_path).parent.as_posix() for o in owners.owners}
+        return [".", *sorted(b for b in bases if b != ".")]
+
+    @staticmethod
+    def _runs_dir(base: str) -> str:
+        return RUNS_DIR if base == "." else f"{base}/{RUNS_DIR}"
+
+    def find(self, run_id: str, owners: OwnerIndex) -> Owner | None:
+        name = run_id.casefold()
+        if not re.fullmatch(r"run-[0-9a-z-]{1,80}", name):
+            return None
+        root = self.registry.ws.root
+        for base in self._bases(owners):
+            folder = f"{self._runs_dir(base)}/{name}"
+            if (root / folder).is_dir() and (run := self._load(folder)) and run.owner_id.casefold() == name:
+                return run
+        # 慢路径：目录名不是编号小写的旧数据
+        return next((r for r in self.iter_all(owners) if r.owner_id.casefold() == name), None)
+
+    def _list(self, base: str) -> list[Owner]:
+        scope = ReadScope()  # 本次列出共用一份目录枚举，返回前复核
+        directory = safe_path(self.registry.ws.root, self._runs_dir(base), scope)
+        if not directory.is_dir():
+            return []
+        found = []
+        for child in sorted(directory.iterdir()):
+            if child.is_dir() and not child.is_symlink() and (
+                    run := self._load(f"{self._runs_dir(base)}/{child.name}", scope)):
+                found.append(run)
+        scope.recheck()
+        return found
+
+    def iter_all(self, owners: OwnerIndex) -> Iterator[Owner]:
+        seen: dict[str, str] = {}
+        for base in self._bases(owners):
+            for run in self._list(base):
+                key = run.owner_id.casefold()
+                if key in seen:
+                    raise BurrowlError("INTEGRITY_ERROR", "重复的 Run 身份", {"owner_id": run.owner_id,
+                                                                       "paths": [seen[key], run.native_path]})
+                seen[key] = run.native_path
+                yield run
+
+    def parent_of(self, run: Owner, owners: OwnerIndex) -> Owner | None:
+        base = PurePosixPath(run.native_path).parent.parent.parent.as_posix()  # <base>/runs/<id>/run.json
+        if base == ".":
+            return None
+        here = [o for o in owners.owners if PurePosixPath(o.native_path).parent.as_posix() == base]
+        cards = [o for o in here if o.id_field is not None]
+        if len(cards) == 1:
+            return cards[0]
+        declared = run.native.get("owner_id")
+        return next((o for o in here if o.owner_id == declared), None)
+
+    def list_under(self, owner: Owner | None, owners: OwnerIndex) -> list[Owner]:
+        if owner is None:
+            return self._list(".")
+        base = PurePosixPath(owner.native_path).parent.as_posix()
+        return [r for r in self._list(base) if (p := self.parent_of(r, owners)) is not None
+                and p.owner_id == owner.owner_id]
+
+    def of_path(self, target: PurePosixPath) -> Owner | None:
+        """路径位于某个 Run 目录内时返回该 Run（权限检查用）。"""
+        parts = target.parts
+        for i, part in enumerate(parts[:-1]):
+            if part == RUNS_DIR:
+                # 路径不安全时照常报错，不能当作"不属于任何 Run"而放过受限检查
+                if (run := self._load("/".join(parts[:i + 2]))) is not None:
+                    return run
+        return None

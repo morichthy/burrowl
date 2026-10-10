@@ -31,7 +31,8 @@ from ..core.errors import BurrowlError
 from ..core.hashing import canonical_hash, sha256_bytes, sha256_file
 
 FORMAT = "burrowl-bundle/1"
-EXCLUDE = [".burrowl/index/*", ".burrowl/hub/*", "exports/*", "*.lock", "*/lock-recovery/*", "*/staging/*", "*.stale-*",
+# 排除可重建或可丢弃的数据：索引、中枢映射、Run 回收站（R14 D-12）、交换包、锁与暂存
+EXCLUDE = [".burrowl/index/*", ".burrowl/hub/*", ".burrowl/trash/*", "exports/*", "*.lock", "*/lock-recovery/*", "*/staging/*", "*.stale-*",
            "*/__pycache__/*", "*.pyc"]
 MAX_BUNDLE_BYTES = 8 * 1024 ** 3
 ABS = "ABS"

@@ -36,7 +36,7 @@ export interface QueueItem {
   maturity?: string | null;
   stale_maturity?: string | null;
   requested_maturity?: string | null;
-  stats?: { supports: number; contradicts: number; open_counterexamples: number; cited_by: number; run_inputs: number };
+  stats?: { supports: number; contradicts: number; open_counterexamples: number; cited_by: number };
 }
 
 interface Queue {

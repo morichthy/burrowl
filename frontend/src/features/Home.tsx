@@ -16,9 +16,11 @@ export type ActivityItem = {
   ref: { kind: string; owner_id?: string; commit_id?: string; run_id?: string | number; connector_id?: string };
 };
 
-function activityHref(ref: ActivityItem["ref"]): string {
+function activityHref(item: ActivityItem): string {
+  const ref = item.ref;
   if (ref.kind === "hub_run") return href("hub");
-  if (ref.kind === "run") return href("memory", String(ref.run_id));
+  // R14：Run 不保存记录。对象内 Run 链到上级对象（时间线里有它）；独立 Run 链到维护页的 Run 列表
+  if (ref.kind === "run") return item.owner_id && item.owner_id !== ref.run_id ? href("memory", item.owner_id) : href("maintenance");
   return href("memory", ref.owner_id ?? "");
 }
 
@@ -81,7 +83,7 @@ export function Home() {
           <ul className="activity">
             {activity.data.items.map((item) => (
               <li key={item.cursor}>
-                <Time value={item.at} /> <a href={activityHref(item.ref)}>{item.summary}</a>
+                <Time value={item.at} /> <a href={activityHref(item)}>{item.summary}</a>
                 {item.actor !== "—" ? <span className="hint"> · {item.actor}</span> : null}
               </li>
             ))}

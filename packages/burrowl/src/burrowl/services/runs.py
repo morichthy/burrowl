@@ -11,6 +11,8 @@ import base64
 import json
 import os
 import platform
+import re
+import shutil
 import subprocess
 import sys
 import uuid
@@ -25,9 +27,13 @@ from ..core.errors import BurrowlError
 from ..core.hashing import sha256_bytes, sha256_file
 from ..core.pathsafe import safe_path
 from ..storage.owners import Owner
+from .memory.claims import FIXING_LEVELS, ClaimGraph, citations
 from .memory.context import Storage
 
 STATUSES = ("planned", "running", "succeeded", "failed", "abandoned")
+STANDARD_RUN_DIR = re.compile(r"run-\d{8}t\d{6}z-[0-9a-f]{12}")  # 目录名 = 编号小写，含创建时间
+TRASH = "trash/runs"            # R14 D-12：丢弃的 Run 移到 .burrowl/trash/runs/<run-id>/
+DISCARD_NOTE = "discard.json"
 FINISHED = {"succeeded", "failed", "abandoned"}
 
 
@@ -46,18 +52,109 @@ class RunService:
             raise BurrowlError("INVALID_ARGUMENT", "目标不是 Run", {"owner_id": run_id})
         return owner.require_readable()
 
-    def search(self, *, query: str = "", owner_id: str | None = None, limit: int = 50) -> list[dict]:
+    def search(self, *, query: str = "", owner_id: str | None = None, limit: int = 50,
+               unfixed_only: bool = False) -> list[dict]:
+        """R14 D-07：显式查找 Run 的入口。指定对象时只列它位置下的 Run，否则遍历全部 Run 卡。
+
+        unfixed_only：只列没有被全库任何 L1–L4 记录引用的 Run（D-09；要读入全部记录，走已校验缓存）。"""
         needle = query.casefold()
         items = []
-        for owner in self.storage.owners.scan().readable("run"):
-            card = owner.native
+        index = self.storage.owners.scan()
+        cited = (citations(ClaimGraph(self.storage, index), levels=FIXING_LEVELS) if unfixed_only else {})
+        for run in self._newest_first(index, owner_id):
+            card = run.native
             text = " ".join([card.get("title", ""), card.get("question", ""), *card.get("keywords", [])]).casefold()
-            if (owner_id and card.get("owner_id") != owner_id) or (needle and needle not in text):
+            if not run.readable or (needle and needle not in text) or (unfixed_only and run.owner_id in cited):
                 continue
-            items.append({"run_id": owner.owner_id, "title": card.get("title"), "status": card.get("status"),
-                          "owner_id": card.get("owner_id"), "created_at": card.get("created_at"),
-                          "path": owner.native_path})
-        return sorted(items, key=lambda r: r["created_at"] or "", reverse=True)[:limit]
+            parent = index.run_parent(run)
+            items.append({"run_id": run.owner_id, "title": card.get("title"), "status": card.get("status"),
+                          "owner_id": parent.owner_id if parent else None, "created_at": card.get("created_at"),
+                          "ended_at": card.get("ended_at"), "path": run.native_path})
+            if len(items) >= limit:
+                break
+        index.recheck_runs()  # 批量读卡共用了目录枚举，返回前复核
+        return sorted(items, key=lambda r: r["created_at"] or "", reverse=True)
+
+    @staticmethod
+    def _newest_first(index, owner_id: str | None):
+        """按创建时间从新到旧逐个给出 Run。不限对象且目录名都是标准编号时，按目录名倒序惰性读卡（编号里含创建时间），
+        找够就停；否则读全部再排序。"""
+        if owner_id:
+            runs = index.runs_under(index.get(owner_id).require_readable())
+        else:
+            entries = index.run_entries()
+            names = [PurePosixPath(folder).name for folder, _mtime in entries]
+            if all(STANDARD_RUN_DIR.fullmatch(name) for name in names):
+                for _name, folder in sorted(zip(names, (f for f, _ in entries), strict=True), reverse=True):
+                    if (run := index.load_run(folder)) is not None:
+                        yield run
+                return
+            runs = index.all_runs()
+        yield from sorted(runs, key=lambda r: r.native.get("created_at") or "", reverse=True)
+
+    # ---------- 丢弃与回收站（R14 D-12）----------
+    def _trash(self) -> Path:
+        return self.storage.ws.state(TRASH)
+
+    def discard(self, run_id: str, *, reason: str, actor: dict) -> dict:
+        """丢弃没有知识的 Run：当前没有任何记录引用时，整个目录移入回收站（可恢复，不删除文件）。
+
+        只核对当前修订：旧修订引用过的 Run 被丢弃后，那条历史修订回源会失败，可从回收站恢复。"""
+        if not str(reason).strip():
+            raise BurrowlError("INVALID_ARGUMENT", "丢弃 Run 要说明理由（例如：沉淀检查没有可写成记录的内容）")
+        run = self._run(run_id)
+        index = self.storage.owners.scan()
+        cited = citations(ClaimGraph(self.storage, index), {run.owner_id}).get(run.owner_id, [])
+        if cited:
+            raise BurrowlError("VERSION_CONFLICT", "Run 已被记录引用，不能丢弃", {"run_id": run_id, "cited_by": cited})
+        folder = self.storage.ws.path(PurePosixPath(run.native_path).parent.as_posix())
+        target = self._trash() / run.owner_id.casefold()  # 按编号命名，restore 按编号找
+        if target.exists():
+            raise BurrowlError("VERSION_CONFLICT", "回收站中已有同名 Run，请先恢复或由用户清空回收站", {"run_id": run_id})
+        target.parent.mkdir(parents=True, exist_ok=True)
+        origin = self.storage.ws.relative(folder)
+        os.replace(folder, target)  # 同一卷内整体改名
+        write_new(target / DISCARD_NOTE, _json_bytes({"run_id": run.owner_id, "original_path": origin,
+                                                       "reason": reason, "discarded_at": utc_now(), "actor": actor}))
+        self.storage.owners.invalidate()
+        return {"run_id": run.owner_id, "status": "discarded", "trash_path": self.storage.ws.relative(target),
+                "files_deleted": 0}
+
+    def trash(self) -> list[dict]:
+        """回收站中的 Run（丢弃说明）。"""
+        root = self._trash()
+        if not root.is_dir():
+            return []
+        return [read_json(note) for child in sorted(root.iterdir())
+                if child.is_dir() and (note := child / DISCARD_NOTE).is_file()]
+
+    def restore(self, run_id: str) -> dict:
+        """把回收站中的 Run 移回原位置；原位置已被占用时拒绝。"""
+        source = self._trash() / run_id.casefold()
+        note_path = source / DISCARD_NOTE
+        if not note_path.is_file():
+            raise BurrowlError("NOT_FOUND", "回收站中没有这个 Run", {"run_id": run_id})
+        note = read_json(note_path)
+        target = self.storage.ws.path(note["original_path"])
+        if target.exists():
+            raise BurrowlError("VERSION_CONFLICT", "原位置已被占用", {"path": note["original_path"]})
+        target.parent.mkdir(parents=True, exist_ok=True)
+        history = source / ".run-captures"
+        history.mkdir(exist_ok=True)
+        os.replace(note_path, history / f"discard-{uuid.uuid4().hex}.json")  # 丢弃说明留作历史，不删除
+        os.replace(source, target)
+        self.storage.owners.invalidate()
+        return {"run_id": note["run_id"], "status": "restored", "path": note["original_path"]}
+
+    def empty_trash(self) -> dict:
+        """永久删除回收站中的全部 Run。用户专属操作（effect=user），不暴露给 MCP。"""
+        root = self._trash()
+        removed = []
+        for child in sorted(root.iterdir()) if root.is_dir() else []:
+            if child.is_dir() and not child.is_symlink() and (child / DISCARD_NOTE).is_file():
+                shutil.rmtree(child)
+                removed.append(child.name)
+        return {"removed": removed}
 
     # ---------- 创建与更新 ----------
     def create(self, title: str, *, owner_id: str | None = None, question: str = "",

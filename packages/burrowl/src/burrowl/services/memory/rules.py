@@ -72,7 +72,6 @@ def _answer(ref: Any, record_id: str, resolve: Resolve, path: str) -> None:
     if value is None or _kind(value) == "claim" or ref.get("target_kind") == "claim":
         return
     kind, payload = _kind(value), value.get("payload", {})
-    native = value.get("native", {})
     if kind == "narrative" and (payload.get("claims") or any(
             _text(s.get("outcome")) and s.get("evidence_refs") for s in payload.get("stages", []))):
         return
@@ -81,9 +80,8 @@ def _answer(ref: Any, record_id: str, resolve: Resolve, path: str) -> None:
         return
     if kind == "overview" and payload.get("claims"):
         return
-    if kind == "run" and (_text(native.get("conclusion")) or _text(native.get("decision"))):
-        return
-    _fail("解决依据必须是可取得的答案或决策，不能只引用导航、步骤或未决问题", path)
+    # R14 D-08：Run 卡的 conclusion 只是执行摘要，不能作为解决依据；结论要写成记录并引用该 Run
+    _fail("解决依据必须是可取得的答案或决策（带结论的记录），不能只引用导航、步骤、未决问题或 Run", path)
 
 
 def validate_change(old: dict | None, record: dict, *, record_id: str, resolve: Resolve) -> None:

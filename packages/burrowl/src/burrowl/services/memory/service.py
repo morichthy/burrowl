@@ -112,6 +112,15 @@ class MemoryService:
             raise BurrowlError("INVALID_ARGUMENT", "request_id 必须为 UUID") from exc
         return deepcopy(request)
 
+    @staticmethod
+    def _target(index: OwnerIndex, owner_id: str) -> Owner:
+        """提交的归属对象：必须可读，且不是 Run（R14 D-01：Run 是执行证据，知识写到上级或合适的知识对象）。"""
+        owner = index.get(owner_id).require_readable()
+        if owner.owner_type == "run":
+            raise BurrowlError("INVALID_ARGUMENT", "Run 不保存记忆记录；把结论写到上级对象或合适的知识对象，并引用该 Run",
+                               {"owner_id": owner_id, "parent_id": (p.owner_id if (p := index.run_parent(owner)) else None)})
+        return owner
+
     def _resolver(self, index: OwnerIndex) -> RefResolver:
         lookup = self.claim_lookup_factory(index) if self.claim_lookup_factory else None
         return RefResolver(self.storage, index, claim_lookup=lookup)
@@ -295,7 +304,7 @@ class MemoryService:
     def validate_draft(self, request: dict, *, allow_review: bool = False) -> dict:
         request = self._check_request(request, allow_review=allow_review)
         index = self.owners()
-        owner = index.get(request["owner_id"]).require_readable()
+        owner = self._target(index, request["owner_id"])
         snapshot = self.snapshot(owner)
         if snapshot.commit_id != request["expected_head"]:
             raise BurrowlError("VERSION_CONFLICT", "预检依据的 HEAD 已变化", {"current_head": snapshot.head})
@@ -330,7 +339,7 @@ class MemoryService:
         if request.get("dry_run"):
             return self.validate_draft(request, allow_review=allow_review)
         index = self.owners()
-        owner = index.get(request["owner_id"]).require_readable()
+        owner = self._target(index, request["owner_id"])
         digest = hash_override or request_hash(request)
         snapshot = self.snapshot(owner)
         if prior := self.storage.store.find_receipt(owner, snapshot, request["request_id"], digest):

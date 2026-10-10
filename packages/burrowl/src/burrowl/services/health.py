@@ -1,14 +1,16 @@
 """全工作区校验（burrowl validate / system.validate）：只读，逐项报告问题，不修复任何东西。
 
 检查：每个对象的提交链与记录指纹（读取即校验）、写锁与孤立提交、登记来源是否仍在原位且指纹一致、
-检索投影是否落后于 HEAD。业务结论是否正确不在检查范围内。
+检索投影是否落后于 HEAD、Run 的编号与位置（R14）。业务结论是否正确不在检查范围内。
 """
+from pathlib import PurePosixPath
 from typing import Any
 
 from ..core.errors import BurrowlError
 from ..core.hashing import sha256_file
 from ..storage import recovery
 from .indexing import IndexService
+from .memory.claims import FIXING_LEVELS, ClaimGraph, citations
 from .memory.context import Storage
 
 
@@ -52,5 +54,35 @@ def validate(storage: Storage, index: IndexService) -> dict[str, Any]:
         except (BurrowlError, OSError) as exc:
             problems.append({"area": "sources", "source_id": entry["source_id"],
                              "code": getattr(exc, "code", "STORAGE_ERROR"), "message": str(exc)})
+    runs_checked = _check_runs(storage, owners, problems, warnings)
     return {"ok": not problems, "owners_checked": checked, "sources_checked": len(storage.sources.entries()),
-            "problems": problems, "warnings": warnings}
+            "runs_checked": runs_checked, "problems": problems, "warnings": warnings}
+
+
+def _check_runs(storage: Storage, owners, problems: list[dict], warnings: list[dict]) -> int:
+    """R14：Run 按目录位置与编号定位。编号重复是问题；目录名不规范、业务卡 owner_id 与位置不一致、
+    没有被任何 L1–L4 记录引用（执行知识尚未写成记录，D-09）是提示。"""
+    try:
+        runs = owners.all_runs()
+    except BurrowlError as exc:
+        problems.append({"area": "runs", "code": exc.code, "message": exc.message, "details": exc.details})
+        return 0
+    for run in runs:
+        folder = PurePosixPath(run.native_path).parent
+        if folder.name != run.owner_id.casefold():
+            warnings.append({"area": "runs", "owner_id": run.owner_id, "code": "RUN_DIR_NAME",
+                             "message": "Run 目录名不是小写的 Run 编号，按编号查找会走慢路径", "details": {"path": run.native_path}})
+        parent, declared = owners.run_parent(run), run.native.get("owner_id")
+        if declared and (parent is None or parent.owner_id != declared):
+            warnings.append({"area": "runs", "owner_id": run.owner_id, "code": "RUN_LOCATION",
+                             "message": "业务卡的 owner_id 与 Run 所在位置不一致；上级以位置为准",
+                             "details": {"declared": declared, "by_location": parent.owner_id if parent else None}})
+    if runs:
+        cited = citations(ClaimGraph(storage, owners), {r.owner_id for r in runs}, FIXING_LEVELS)
+        unfixed = [r.owner_id for r in runs if r.owner_id not in cited]
+        if unfixed:
+            warnings.append({"area": "runs", "code": "RUN_UNFIXED",
+                             "message": f"{len(unfixed)} 个 Run 没有被任何 L1–L4 记录引用：把执行知识写成记录，"
+                                        "没有知识的用 runs.discard 丢弃（runs.search unfixed_only=true 查看）",
+                             "details": {"run_ids": unfixed[:20]}})
+    return len(runs)

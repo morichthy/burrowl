@@ -15,7 +15,7 @@ from typing import Any
 
 from ..core.hashing import canonical_hash
 
-GRAPH_VERSION = "graph-v1"
+GRAPH_VERSION = "graph-v2"  # v2：Run 节点由引用它的对象投影（R14 D-11）
 SKIP_KINDS = {"review", "policy", "feedback", "association", "representation"}  # 不成为节点（association 画成边）
 CONCEPT_PAGE_TYPES = {"concept", "entity"}
 CATEGORY = {
@@ -65,9 +65,11 @@ def _is_concept(record: dict) -> bool:
 
 
 def graph(owner, records: list[dict], badges: dict[str, str], hidden: set[str],
-          maturity: dict[str, str | None] | None = None, produced_by: str | None = None) -> tuple[list[dict], list[dict]]:
-    """owner：projections.OwnerInfo；badges / maturity：结论 ID → 复核徽标 / 有效成熟度（服务层给出）；
-    produced_by：Run 对象的业务卡里登记的上级对象（画成 上级 → Run 的 produces 边）。"""
+          maturity: dict[str, str | None] | None = None,
+          run_titles: dict[str, str] | None = None) -> tuple[list[dict], list[dict]]:
+    """owner：projections.OwnerInfo；badges / maturity：结论 ID → 复核徽标 / 有效成熟度（服务层给出）。
+    run_titles：本对象记录引用的 Run → 标题。Run 不再作为对象投影（R14 D-11），Run 节点由引用它的对象各投影一行，
+    与被引用的来源节点同理。"""
     maturity = maturity or {}
     visible = [r for r in records if r["record_id"] not in hidden and r["sensitivity"] != "restricted"]
     nodes: dict[str, dict] = {}
@@ -100,8 +102,6 @@ def graph(owner, records: list[dict], badges: dict[str, str], hidden: set[str],
     node(owner.owner_id, "owner", owner.title, ref={"target_kind": "owner", "target_id": owner.owner_id,
                                                     "revision": None, "sha256": owner.fingerprint, "locator": "",
                                                     "relation": "references"})
-    if produced_by:
-        edge(produced_by, owner.owner_id, "produces", {"record_id": owner.owner_id, "revision": None}, "run.owner_id")
     for record in visible:
         rid, payload = record["record_id"], record["payload"]
         if record["kind"] in SKIP_KINDS:
@@ -165,11 +165,16 @@ def graph(owner, records: list[dict], badges: dict[str, str], hidden: set[str],
                  "review.replacement_claim_id")
     file_refs = {ref["target_id"]: ref for record in visible for ref in _refs([record["sources"], record["payload"]])
                  if ref.get("target_kind") == "file"}
+    run_refs = {ref["target_id"]: ref for record in visible for ref in _refs([record["sources"], record["payload"]])
+                if ref.get("target_kind") == "owner" and ref["target_id"] in (run_titles or {})}
     for ref_target in {e["dst"] for e in edges.values()} - nodes.keys():   # 被引用的已登记来源
         if ref_target.startswith("SRC-"):
             ref = file_refs.get(ref_target)
             node(ref_target, "source", ref_target,
                  ref=dict(ref, locator="", relation="references") if ref else None)
+        elif ref_target in run_refs:                                    # 被引用的 Run（R14 D-11）
+            node(ref_target, "owner", run_titles[ref_target], kind="run",
+                 ref=dict(run_refs[ref_target], locator="", relation="references"))
     return list(nodes.values()), list(edges.values())
 
 

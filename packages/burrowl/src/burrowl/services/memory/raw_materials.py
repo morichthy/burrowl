@@ -95,8 +95,8 @@ class _Collector:
         pending = deque(self.records(owner_id))
         if self.root.owner_type == "run":
             pending.extend(self.run(owner_id))
-        for run in self.reader.index.readable("run"):
-            if run.native.get("owner_id") == owner_id:
+        if self.root.owner_type != "run":  # R14 D-04：该对象目录下的 Run
+            for run in self.reader.index.runs_under(self.root):
                 pending.extend(self.run(run.owner_id))
         seen: set[tuple] = set()
         while pending:

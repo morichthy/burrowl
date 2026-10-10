@@ -15,10 +15,10 @@
 | 术语 | 定义 | 不是什么 / 注意 | 代码标识 |
 |---|---|---|---|
 | 数据目录 | 存放内容树、记忆和程序状态的文件夹，由用户配置，在代码仓库之外 | 不是代码仓库 | `--data-dir`、`BURROWL_DATA_DIR` |
-| Owner（归属对象） | 可以独立拥有记忆记录的稳定身份。类型有 research、project、core-algorithm、knowledge、data、tool、report、run。一条记录只属于一个 Owner | 不是记录，也不是可信等级；目录名不决定它 | `owner_id`，如 `RES-…`、`PRJ-…`、`ALG-…`、`RUN-…` |
+| Owner（归属对象） | 可以独立拥有记忆记录的稳定身份。类型有 research、project、core-algorithm、knowledge、data、tool、report。一条记录只属于一个 Owner。Run 也有业务卡和编号，但它是执行证据，不保存记录，不参与对象扫描（R14） | 不是记录，也不是可信等级；目录名不决定它 | `owner_id`，如 `RES-…`、`PRJ-…`、`ALG-…`、`RUN-…` |
 | 业务卡 | 描述 Owner 的 JSON 文件，如 research.json、run.json | 不是记忆记录；记忆在 `memory_home` 中 | `research.json` 等 |
 | 核心算法 | 公司算法/模块文档定义的关键模型算法 | 不是普通脚本、软件模块或通用工具。建立时必须给出 `source_document` | `core-algorithm` |
-| Run | 一次真实执行（分析、仿真、训练、报告生成），保存输入版本、产物、日志和结论 | 没有执行就不建 Run；执行成功不代表结论正确 | `RUN-…`，`runs.*` |
+| Run | 一次真实执行（分析、仿真、训练、报告生成）的证据：输入版本、程序、产物、日志、成功或失败。放在上级对象目录的 `runs/` 下（对象内 Run）或顶层 `runs/` 下（独立 Run），上级按目录位置判断 | 不保存记忆记录、不进检索；执行得到的知识写进引用它的记录；业务卡的 `conclusion` 只是执行摘要。没有执行就不建 Run，没有知识的 Run 丢弃到回收站 | `RUN-…`，`runs.*` |
 | 记录（record） | 记忆中的一条带版本的 JSON 内容，有类型（kind）、正文和来源 | 不是原始文件 | `MEM-…` |
 | 外壳 / payload | 外壳是所有记录共用的部分：身份、所属对象、类型与层级、标题、正文、来源、修订信息。payload 是随类型变化的结构化字段，供程序读取和校验，例如技术块、适用条件、结论、关联端点 | payload 不会被拼回正文；给人读的内容写在正文（L1 写在 blocks） | `payload`；字段见 `memory.contract(kind)` |
 | L0–L4 | 记录的内容层级：L0 原始依据、L1 技术单元、L2 经过、L3 可复用认识、L4 概览。表示内容职责和默认阅读粒度 | 不是可信等级，也不要求逐级补齐 | `level` |
@@ -65,7 +65,7 @@
 | 复核状态 | not-reviewed 未复核；accepted 已确认（需范围与证据）；disputed 有争议；retracted 已撤回；superseded 已被替代 | — | `state` |
 | 已失效（stale） | 复核之后结论或所在记录被修改，原复核不再适用 | 不等于结论错了 | `stale` |
 | 成熟度 | 结论在证据阶梯上的位置：conjecture 设想、preliminary 初步、replicated 重复验证、established 已确立。存在复核记录中；AI 不能登记 established，只能提出升级 | 不是复核状态，也不是主观概率；`knowledge_facets.confidence` 是作者自评，不是成熟度 | `maturity`、`requested_maturity`、`evidence_basis` |
-| 派生统计 | 独立支持数（按原件去重）、反例数与未处理反例、被引用次数、作为 Run 输入的次数、被采纳的反馈数 | 可随时重算，不是第二份真源；"用得多"不等于"对" | `review.queue` 的 `stats` |
+| 派生统计 | 独立支持数（按原件去重）、反例数与未处理反例、被引用次数、被采纳的反馈数 | 可随时重算，不是第二份真源；"用得多"不等于"对" | `review.queue` 的 `stats` |
 | 依据受阻（upstream-blocked） | 已确认的结论，其依据后来变化、失效或不可读 | — | `upstream-blocked` |
 | 复核类别 | 检索时对一条记录全部结论的汇总：none 无结论、accepted 全部已确认、unreviewed 都未复核、mixed 部分确认、unsafe 有争议/撤回/替代/失效 | — | `review` |
 | 复核过滤 | 检索时按复核类别筛选：all / reviewed_only / exclude_unsafe / unreviewed_only | — | `review_filter` |
@@ -93,7 +93,7 @@
 | 术语 | 定义 | 不是什么 / 注意 | 代码标识 |
 |---|---|---|---|
 | 知识节点 | 可以被单独引用、判断和修订的图节点：结论、概念，以及作为容器的对象、记录、L1 块、来源 | 与 L0–L4 正交：层级是容纳知识节点的容器 | `node_type` |
-| 概念库 / 概念页 | 概念库是全库唯一的 knowledge 对象；其中 page_type 为 concept / entity 的 wiki_page 是概念页，标题加别名就是概念的身份。可按领域（`domains`）筛选或屏蔽；合并、拆分用修订表达，从不删除 | 不是证据，也不是结论 | `graph.concept_owner_id`、`KNW-…` |
+| 概念库 / 概念页 | 概念库是配置 `graph.concept_owner_id` 指定的那一个 knowledge 对象；其他 knowledge 对象是通用知识对象，承接不属于具体研究、项目、工具、数据的知识；其中 page_type 为 concept / entity 的 wiki_page 是概念页，标题加别名就是概念的身份。可按领域（`domains`）筛选或屏蔽；合并、拆分用修订表达，从不删除 | 不是证据，也不是结论 | `graph.concept_owner_id`、`KNW-…` |
 | 链接 | 正文里的 `[[概念]]`、`[[@handle]]`、`[[@对象短名/handle]]`、`[[@handle#块]]`、`[[!结论短名]]` 写法；提交时解析并固定版本，存入记录的 `links` | 不是证据，除非另写在依据字段里；未解析的概念不阻塞提交 | `links`、`UNRESOLVED_LINK` |
 | 图投影 | 从记录派生的节点表和边表，存在 index.sqlite 中，带水位，可以重建 | 不是真源；要修改关系应修改记录 | `graph_nodes`、`graph_edges` |
 | 边类别 | 由程序按关系名查表得出：structure 结构、evidence 证据、reference 引用、navigation 关联、concept 概念、claim_relation 结论关系 | AI 不填写类别 | `category` |

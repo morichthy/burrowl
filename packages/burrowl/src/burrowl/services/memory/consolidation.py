@@ -10,8 +10,9 @@ from copy import deepcopy
 from ...core.errors import BurrowlError
 from ...core.hashing import canonical_hash, sha256_file
 from ...core.records import validate_record
+from ...storage.owners import Owner, OwnerIndex
 from . import provenance
-from .claims import ClaimGraph, iter_refs
+from .claims import FIXING_LEVELS, ClaimGraph, citations, iter_refs
 from .reader import fixed_ref
 from .service import MemoryService
 
@@ -38,6 +39,21 @@ def _source_states(memory: MemoryService, refs: list[dict]) -> dict[str, dict]:
 def _basis_hash(basis: dict) -> str:
     return canonical_hash({k: basis.get(k) for k in ("owner_id", "basis_heads", "changed", "affected", "remaining",
                                                      "source_states")})
+
+
+def unfixed_evidence(index: OwnerIndex, owner: Owner, graph: ClaimGraph) -> dict:
+    """R14 D-09：本对象位置下的 Run 与本对象的 L0 记录中，没有被全库任何 L1–L4 记录引用的。只报告，不改记录。
+
+    被任何对象的正式记录引用即视为已固定（知识可能按主题写在别的对象里）。graph 是全库复核图，已读入全部记录。"""
+    cited = citations(graph, levels=FIXING_LEVELS)
+    runs = [{"run_id": r.owner_id, "title": r.title, "status": r.native.get("status"),
+             "ended_at": r.native.get("ended_at"), "path": r.native_path}
+            for r in (index.runs_under(owner) if owner.owner_type != "run" else [])
+            if r.readable and r.owner_id not in cited]
+    raw = [fixed_ref(record) for record in graph.records.values()
+           if record["owner_id"] == owner.owner_id and record["kind"] == "source"
+           and record["sensitivity"] != "restricted" and record["record_id"] not in cited]
+    return {"runs": runs, "raw_records": raw}
 
 
 def prepare(memory: MemoryService, owner_id: str, *, since_commit: str | None = None, trigger: str = "manual") -> dict:
@@ -87,7 +103,8 @@ def prepare(memory: MemoryService, owner_id: str, *, since_commit: str | None = 
     result = {"owner_id": owner_id, "trigger": trigger, "since_commit": base_commit, "basis_heads": basis_heads,
               "changed": changed, "affected": affected,
               "remaining": deepcopy(latest["payload"]["remaining_refs"]) if latest else [],
-              "candidates": candidates, "source_states": states, "writes": 0}
+              "candidates": candidates, "source_states": states,
+              "unfixed_evidence": unfixed_evidence(memory.owners(), owner, graph), "writes": 0}
     result["basis_hash"] = _basis_hash(result)
     return result
 

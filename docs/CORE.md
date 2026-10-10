@@ -173,7 +173,7 @@ finish：交接文本 = 有效综合稿或逐对象笔记；陈旧笔记、超�
     → relations.candidates（已判断过的端点对不再出现）→ 改写链接或 relations.decide
 关联：relations.decide 保存（带 certainty、origin、observed_in）；只给两端和说明时
       按快速添加处理：related_to + speculative + accepted；关联不能是 supports/input
-概念库：全库唯一的 knowledge 对象（graph.concept_owner_id），概念页可按 domains 筛选或屏蔽
+概念库：配置 graph.concept_owner_id 指定的 knowledge 对象，概念页可按 domains 筛选或屏蔽（其他 knowledge 对象是通用知识对象）
 ```
 
 - 关联只做导航：不会进入 supports 证据，也不会改变复核状态。
@@ -226,7 +226,7 @@ assemble(已选候选)：
 
 ```text
 review.queue：跨对象列出结论及状态（未复核、已失效、有争议、依据受阻、待确认升级……）、原因、
-    有效成熟度与派生统计（独立依据按原件去重、反例与未处理反例、被引用、Run 输入、被采纳反馈）
+    有效成熟度与派生统计（独立依据按原件去重、反例与未处理反例、被引用、被采纳反馈）
 review.submit：确认需要范围与证据；替代需要替代结论；dry_run 预检
     可同时登记成熟度：preliminary 需依据，replicated 需至少两份独立依据，
     established 需 accepted + 证据类型 + 依据，且执行者不能是 ai（ai 只能提交 requested_maturity）

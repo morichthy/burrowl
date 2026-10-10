@@ -15,6 +15,8 @@ QUESTION = "浮点求和中求和顺序与补偿算法对误差的影响"
 @pytest.fixture
 def reading(sample_workspace):
     storage = Storage.open(sample_workspace)
+    # R14 D-01：Run 不再是阅读候选。样例里另外的候选原本都是 Run，这里补一个知识对象充当"另一个候选"
+    storage.owners.create("research", "numeric-notes", "数值计算杂记", {"description": "浮点格式的零散观察"})
     index = IndexService.open(storage, IndexConfig(), fake_vectors=True)
     index.reconcile()
     config = BurrowlConfig()
@@ -33,14 +35,15 @@ def test_standard_flow_and_rules(reading):
     session = service.start(QUESTION, actor=AI)
     sid = session["session_id"]
     assert session["batch"][0]["owner_id"] == OWNER and session["batch"][0]["windows"]
-    run_id = next(p["owner_id"] for p in session["batch"] if p["owner_id"].startswith("RUN-"))
+    assert not any(p["owner_id"].startswith("RUN-") for p in session["batch"])  # R14 AC-P2.1
+    other = next(p["owner_id"] for p in session["batch"] if p["owner_id"] != OWNER)
     with pytest.raises(BurrowlError) as caught:
         service.read(sid, OWNER)
     assert caught.value.code == "INVALID_TRANSITION"  # 未判断不能读
     assessed = judge_all(service, session)
     assert assessed["relevant"] == [OWNER] and assessed["phase"] == "reading"
     with pytest.raises(BurrowlError):
-        service.read(sid, run_id)  # 判为不相关
+        service.read(sid, other)  # 判为不相关
     page = service.read(sid, OWNER)
     assert page["outline"] and page["total_pages"] >= 1 and page["ids"]
     while page["has_more"]:
@@ -106,11 +109,11 @@ def test_quick_mode_and_owner_cap(reading):
     assert any(g["code"] == "QUICK_MODE" for g in handoff["gaps"])
     config.reading.context.max_owners = 1
     capped = service.start(QUESTION, actor=AI)
-    runs = [p["owner_id"] for p in capped["batch"]][:2]
-    judge_all(service, capped, relevant=runs)
-    service.read(capped["session_id"], runs[0])
+    pair = [p["owner_id"] for p in capped["batch"]][:2]
+    judge_all(service, capped, relevant=pair)
+    service.read(capped["session_id"], pair[0])
     with pytest.raises(BurrowlError) as caught:
-        service.read(capped["session_id"], runs[1])
+        service.read(capped["session_id"], pair[1])
     assert caught.value.code == "BUDGET_EXCEEDED"
     assert {s["session_id"] for s in service.list()} >= {sid, capped["session_id"]}
 

@@ -15,11 +15,14 @@ ROLE = {"source": "raw_material", "detail": "technical_unit", "narrative": "proc
 
 
 def _run_ids(reader: Reader, owner_id: str, records: list[dict]) -> set[str]:
-    """只认显式关联：记录里的 RUN 引用、Run 卡的 owner_id。目录位置与标题不算。"""
+    """记录里的 RUN 引用，加上位于该对象目录下的 Run（R14 D-04：上级按目录位置判断）。标题不算。"""
     runs = {ref["target_id"] for r in records for ref in iter_refs(r["payload"])
             if ref.get("target_kind") == "owner" and ref["target_id"].startswith("RUN-")}
-    runs.update(o.owner_id for o in reader.index.readable("run")
-                if o.owner_id == owner_id or o.native.get("owner_id") == owner_id)
+    owner = reader.index.get(owner_id)
+    if owner.owner_type == "run":
+        runs.add(owner.owner_id)
+    else:
+        runs.update(r.owner_id for r in reader.index.runs_under(owner))
     return runs
 
 

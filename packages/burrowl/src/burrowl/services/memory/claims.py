@@ -63,6 +63,25 @@ def iter_refs(value: Any):
             yield from iter_refs(item)
 
 
+FIXING_LEVELS = frozenset({"L1", "L2", "L3", "L4"})  # 正式记录：执行证据被它们引用才算固定（R14 D-09）
+
+
+def citations(graph: "ClaimGraph", target_ids: set[str] | None = None,
+              levels: frozenset[str] | None = None) -> dict[str, list[str]]:
+    """全库当前记录中的引用：目标 ID → 引用它的记录 ID。levels 给出时只算这些层级的记录。只看当前修订。"""
+    found: dict[str, list[str]] = {}
+    for record in graph.records.values():
+        if levels is not None and record.get("level") not in levels:
+            continue
+        for ref in iter_refs({"sources": record["sources"], "payload": record["payload"]}):
+            target = ref.get("target_id")
+            if target and (target_ids is None or target in target_ids):
+                ids = found.setdefault(target, [])
+                if record["record_id"] not in ids:
+                    ids.append(record["record_id"])
+    return found
+
+
 def claim_hash(claim: dict) -> str:
     return canonical_hash(claim)
 
@@ -367,7 +386,7 @@ class ClaimGraph:
 
         supports：本结论（含当前复核）的 supports/input 依据追溯到的独立 L0 根数；
         contradicts / open_counterexamples：指向本结论或其所在记录的 contradicts（未被撤回或替代的算未处理）；
-        cited_by：在依据类字段中引用本结论或其所在记录的其他记录数；run_inputs：以 input 引用它的 Run 对象数；
+        cited_by：在依据类字段中引用本结论或其所在记录的其他记录数（R14 起 Run 不保存记录，原 run_inputs 统计删除）；
         feedback_adopted：以它为目标且已被采纳的反馈数。"""
         claim, record = self.claims[claim_id]
         evidence = list(claim["evidence_refs"])
@@ -383,12 +402,10 @@ class ClaimGraph:
                         if c is None or self.badge(c["claim_id"]) not in {"retracted", "superseded"}]
         cited = {r["record_id"] for r, ref, _c in incoming
                  if ref.get("relation") in {*DEPENDENT, "background", "prerequisite", "used_in"}}
-        runs = {r["owner_id"] for r, ref, _c in incoming if ref.get("relation") == "input"
-                and (o := self.index.find(r["owner_id"])) is not None and o.owner_type == "run"}
         adopted = [1 for r, ref, _c in incoming if r["kind"] == "feedback" and ref is r["payload"].get("target")
                    and r["payload"].get("adopted_in")]
         return {"supports": len(support_roots), "contradicts": len(contradicting),
-                "open_counterexamples": len(open_counter), "cited_by": len(cited), "run_inputs": len(runs),
+                "open_counterexamples": len(open_counter), "cited_by": len(cited),
                 "feedback_adopted": len(adopted)}
 
     # ---------- 复核草案 ----------
