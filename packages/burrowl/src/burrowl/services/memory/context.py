@@ -112,8 +112,8 @@ class RefResolver:
         raise BurrowlError("INVALID_SCHEMA", "未知引用类型", {"target_kind": kind})
 
     def recheck(self) -> None:
-        """发布前逐项回源：依据在预检与发布之间变化则拒绝发布。"""
-        fresh = RefResolver(self.storage, self.storage.owners.scan(), claim_lookup=self.claim_lookup)
+        """发布前逐项回源：依据在预检与发布之间变化则拒绝发布。对象列表必须重新扫描，不用本次操作复用的结果。"""
+        fresh = RefResolver(self.storage, self.storage.owners.scan(fresh=True), claim_lookup=self.claim_lookup)
         for check in {canonical_hash(c): c for c in self.checks}.values():
             if check["kind"] == "head":
                 owner = fresh.index.get(check["owner_id"]).require_readable()

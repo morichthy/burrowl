@@ -88,6 +88,7 @@ class RunService:
         write_new(folder / "run.json", _json_bytes(card))
         write_new(folder / "README.md", f"# {run_id}：{title}\n\n## 问题\n\n{question}\n\n## 方法\n\n## 结果\n\n"
                   f"## 结论与限制\n".encode())
+        self.storage.owners.invalidate()  # 新业务卡：本次操作内复用的对象列表作废
         return {"run_id": run_id, "path": self.storage.ws.relative(folder / "run.json")}
 
     def update(self, run_id: str, fields: dict, *, expected_sha256: str | None = None) -> dict:
@@ -170,6 +171,7 @@ class RunService:
                 "schema_version": 1, "run_path": owner.native_path, "before_bytes": base64.b64encode(before).decode(),
                 "after": after, "created_at": utc_now()}))
             write_json_atomic(path, after, pretty=True)
+        self.storage.owners.invalidate()  # 业务卡指纹已变
         return {"status": "updated", "run_id": run_id,
                 "receipt": self.storage.ws.relative(folder / "registration.json"),
                 "sha256": sha256_file(path)}
@@ -202,6 +204,7 @@ class RunService:
             temporary = path.with_name(f".run.{uuid.uuid4().hex}.tmp")
             write_new(temporary, original)
             os.replace(temporary, path)
+        self.storage.owners.invalidate()
         return {"status": "restored", "files_deleted": 0}
 
     # ---------- 执行 ----------

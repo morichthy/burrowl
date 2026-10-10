@@ -153,8 +153,8 @@ class Reader:
         return {oid: s.commit_id or "none" for oid, s in self.states.items()}
 
     def recheck(self) -> None:
-        """返回前回源：本次读过的对象业务卡、HEAD 与来源文件都必须未变化。"""
-        fresh = self.storage.owners.scan()
+        """返回前回源：本次读过的对象业务卡、HEAD 与来源文件都必须未变化。对象列表重新扫描，不用本次操作复用的结果。"""
+        fresh = self.storage.owners.scan(fresh=True)
         for owner_id in self.used:
             before, after = self.index.get(owner_id), fresh.find(owner_id)
             if after is None or after.fingerprint != before.fingerprint or not after.readable:
