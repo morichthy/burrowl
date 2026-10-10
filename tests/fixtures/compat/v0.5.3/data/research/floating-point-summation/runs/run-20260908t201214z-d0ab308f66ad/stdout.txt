@@ -1,0 +1,12 @@
+{
+  "sequential": {
+    "cases": 3,
+    "exact_matches": 1,
+    "max_absolute_error": 1000.0
+  },
+  "math.fsum": {
+    "cases": 3,
+    "exact_matches": 3,
+    "max_absolute_error": 0.0
+  }
+}

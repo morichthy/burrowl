@@ -57,3 +57,4 @@
 - 记录契约：`core/schema/memory.schema.json`（由 `tools/extract_schema.py` 生成）。
 - 操作契约：各操作函数的类型签名（`interfaces/ops/builtin/`）。
 - 配置契约：`core/config.py`。
+- 真源兼容：`tests/fixtures/compat/` 中各版本冻结的标本（由 `tools/make_compat_fixture.py` 生成，规则见 [TESTING](TESTING.md)）。

@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "run_path": "research/floating-point-summation/runs/run-20261010t203447z-c4ba1d1f3b79/run.json",
+  "before_bytes": "ewogICJhcnRpZmFjdHMiOiBbCiAgICB7CiAgICAgICJwYXRoIjogInJlc2VhcmNoL2Zsb2F0aW5nLXBvaW50LXN1bW1hdGlvbi9ydW5zL3J1bi0yMDI2MTAxMHQyMDM0NDd6LWM0YmExZDFmM2I3OS8ucnVuLWNhcHR1cmVzL2E0MTkxNjUzMDZmOTQ5MmM5YWIyMDc5NTNkMDgxNTc4L3N0ZG91dC50eHQiLAogICAgICAicmVnaXN0ZXJlZF9hdCI6ICIyMDI2LTEwLTEwVDIwOjM0OjQ3Ljk4MjAxMloiLAogICAgICAicm9sZSI6ICJleGVjdXRpb25fbG9nIiwKICAgICAgInNoYTI1NiI6ICI5ZDg4YTgzZjEyODI2YTU4YmIzNGVlZTFjNWU2ZjVhMjBlODY4NGM2NmNiZjA5YTgyNmIyOWM2MzU2NjM1NjU5IgogICAgfSwKICAgIHsKICAgICAgInBhdGgiOiAicmVzZWFyY2gvZmxvYXRpbmctcG9pbnQtc3VtbWF0aW9uL3J1bnMvcnVuLTIwMjYxMDEwdDIwMzQ0N3otYzRiYTFkMWYzYjc5Ly5ydW4tY2FwdHVyZXMvYTQxOTE2NTMwNmY5NDkyYzlhYjIwNzk1M2QwODE1Nzgvc3RkZXJyLnR4dCIsCiAgICAgICJyZWdpc3RlcmVkX2F0IjogIjIwMjYtMTAtMTBUMjA6MzQ6NDcuOTk1MjE4WiIsCiAgICAgICJyb2xlIjogImV4ZWN1dGlvbl9sb2ciLAogICAgICAic2hhMjU2IjogImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUiCiAgICB9LAogICAgewogICAgICAicGF0aCI6ICJyZXNlYXJjaC9mbG9hdGluZy1wb2ludC1zdW1tYXRpb24vcnVucy9ydW4tMjAyNjEwMTB0MjAzNDQ3ei1jNGJhMWQxZjNiNzkvLnJ1bi1jYXB0dXJlcy9hNDE5MTY1MzA2Zjk0OTJjOWFiMjA3OTUzZDA4MTU3OC9leGVjdXRpb24uanNvbiIsCiAgICAgICJyZWdpc3RlcmVkX2F0IjogIjIwMjYtMTAtMTBUMjA6MzQ6NDguMDI0MDk4WiIsCiAgICAgICJyb2xlIjogImV4ZWN1dGlvbl9sb2ciLAogICAgICAic2hhMjU2IjogImQ2YmZiMzFhN2JkYTI5MjI4NmNjYzYyNTFiNmI1MTQ3NWFmMDBjOWZhYzk5NjM1YzI5MTcyN2Y4MWM0MjAzOTUiCiAgICB9CiAgXSwKICAiY29uY2x1c2lvbiI6ICIiLAogICJjcmVhdGVkX2F0IjogIjIwMjYtMTAtMTBUMjA6MzQ6NDdaIiwKICAiZW5kZWRfYXQiOiAiMjAyNi0xMC0xMFQyMDozNDo0Ny45NDk2NjVaIiwKICAiZW52aXJvbm1lbnQiOiB7CiAgICAicGxhdGZvcm0iOiAiV2luZG93cy0xMS0xMC4wLjIyNjMxLVNQMCIsCiAgICAicHl0aG9uIjogIjMuMTIuMTUiCiAgfSwKICAiaW5wdXRzIjogWwogICAgewogICAgICAicGF0aCI6ICJTUkMtQ09NUEFULVNBTVBMRVMiLAogICAgICAicmVnaXN0ZXJlZF9hdCI6ICIyMDI2LTEwLTEwVDIwOjM0OjQ3LjcxNTI2OVoiLAogICAgICAicm9sZSI6ICJpbnB1dCIsCiAgICAgICJzaGEyNTYiOiAiMmEyYjg2ZTc0ZmZkNWU2YTliNzVlNTJhMTA1Y2Y5ZDAyOTIwODM3MTc5ZjhlODk2MWFhMTU0MTFkMzgwZjdhMyIKICAgIH0sCiAgICB7CiAgICAgICJwYXRoIjogInJlc2VhcmNoL2Zsb2F0aW5nLXBvaW50LXN1bW1hdGlvbi9jb21wYXRfYW5hbHl6ZS5weSIsCiAgICAgICJyZWdpc3RlcmVkX2F0IjogIjIwMjYtMTAtMTBUMjA6MzQ6NDcuNzk2ODUwWiIsCiAgICAgICJyb2xlIjogInNjcmlwdCIsCiAgICAgICJzaGEyNTYiOiAiNDdkZGYzYmEyNDMyMmYyZTJlYTU5MjNiYjE0ZGZjOTUwMDNiNTUxYmIyYjg1YTkwMzE3MzllMGZiMzNlMjViOSIKICAgIH0KICBdLAogICJrZXl3b3JkcyI6IFtdLAogICJsaW1pdGF0aW9ucyI6IFtdLAogICJvd25lcl9pZCI6ICJSRVMtRkxPQVRJTkctUE9JTlQtU1VNTUFUSU9OIiwKICAicGFyYW1ldGVycyI6IHt9LAogICJwYXJlbnRfcnVuX2lkcyI6IFtdLAogICJxdWVzdGlvbiI6ICLmoLfmnKzmnInlh6DooYwiLAogICJydW5faWQiOiAiUlVOLTIwMjYxMDEwVDIwMzQ0N1otQzRCQTFEMUYzQjc5IiwKICAicnVuX3R5cGUiOiAiYW5hbHlzaXMiLAogICJzY2hlbWFfdmVyc2lvbiI6IDEsCiAgInNlbnNpdGl2aXR5IjogImludGVybmFsIiwKICAic3RhcnRlZF9hdCI6ICIyMDI2LTEwLTEwVDIwOjM0OjQ3LjgxOTYzM1oiLAogICJzdGF0dXMiOiAic3VjY2VlZGVkIiwKICAidGl0bGUiOiAi5qCH5pys5a+56LGhIFJ1biIKfQo=",
+  "after": {
+    "artifacts": [
+      {
+        "path": "research/floating-point-summation/runs/run-20261010t203447z-c4ba1d1f3b79/.run-captures/a419165306f9492c9ab207953d081578/stdout.txt",
+        "registered_at": "2026-10-10T20:34:47.982012Z",
+        "role": "execution_log",
+        "sha256": "9d88a83f12826a58bb34eee1c5e6f5a20e8684c66cbf09a826b29c6356635659"
+      },
+      {
+        "path": "research/floating-point-summation/runs/run-20261010t203447z-c4ba1d1f3b79/.run-captures/a419165306f9492c9ab207953d081578/stderr.txt",
+        "registered_at": "2026-10-10T20:34:47.995218Z",
+        "role": "execution_log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "research/floating-point-summation/runs/run-20261010t203447z-c4ba1d1f3b79/.run-captures/a419165306f9492c9ab207953d081578/execution.json",
+        "registered_at": "2026-10-10T20:34:48.024098Z",
+        "role": "execution_log",
+        "sha256": "d6bfb31a7bda292286ccc6251b6b51475af00c9fac99635c291727f81c420395"
+      }
+    ],
+    "conclusion": "执行成功，输出行数",
+    "created_at": "2026-10-10T20:34:47Z",
+    "ended_at": "2026-10-10T20:34:47.949665Z",
+    "environment": {
+      "platform": "Windows-11-10.0.22631-SP0",
+      "python": "3.12.15"
+    },
+    "inputs": [
+      {
+        "path": "SRC-COMPAT-SAMPLES",
+        "registered_at": "2026-10-10T20:34:47.715269Z",
+        "role": "input",
+        "sha256": "2a2b86e74ffd5e6a9b75e52a105cf9d02920837179f8e8961aa15411d380f7a3"
+      },
+      {
+        "path": "research/floating-point-summation/compat_analyze.py",
+        "registered_at": "2026-10-10T20:34:47.796850Z",
+        "role": "script",
+        "sha256": "47ddf3ba24322f2e2ea5923bb14dfc95003b551bb2b85a9031739e0fb33e25b9"
+      }
+    ],
+    "keywords": [],
+    "limitations": [
+      "合成数据"
+    ],
+    "owner_id": "RES-FLOATING-POINT-SUMMATION",
+    "parameters": {},
+    "parent_run_ids": [],
+    "question": "样本有几行",
+    "run_id": "RUN-20261010T203447Z-C4BA1D1F3B79",
+    "run_type": "analysis",
+    "schema_version": 1,
+    "sensitivity": "internal",
+    "started_at": "2026-10-10T20:34:47.819633Z",
+    "status": "succeeded",
+    "title": "标本对象 Run"
+  },
+  "created_at": "2026-10-10T20:34:48.135419Z"
+}

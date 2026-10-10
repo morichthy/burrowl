@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-20260908T201240Z-90107A617CF8",
+  "project_id": null,
+  "title": "求和探索03：固定种子多排列复验",
+  "keywords": [
+    "浮点求和"
+  ],
+  "review_history": [],
+  "claims": [],
+  "dependencies": [],
+  "run_type": "analysis",
+  "status": "succeeded",
+  "created_at": "2026-09-08T20:12:40Z",
+  "started_at": "2026-09-08T20:12:40.304331+00:00",
+  "ended_at": "2026-09-08T20:12:40.497595+00:00",
+  "owner": "AI research assistant",
+  "question": "前轮观察在重复抵消结构的30个固定种子排列中是否保留？",
+  "hypotheses": [
+    "本轮路线选择依据前轮观察；没有将前轮数值输出作为本轮输入。"
+  ],
+  "inputs": [
+    {
+      "path": "runs/run-20260908t201240z-90107a617cf8/inputs.json",
+      "sha256": "9da1f46663a569680b3e61e842f164880d24c047e0ab13ac0471df6683d32561"
+    }
+  ],
+  "parameters": {
+    "round": 3,
+    "samples": 30,
+    "methods": [
+      "sequential",
+      "kahan",
+      "neumaier",
+      "math.fsum"
+    ]
+  },
+  "code": {
+    "commit": null,
+    "dirty": null,
+    "source_snapshot_sha256": "8dc8cd86e17a2595b0217e9bcef712c5a61db1eec07828fb446ea556657f2284",
+    "source_path": "runs/run-20260908t201240z-90107a617cf8/reproduce.py"
+  },
+  "environment": {
+    "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "lock_or_image_digest": null,
+    "dependencies": "Python standard library only"
+  },
+  "random_seeds": [
+    20260909
+  ],
+  "quality_results": [
+    {
+      "check": "Actual finite-output computation and rational/integer reference cross-check",
+      "required": true,
+      "status": "passed"
+    }
+  ],
+  "metrics": {
+    "sequential": {
+      "cases": 30,
+      "exact_matches": 0,
+      "max_absolute_error": 10.0
+    },
+    "kahan": {
+      "cases": 30,
+      "exact_matches": 5,
+      "max_absolute_error": 10.0
+    },
+    "neumaier": {
+      "cases": 30,
+      "exact_matches": 30,
+      "max_absolute_error": 0.0
+    },
+    "math.fsum": {
+      "cases": 30,
+      "exact_matches": 30,
+      "max_absolute_error": 0.0
+    }
+  },
+  "artifacts": [
+    {
+      "path": "runs/run-20260908t201240z-90107a617cf8/results.json",
+      "sha256": "693058d77bb3ed61e94535369bbfa4d74b6a2ed7f406a8af0b5782a0dc4fa7ef"
+    },
+    {
+      "path": "runs/run-20260908t201240z-90107a617cf8/reproduce.py",
+      "sha256": "8dc8cd86e17a2595b0217e9bcef712c5a61db1eec07828fb446ea556657f2284"
+    },
+    {
+      "path": "runs/run-20260908t201240z-90107a617cf8/execution.json",
+      "sha256": "6ec8ecba6aebbac0609d5a89ca0e67028639d22c0356e9b34ffae71ad125d1ae"
+    },
+    {
+      "path": "runs/run-20260908t201240z-90107a617cf8/README.md",
+      "sha256": "082783ec986a0a5b9f4a6bb1c26248033e6300522dec5764d08799abba3f01dc"
+    }
+  ],
+  "lineage_events": "lineage.jsonl",
+  "conclusion": "本轮以固定随机种子扩展排列，结果限于这30个已保存输入；不作任意浮点数据的正确性保证。",
+  "limitations": [
+    "Constructed dimensionless finite inputs only.",
+    "No overflow, NaN, infinity, timing or proof of universal correctness."
+  ],
+  "parent_run_ids": [],
+  "related_module_ids": [],
+  "related_research_ids": [
+    "RES-FLOATING-POINT-SUMMATION"
+  ],
+  "related_dataset_ids": [],
+  "review": {
+    "status": "not-reviewed",
+    "reviewer": null,
+    "date": null
+  },
+  "sensitivity": "internal",
+  "prior_exploration_run": "RUN-20260908T201228Z-A0980824DC18"
+}
