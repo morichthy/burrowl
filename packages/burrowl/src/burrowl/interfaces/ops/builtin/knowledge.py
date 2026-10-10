@@ -1,6 +1,6 @@
 """复核、溯源、关联与关系图、语义维护、监测、Run、来源登记。"""
 from pathlib import PurePosixPath
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import Field
 
@@ -145,23 +145,65 @@ def view_save(ctx: Ctx, view: dict) -> dict:
     return ctx.app.prefs.save_view(view)
 
 
+NoteStatus = Literal["open", "queued", "proposed", "needs_user", "handled", "done", "dismissed"]
+
+
 @op("relations.notes")
-def notes(ctx: Ctx) -> list:
-    """关系图上的随手笔记（分组名、桥接问题、关系设想）。"""
-    return ctx.app.prefs.notes()
+def notes(ctx: Ctx, status: Annotated[list[NoteStatus] | None, Field(description=(
+              "只看这些状态；AI 处理用户交给你的笔记时用 ['queued']"))] = None,
+          owner_id: Annotated[str | None, Field(description="只看引用了该对象或其记录的笔记")] = None) -> list:
+    """工作台笔记（R15）：用户在关系图旁写下的分组名、桥接问题、关系设想。queued 表示用户交给 AI 处理，
+    用 relations_note_reply 回写方案、提问或说明不处理。笔记不是研究记录。"""
+    return ctx.app.notes.items(status=status, owner_id=owner_id)
 
 
 @op("relations.note_add", effect="user")
 def note_add(ctx: Ctx, kind: Literal["cluster-name", "bridge-question", "relation-idea"], title: str, text: str = "",
              refs: list[str] | None = None) -> dict:
-    """添加关系图笔记。"""
-    return ctx.app.prefs.add_note(kind, title, text, refs or [])
+    """（仅用户）新建工作台笔记（草稿）。"""
+    return ctx.app.notes.add(kind, title, text, refs or [])
 
 
 @op("relations.note_resolve", effect="user")
-def note_resolve(ctx: Ctx, note_id: str, status: Literal["open", "done", "dismissed"]) -> dict:
-    """更新关系图笔记状态。"""
-    return ctx.app.prefs.resolve_note(note_id, status)
+def note_resolve(ctx: Ctx, note_id: str, status: Literal["open", "queued", "done", "dismissed"]) -> dict:
+    """（仅用户）交给 AI（queued）、收回或重新打开（open）、完成（无需 AI）、放弃。"""
+    return ctx.app.notes.resolve(note_id, status)
+
+
+@op("relations.note_answer", effect="user")
+def note_answer(ctx: Ctx, note_id: str, text: str) -> dict:
+    """（仅用户）回答 AI 在笔记上的提问；笔记回到 queued。"""
+    return ctx.app.notes.answer(note_id, text)
+
+
+@op("relations.note_reply", effect="write")
+def note_reply(ctx: Ctx, note_id: str, outcome: Annotated[Literal["proposal", "question", "declined"], Field(description=(
+                   "proposal：写入方案（先预演，用户在工作台执行后才写入）；question：向用户提问；declined：说明不需要或不能写入"))],
+               message: Annotated[str, Field(description="给用户看的一句说明、问题或理由")],
+               steps: Annotated[list[dict[str, Any]] | None, Field(description=(
+                   "仅 proposal：最多 10 步，每步 {op:'memory.commit', owner_id, operations, expected_head} 或 "
+                   "{op:'relations.decide', owner_id, payload, reason}；参数与对应操作相同。同一对象只提交一次；"
+                   "服务端逐步 dry_run 预检并生成预览，不会写入"))] = None) -> dict:
+    """回写用户交给你的工作台笔记（只能作用于 queued 的笔记）。写入方案须由用户在工作台执行，不能替用户确认或执行。"""
+    return ctx.app.notes.reply(note_id, outcome, message, steps, actor=ctx.actor)
+
+
+@op("relations.note_apply", effect="user")
+def note_apply(ctx: Ctx, note_id: str, proposal_id: str) -> dict:
+    """（仅用户）执行笔记上的 AI 方案：核对依据未变后按预览原样写入；依据变化或某步失败时退回 AI。"""
+    return ctx.app.notes.apply(note_id, proposal_id)
+
+
+@op("relations.note_reject", effect="user")
+def note_reject(ctx: Ctx, note_id: str, proposal_id: str, comment: str = "") -> dict:
+    """（仅用户）退回 AI 方案并附意见；笔记回到 queued。"""
+    return ctx.app.notes.reject(note_id, proposal_id, comment)
+
+
+@op("relations.note_clear", effect="user")
+def note_clear(ctx: Ctx) -> dict:
+    """（仅用户）删除已处理、已完成和已放弃的笔记。编号不复用。"""
+    return ctx.app.notes.clear()
 
 
 # ---------- 语义维护 ----------

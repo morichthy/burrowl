@@ -49,6 +49,9 @@ def test_tools_calls_and_errors(server):
             tools = {t.name: t for t in (await client.list_tools()).tools}
             assert {"memory_inspect", "query_search", "reading_start", "review_queue"} <= tools.keys()
             assert "reading_respond" not in tools and "config_secret_set" not in tools  # 用户动作不给 agent
+            # R15 D-03：AI 只能读笔记和回写；交给 AI、执行方案、清除等都是用户专属
+            assert {"relations_notes", "relations_note_reply"} <= tools.keys()
+            assert not {"relations_note_apply", "relations_note_resolve", "relations_note_clear"} & tools.keys()
             assert tools["memory_inspect"].annotations.read_only_hint is True
             assert "owner_id" in tools["memory_inspect"].input_schema["properties"]
             inspected = await client.call_tool("memory_inspect", {"owner_id": OWNER})

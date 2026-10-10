@@ -72,7 +72,7 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | `memory.records` | 只读 | 对象内的记录目录（按层级，分页；不含正文）。kinds 按类型筛选，query 匹配标题或 ID；kind_counts 是类型筛选前的计数。 | `owner_id`*: string，`levels`: array|null，`kinds`: array|null，`query`: string，`main_only`: boolean，`offset`: integer，`limit`: integer |
 | `memory.recovery` | 管理 | 检查记忆目录健康状况（写锁、孤立提交、暂存残留）；只报告不修改。 | `owner_id`*: string |
 | `memory.render` | 只读 | 按交换格式把一条记录渲染为 Markdown（YAML 头 + 正文 + 自动生成的反链与关联）。只读。 | `owner_id`*: string，`record_id`*: string |
-| `memory.resume` | 只读 | 续接对象的工作上下文：目标→检查点→最新概览/经过/技术→路线/问题/经验（只读）。 不建立阅读会话；用户查询主题相关知识、找已有经验时默认先 reading_start。 | `owner_id`*: string |
+| `memory.resume` | 只读 | 续接对象的工作上下文：目标→检查点→最新概览/经过/技术→路线/问题/经验（只读）。 不建立阅读会话；用户查询主题相关知识、找已有经验时默认先 reading_start。 workbench_notes 列出与该对象相关、尚未结束的工作台笔记；queued 的由你用 relations_note_reply 回写。 | `owner_id`*: string |
 | `memory.summary_materials` | 只读 | 跨对象总结的固定材料包（不生成总结）。 | `owner_ids`*: array，`exclude_ids`: array|null |
 | `memory.summary_save` | 写入 | 把写好的总结保存为本对象的 L3/L4；依据对象有新提交则拒绝。 | `owner_id`*: string，`draft`*: object，`basis_heads`*: object，`record_id`: string|null，`expected_revision`: integer|null，`dry_run`: boolean |
 | `memory.timeline` | 只读 | 研究时间线：全部记录的全部修订与关联 Run（不含正文）。 | `owner_id`*: string，`offset`: integer，`limit`: integer |
@@ -139,9 +139,14 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | `relations.candidates` | 只读 | 待判断的线索：正文提到概念却没链接（concept_mention）、向量近邻（similar）、外部工具回流（external:*）。 已判断过的端点对会被过滤。只读。 | `record_id`: string|null，`owner_id`: string|null，`kinds`: array|null，`limit`: integer |
 | `relations.decide` | 写入 | 保存关联判断（candidate/accepted/rejected/withdrawn）；只能是导航关系。 "A 会影响 B"这类可以验证的判断写成结论（inference），不要写成关联。 | `owner_id`*: string，`payload`*: object，`reason`*: string，`dry_run`: boolean |
 | `relations.graph` | 只读 | 材料关系图（子图）：对象、记录、块、结论、概念、来源，以及按类别区分的边（来自图投影）。 categories 只看某几类边；domains / excluded_domains 按领域筛选或屏蔽概念。 | `center`: string|null，`hops`: integer，`query`: string，`kinds`: array|null，`levels`: array|null，`excluded`: array|null，`limit`: integer，`categories`: array|null，`domains`: array|null，`excluded_domains`: array|null，`node_types`: array|null |
-| `relations.note_add` | 仅用户（不暴露给 agent） | 添加关系图笔记。 | `kind`*: string，`title`*: string，`text`: string，`refs`: array|null |
-| `relations.note_resolve` | 仅用户（不暴露给 agent） | 更新关系图笔记状态。 | `note_id`*: string，`status`*: string |
-| `relations.notes` | 只读 | 关系图上的随手笔记（分组名、桥接问题、关系设想）。 | 无 |
+| `relations.note_add` | 仅用户（不暴露给 agent） | （仅用户）新建工作台笔记（草稿）。 | `kind`*: string，`title`*: string，`text`: string，`refs`: array|null |
+| `relations.note_answer` | 仅用户（不暴露给 agent） | （仅用户）回答 AI 在笔记上的提问；笔记回到 queued。 | `note_id`*: string，`text`*: string |
+| `relations.note_apply` | 仅用户（不暴露给 agent） | （仅用户）执行笔记上的 AI 方案：核对依据未变后按预览原样写入；依据变化或某步失败时退回 AI。 | `note_id`*: string，`proposal_id`*: string |
+| `relations.note_clear` | 仅用户（不暴露给 agent） | （仅用户）删除已处理、已完成和已放弃的笔记。编号不复用。 | 无 |
+| `relations.note_reject` | 仅用户（不暴露给 agent） | （仅用户）退回 AI 方案并附意见；笔记回到 queued。 | `note_id`*: string，`proposal_id`*: string，`comment`: string |
+| `relations.note_reply` | 写入 | 回写用户交给你的工作台笔记（只能作用于 queued 的笔记）。写入方案须由用户在工作台执行，不能替用户确认或执行。 | `note_id`*: string，`outcome`*: string，`message`*: string，`steps`: array|null |
+| `relations.note_resolve` | 仅用户（不暴露给 agent） | （仅用户）交给 AI（queued）、收回或重新打开（open）、完成（无需 AI）、放弃。 | `note_id`*: string，`status`*: string |
+| `relations.notes` | 只读 | 工作台笔记（R15）：用户在关系图旁写下的分组名、桥接问题、关系设想。queued 表示用户交给 AI 处理， 用 relations_note_reply 回写方案、提问或说明不处理。笔记不是研究记录。 | `status`: array|null，`owner_id`: string|null |
 | `relations.similar` | 只读 | 为种子记录找关联候选（关键词重合 / 语义近邻）；只是待判断的线索。 | `seeds`*: array，`method`: string，`limit`: integer |
 | `relations.view` | 只读 | 工作台关系图的本机视图偏好。 | 无 |
 | `relations.view_save` | 仅用户（不暴露给 agent） | 保存关系图视图偏好（布局、分组、中心、排除项）。 | `view`*: object |

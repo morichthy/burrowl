@@ -23,8 +23,6 @@ def test_graph_and_subgraph(sample_workspace):
     prefs = relations.WorkbenchPrefs(storage)
     prefs.save_view({"name": "默认", "mode": "radial", "positions": {}})
     assert prefs.view()["name"] == "默认"
-    note = prefs.add_note("bridge-question", "顺序与补偿是否可统一", "", [OWNER])
-    assert prefs.resolve_note(note["id"], "done")["status"] == "done"
 
 
 def test_monitor_detects_source_change(sample_workspace):

@@ -1,8 +1,10 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Relations } from "./Relations";
+import { useState } from "react";
+import { Focus, Relations } from "./Relations";
 
 let stored: Record<string, unknown>;
+let notes: { id: string; kind: string; title: string; text: string; refs: string[]; status: string; created_at: string }[];
 let calls: { name: string; args: Record<string, unknown> }[];
 const defaults = ["owner", "record", "claim", "concept", "source"];
 const nodeLabels = ["对象", "记录", "内容块（L1）", "结论（Claim）", "概念", "来源"];
@@ -10,6 +12,7 @@ const latestGraph = () => calls.filter((call) => call.name === "relations.graph"
 
 beforeEach(() => {
   stored = {};
+  notes = [];
   calls = [];
   vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
     const name = url.replace("api/v1/ops/", "");
@@ -18,6 +21,11 @@ beforeEach(() => {
     let body: unknown = [];
     if (name === "relations.view") body = stored;
     if (name === "relations.view_save") body = stored = args.view as Record<string, unknown>;
+    if (name === "relations.notes") body = notes;
+    if (name === "relations.note_resolve") {
+      notes = notes.map((n) => (n.id === args.note_id ? { ...n, status: args.status as string } : n));
+      body = notes.find((n) => n.id === args.note_id);
+    }
     // 用各类型一个节点模拟后端可见性，断言用户能看到的节点计数。
     if (name === "relations.graph") body = {
       nodes: (args.node_types as string[]).map((type) => ({ id: type, type, kind: type, title: type, owner_id: null, level: null })),
@@ -124,4 +132,31 @@ describe("关系图筛选（R12 T-P2.8）", () => {
     expect(latestGraph().node_types).toEqual(defaults);
     expect(latestGraph()).not.toHaveProperty("levels");
   });
+});
+
+describe("关系图交互修复", () => {
+  it("再次点击“从这里添加关联”取消关联起点", () => {
+    const node = { id: "MEM-1", type: "record", kind: "detail", title: "求和记录", level: "L1", owner_id: "RES-1", ref: { target_kind: "record", target_id: "MEM-1", revision: 1, sha256: null, locator: "", relation: "navigation" } };
+    function Harness() {
+      const [linkFrom, setLinkFrom] = useState<typeof node>();
+      return (
+        <Focus node={node} candidates={[]} onCenter={() => {}} onHide={() => {}} reloadCandidates={() => {}} candidatesLoading={false}
+          linkFrom={linkFrom} setLinkFrom={(n) => setLinkFrom(n as typeof node | undefined)} reloadGraph={() => {}} />
+      );
+    }
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "从这里添加关联" }));
+    expect(screen.getByRole("button", { name: "取消关联起点" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "取消关联起点" }));
+    expect(screen.getByRole("button", { name: "从这里添加关联" })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("隐藏的节点可以逐个恢复", async () => {
+    stored = { excluded: ["claim", "concept"], filters: {} };
+    render(<Relations />);
+    const bar = within(await screen.findByRole("group", { name: "已隐藏的节点" }));
+    fireEvent.click(bar.getByRole("button", { name: /^claim/ }));
+    await waitFor(() => expect(latestGraph().excluded).toEqual(["concept"]));
+  });
+
 });

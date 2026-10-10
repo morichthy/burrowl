@@ -51,6 +51,7 @@ requires_tools: [memory_inspect, memory_document, memory_timeline, memory_contra
    - 复核本身由用户在工作台完成。只有符合 RULES 第 4 节的情况才由 AI 代为 `review_submit`。
    - **评估成熟度**：按 RULES 第 4 节的阶梯给结论登记 `maturity`（设想 / 初步 / 重复验证），写明理由和依据；认为证据已足以"已确立"时只提交 `requested_maturity=established`，由用户在复核队列确认。看 `review_queue` 里的派生统计（独立依据、未处理反例），有未处理反例的先处理反例。
    - `provenance_lineage` 查原件来源；来源数不等于独立支持数。
+   - 用 `relations_notes(status=['queued'], owner_id=…)` 查用户交给 AI 的工作台笔记，按 RULES 第 8 节"工作台笔记"逐条回写（写入只给方案，由用户在工作台执行）。
 6. **关联与概念**：
    - 用 `relations_candidates(owner_id=…)` 看保存后自动算出的线索（正文提到概念却没链接、向量近邻），也可以用 `relations_similar` 补充。逐条判断：该链接的改写正文加 `[[…]]`，值得放在一起看的 `relations_decide` 保存（带 certainty），不相关的保存为 rejected（以后不再出现）。
    - 类比（analogous_to）必须写共享结构和迁移边界；"A 会影响 B"写成结论，不写成关联。关联只是导航，不进入证据。

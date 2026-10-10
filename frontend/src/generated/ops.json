@@ -1106,11 +1106,50 @@
   "name": "relations.notes",
   "group": "relations",
   "effect": "read",
-  "summary": "关系图上的随手笔记（分组名、桥接问题、关系设想）。",
+  "summary": "工作台笔记（R15）：用户在关系图旁写下的分组名、桥接问题、关系设想。queued 表示用户交给 AI 处理， 用 relations_note_reply 回写方案、提问或说明不处理。笔记不是研究记录。",
   "input": {
    "additionalProperties": false,
-   "description": "关系图上的随手笔记（分组名、桥接问题、关系设想）。",
-   "properties": {},
+   "description": "工作台笔记（R15）：用户在关系图旁写下的分组名、桥接问题、关系设想。queued 表示用户交给 AI 处理，\n用 relations_note_reply 回写方案、提问或说明不处理。笔记不是研究记录。",
+   "properties": {
+    "status": {
+     "anyOf": [
+      {
+       "items": {
+        "enum": [
+         "open",
+         "queued",
+         "proposed",
+         "needs_user",
+         "handled",
+         "done",
+         "dismissed"
+        ],
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "只看这些状态；AI 处理用户交给你的笔记时用 ['queued']",
+     "title": "Status"
+    },
+    "owner_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "只看引用了该对象或其记录的笔记",
+     "title": "Owner Id"
+    }
+   },
    "title": "relations_notes_input",
    "type": "object"
   }
@@ -1119,10 +1158,10 @@
   "name": "relations.note_add",
   "group": "relations",
   "effect": "user",
-  "summary": "添加关系图笔记。",
+  "summary": "（仅用户）新建工作台笔记（草稿）。",
   "input": {
    "additionalProperties": false,
-   "description": "添加关系图笔记。",
+   "description": "（仅用户）新建工作台笔记（草稿）。",
    "properties": {
     "kind": {
      "enum": [
@@ -1170,10 +1209,10 @@
   "name": "relations.note_resolve",
   "group": "relations",
   "effect": "user",
-  "summary": "更新关系图笔记状态。",
+  "summary": "（仅用户）交给 AI（queued）、收回或重新打开（open）、完成（无需 AI）、放弃。",
   "input": {
    "additionalProperties": false,
-   "description": "更新关系图笔记状态。",
+   "description": "（仅用户）交给 AI（queued）、收回或重新打开（open）、完成（无需 AI）、放弃。",
    "properties": {
     "note_id": {
      "title": "Note Id",
@@ -1182,6 +1221,7 @@
     "status": {
      "enum": [
       "open",
+      "queued",
       "done",
       "dismissed"
      ],
@@ -1194,6 +1234,157 @@
     "status"
    ],
    "title": "relations_note_resolve_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "relations.note_answer",
+  "group": "relations",
+  "effect": "user",
+  "summary": "（仅用户）回答 AI 在笔记上的提问；笔记回到 queued。",
+  "input": {
+   "additionalProperties": false,
+   "description": "（仅用户）回答 AI 在笔记上的提问；笔记回到 queued。",
+   "properties": {
+    "note_id": {
+     "title": "Note Id",
+     "type": "string"
+    },
+    "text": {
+     "title": "Text",
+     "type": "string"
+    }
+   },
+   "required": [
+    "note_id",
+    "text"
+   ],
+   "title": "relations_note_answer_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "relations.note_reply",
+  "group": "relations",
+  "effect": "write",
+  "summary": "回写用户交给你的工作台笔记（只能作用于 queued 的笔记）。写入方案须由用户在工作台执行，不能替用户确认或执行。",
+  "input": {
+   "additionalProperties": false,
+   "description": "回写用户交给你的工作台笔记（只能作用于 queued 的笔记）。写入方案须由用户在工作台执行，不能替用户确认或执行。",
+   "properties": {
+    "note_id": {
+     "title": "Note Id",
+     "type": "string"
+    },
+    "outcome": {
+     "description": "proposal：写入方案（先预演，用户在工作台执行后才写入）；question：向用户提问；declined：说明不需要或不能写入",
+     "enum": [
+      "proposal",
+      "question",
+      "declined"
+     ],
+     "title": "Outcome",
+     "type": "string"
+    },
+    "message": {
+     "description": "给用户看的一句说明、问题或理由",
+     "title": "Message",
+     "type": "string"
+    },
+    "steps": {
+     "anyOf": [
+      {
+       "items": {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "仅 proposal：最多 10 步，每步 {op:'memory.commit', owner_id, operations, expected_head} 或 {op:'relations.decide', owner_id, payload, reason}；参数与对应操作相同。同一对象只提交一次；服务端逐步 dry_run 预检并生成预览，不会写入",
+     "title": "Steps"
+    }
+   },
+   "required": [
+    "note_id",
+    "outcome",
+    "message"
+   ],
+   "title": "relations_note_reply_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "relations.note_apply",
+  "group": "relations",
+  "effect": "user",
+  "summary": "（仅用户）执行笔记上的 AI 方案：核对依据未变后按预览原样写入；依据变化或某步失败时退回 AI。",
+  "input": {
+   "additionalProperties": false,
+   "description": "（仅用户）执行笔记上的 AI 方案：核对依据未变后按预览原样写入；依据变化或某步失败时退回 AI。",
+   "properties": {
+    "note_id": {
+     "title": "Note Id",
+     "type": "string"
+    },
+    "proposal_id": {
+     "title": "Proposal Id",
+     "type": "string"
+    }
+   },
+   "required": [
+    "note_id",
+    "proposal_id"
+   ],
+   "title": "relations_note_apply_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "relations.note_reject",
+  "group": "relations",
+  "effect": "user",
+  "summary": "（仅用户）退回 AI 方案并附意见；笔记回到 queued。",
+  "input": {
+   "additionalProperties": false,
+   "description": "（仅用户）退回 AI 方案并附意见；笔记回到 queued。",
+   "properties": {
+    "note_id": {
+     "title": "Note Id",
+     "type": "string"
+    },
+    "proposal_id": {
+     "title": "Proposal Id",
+     "type": "string"
+    },
+    "comment": {
+     "default": "",
+     "title": "Comment",
+     "type": "string"
+    }
+   },
+   "required": [
+    "note_id",
+    "proposal_id"
+   ],
+   "title": "relations_note_reject_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "relations.note_clear",
+  "group": "relations",
+  "effect": "user",
+  "summary": "（仅用户）删除已处理、已完成和已放弃的笔记。编号不复用。",
+  "input": {
+   "additionalProperties": false,
+   "description": "（仅用户）删除已处理、已完成和已放弃的笔记。编号不复用。",
+   "properties": {},
+   "title": "relations_note_clear_input",
    "type": "object"
   }
  },
@@ -2759,10 +2950,10 @@
   "name": "memory.resume",
   "group": "memory",
   "effect": "read",
-  "summary": "续接对象的工作上下文：目标→检查点→最新概览/经过/技术→路线/问题/经验（只读）。 不建立阅读会话；用户查询主题相关知识、找已有经验时默认先 reading_start。",
+  "summary": "续接对象的工作上下文：目标→检查点→最新概览/经过/技术→路线/问题/经验（只读）。 不建立阅读会话；用户查询主题相关知识、找已有经验时默认先 reading_start。 workbench_notes 列出与该对象相关、尚未结束的工作台笔记；queued 的由你用 relations_note_reply 回写。",
   "input": {
    "additionalProperties": false,
-   "description": "续接对象的工作上下文：目标→检查点→最新概览/经过/技术→路线/问题/经验（只读）。\n不建立阅读会话；用户查询主题相关知识、找已有经验时默认先 reading_start。",
+   "description": "续接对象的工作上下文：目标→检查点→最新概览/经过/技术→路线/问题/经验（只读）。\n不建立阅读会话；用户查询主题相关知识、找已有经验时默认先 reading_start。\nworkbench_notes 列出与该对象相关、尚未结束的工作台笔记；queued 的由你用 relations_note_reply 回写。",
    "properties": {
     "owner_id": {
      "description": "对象 ID，如 RES-…、PRJ-…、RUN-…",

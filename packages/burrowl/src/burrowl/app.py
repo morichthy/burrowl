@@ -17,6 +17,7 @@ from .services.maintenance import MaintenanceService
 from .services.memory.context import Storage
 from .services.memory.service import MemoryService
 from .services.monitor import Monitor
+from .services.notes import WorkbenchNotes
 from .services.query.service import QueryService
 from .services.reading.service import ReadingService
 from .services.relations import WorkbenchPrefs
@@ -40,6 +41,7 @@ class App:
     maintenance: MaintenanceService
     monitor: Monitor
     prefs: WorkbenchPrefs
+    notes: WorkbenchNotes
     hub: HubService
     lock: threading.RLock = field(default_factory=threading.RLock)
     # 本进程的接入方式，由启动参数给出、不写入数据目录：
@@ -77,6 +79,7 @@ class App:
                                           reranker_dir=reranker if reranker and reranker.is_dir() else None),
                    runs=RunService(storage), maintenance=MaintenanceService(memory, review),
                    monitor=Monitor(storage), prefs=WorkbenchPrefs(storage),
+                   notes=WorkbenchNotes(storage, memory, index),
                    hub=hub)
 
     def capabilities(self) -> dict:

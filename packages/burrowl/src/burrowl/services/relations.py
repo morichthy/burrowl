@@ -9,15 +9,12 @@ from collections import deque
 from typing import Any
 
 from ..core.atomic import exclusive_lock, read_json, write_json_atomic
-from ..core.clock import utc_now
 from ..core.errors import BurrowlError
 from .indexing import IndexService
 from .memory import associations
 from .memory.context import Storage
 
 VIEW_FILE = "workbench/view.json"
-NOTES_FILE = "workbench/notes.json"
-NOTE_KINDS = {"cluster-name", "bridge-question", "relation-idea"}
 
 
 def build_graph(storage: Storage, index: IndexService) -> dict:
@@ -133,7 +130,7 @@ def _owner_of(storage: Storage, record_id: str) -> str | None:
 
 
 class WorkbenchPrefs:
-    """本机视图偏好与随手笔记（分组名、桥接问题等）。"""
+    """关系图的本机视图偏好（布局、分组、中心、排除项）。工作台笔记见 services/notes.py（R15 D-01）。"""
 
     def __init__(self, storage: Storage):
         self.ws = storage.ws
@@ -158,25 +155,3 @@ class WorkbenchPrefs:
         self._write(VIEW_FILE, view)
         return view
 
-    def notes(self) -> list[dict]:
-        return self._read(NOTES_FILE, [])
-
-    def add_note(self, kind: str, title: str, text: str, refs: list[str]) -> dict:
-        if kind not in NOTE_KINDS or not title.strip():
-            raise BurrowlError("INVALID_ARGUMENT", "笔记类型无效或缺标题", {"kinds": sorted(NOTE_KINDS)})
-        notes = self.notes()
-        item = {"id": f"WN-{len(notes) + 1}", "kind": kind, "title": title, "text": text, "refs": refs,
-                "status": "open", "created_at": utc_now()}
-        self._write(NOTES_FILE, [*notes, item])
-        return item
-
-    def resolve_note(self, note_id: str, status: str) -> dict:
-        if status not in {"open", "done", "dismissed"}:
-            raise BurrowlError("INVALID_ARGUMENT", "status 只能是 open / done / dismissed")
-        notes = self.notes()
-        for note in notes:
-            if note["id"] == note_id:
-                note["status"] = status
-                self._write(NOTES_FILE, notes)
-                return note
-        raise BurrowlError("NOT_FOUND", "笔记不存在", {"id": note_id})

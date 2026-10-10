@@ -173,8 +173,15 @@ def raw_read(ctx: Ctx, owner_id: OwnerId, material_id: str, max_chars: int = 200
 @op("memory.resume")
 def resume(ctx: Ctx, owner_id: OwnerId) -> dict:
     """续接对象的工作上下文：目标→检查点→最新概览/经过/技术→路线/问题/经验（只读）。
-    不建立阅读会话；用户查询主题相关知识、找已有经验时默认先 reading_start。"""
-    return workflow.resume(ctx.app.memory, owner_id)
+    不建立阅读会话；用户查询主题相关知识、找已有经验时默认先 reading_start。
+    workbench_notes 列出与该对象相关、尚未结束的工作台笔记；queued 的由你用 relations_note_reply 回写。"""
+    result = workflow.resume(ctx.app.memory, owner_id)
+    # R15 D-09：续接时带出用户交给 AI、或等待用户处理的笔记（笔记不是记录，不进材料包预算）
+    result["workbench_notes"] = [
+        {"id": n["id"], "status": n["status"], "kind": n["kind"], "title": n["title"], "text": n["text"],
+         "thread": n["thread"][-3:]}
+        for n in ctx.app.notes.items(status=["queued", "needs_user", "proposed"], owner_id=owner_id)]
+    return result
 
 
 @op("memory.export")

@@ -31,6 +31,8 @@ COMMON = """工作流说明（burrowl-work / burrowl-read / burrowl-consolidate 
 只有用户明确只要片段/候选列表，或直接查看已知源码、配置、开发状态时，才直接使用低层查询或读取工具。
 query_*、memory_owners、memory_owner_route、memory_resume 不会建立阅读会话，不会出现在工作台的当前阅读或阅读会话中。
 写操作返回 activity 行时，在回复末尾以"关键操作"为题原样逐行列出（不展开）。
+用户可在工作台把笔记交给 AI：续接或收口时用 relations_notes(status=['queued']) 查看，用 relations_note_reply 回写方案、提问或说明不处理；
+方案只预演不写入，由用户在工作台执行（规则第 8 节"工作台笔记"）。
 要点：候选不是已读正文；保存≠复核≠索引就绪；引用一律用固定版本（提交回执给出 fixed_ref）；
 AI 自查不能登记为已确认；全文补偿必须先 reading_ask_user 获得用户批准。"""
 

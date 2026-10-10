@@ -14,6 +14,7 @@
 
 | 术语 | 定义 | 不是什么 / 注意 | 代码标识 |
 |---|---|---|---|
+| 工作台笔记 | 用户在关系图旁写下的分组名、桥接问题或关系设想，可以交给 AI 处理（R15）。AI 回写方案、提问或说明不处理；方案经用户在工作台执行后才写入记忆 | 不是研究记录，不进检索和复核；AI 不能替用户执行方案 | `WN-…`、`relations.note_*` |
 | 数据目录 | 存放内容树、记忆和程序状态的文件夹，由用户配置，在代码仓库之外 | 不是代码仓库 | `--data-dir`、`BURROWL_DATA_DIR` |
 | Owner（归属对象） | 可以独立拥有记忆记录的稳定身份。类型有 research、project、core-algorithm、knowledge、data、tool、report。一条记录只属于一个 Owner。Run 也有业务卡和编号，但它是执行证据，不保存记录，不参与对象扫描（R14） | 不是记录，也不是可信等级；目录名不决定它 | `owner_id`，如 `RES-…`、`PRJ-…`、`ALG-…`、`RUN-…` |
 | 业务卡 | 描述 Owner 的 JSON 文件，如 research.json、run.json | 不是记忆记录；记忆在 `memory_home` 中 | `research.json` 等 |

@@ -367,3 +367,24 @@ label.check.hint { color: var(--muted); }
   .home { grid-template-columns: 1fr; }
 }
 input.narrow { min-width: 0; width: 64px; }
+
+/* 关系图"已隐藏"栏：每个隐藏节点一个可点的小标签，点即恢复 */
+.hidden-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 10px; padding: 6px 10px; border-radius: var(--radius-sm); background: var(--panel-2); border: 1px dashed var(--line-strong); }
+.hidden-chip { padding: 1px 8px; font-size: 12px; border-radius: 999px; }
+.hidden-chip span { color: var(--muted); margin-left: 2px; }
+.closed-notes { margin-top: 10px; }
+.closed-notes summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+
+/* R15 工作台笔记：按状态分组；方案卡里逐条列出写入预览 */
+.note-group { margin-top: 12px; }
+.note-group h4 { margin: 0 0 6px; font-size: 13px; color: var(--muted); }
+.note-card { border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--line)); background: var(--warn-bg); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 8px; display: grid; gap: 8px; }
+.note-card textarea { background: var(--panel); }
+.note-ai { font-size: 13px; }
+.note-preview { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: 13px; }
+.note-preview-item { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+.note-preview-item ul { margin: 4px 0 0; padding-left: 16px; }
+/* 侧栏较窄：笔记的操作按钮放在内容下方，标题不被挤成竖排 */
+.note-group .claims li, .closed-notes .claims li { flex-direction: column; align-items: stretch; gap: 6px; }
+.note-group .claims li > button, .closed-notes .claims li > button { align-self: flex-start; }
+.note-card .hint, .note-group .hint { overflow-wrap: anywhere; }

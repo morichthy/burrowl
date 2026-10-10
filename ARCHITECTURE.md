@@ -57,7 +57,7 @@
 interfaces   ops 注册表 → FastAPI / MCP / Typer CLI
 app          组合根：按数据目录与配置装配服务
 services     memory, review, query, reading, indexing, hub, runs, relations, monitor, maintenance, config, health, workflow,
-             routing, activity
+             routing, activity, notes
 storage | index | connectors | portable   （四者互不导入）
 core         记录模型与校验、契约说明、哈希、原子写与锁、路径安全、配置模型、错误
 ```
@@ -82,6 +82,7 @@ core         记录模型与校验、契约说明、哈希、原子写与锁、�
 | READ 阅读会话 | `services/reading/`（service、screening、notes、text、session） | 阅读会话页（SSE）；read Skill；配置中的阅读默认值与预算 |
 | HUB 知识中枢 | `services/hub.py`、`storage/hub_state.py`、`connectors/`（spi、registry、fake、mdvault），以及独立包 `burrowl-connector-weknora`、`burrowl-connector-lightrag`（图模式，按需重建） | 发布策略与复核类别；中枢页；wiki_page 记录；合约测试；LightRAG 版本锁定在 1.5.7，升级前重跑 `tests/connectors/test_lightrag.py` |
 | MAINT 维护与监测 | `services/maintenance.py`、`services/monitor.py`、`services/relations.py`（读取图投影、关联候选） | 维护页、关系图页；consolidate Skill |
+| NOTE 工作台笔记 | `services/notes.py`（R15：用户交给 AI 的待办；状态转换、AI 方案的预演与预览、用户执行时核对依据 HEAD 后按方案写入） | 关系图页笔记面板、首页状态卡与导航计数；`memory.resume` 的 `workbench_notes`；RULES 第 8 节、work 与 consolidate Skill；方案步骤依赖 `memory.commit` 与 `relations.decide` 的参数和 dry_run |
 | CFG 配置 | `core/config.py`（BurrowlConfig）、`services/config.py`（CAS 与影响提示）、`storage/config_store.py`、`storage/secrets.py` | 所有读取默认值的服务；设置页；MCP 工具组 |
 | PORT 可移植包 | `portable/bundle.py`（burrowl-bundle 备份、校验、恢复） | 数据目录布局变化；排除规则 |
 | APP 入口 | `interfaces/`（ops 注册表、api、mcp、cli）、`app.py`、`frontend/` | 同一操作在 HTTP/MCP/CLI/前端的一致性；生成类型；effect 分类 |
@@ -111,7 +112,8 @@ core         记录模型与校验、契约说明、哈希、原子写与锁、�
 | 中枢映射 | `.burrowl/hub/state.sqlite3` | 派生状态，丢失后按外部元数据中的 local_key 认领 |
 | 交换包 | 数据目录的 `exports/<名称>/`（manifest、vault、graph），由 `exchange.export` 生成 | 派生数据，可以删除重建；不进备份包；在其中的修改不会回到 burrowl |
 | 外部中枢内容 | WeKnora 等；LightRAG 的暂存表、构建目录与嵌入缓存在连接器 `options.path` 下 | 派生副本，可以由本地重新发布；LightRAG 每次有修改或删除时整体重建，切换成功前旧构建照常可查 |
-| 工作台偏好 | `.burrowl/workbench/`（关系图视图、随手笔记） | 本机偏好，不是研究记录 |
+| 工作台偏好 | `.burrowl/workbench/view.json`（关系图视图） | 本机偏好，不是研究记录 |
+| 工作台笔记 | `.burrowl/workbench/notes.json`（R15：笔记、往来、待确认方案与执行结果） | 用户交给 AI 的待办，不是研究记录；随备份带走；每个状态只由一方推进，读改写在同一把锁内；写入记忆只经用户执行方案 |
 | 当前任务上下文 | 任务的 Markdown 工作清单，由 AI 编辑 | 不是后台同步的状态；检查点保存交接时点 |
 | 模型 | `%LOCALAPPDATA%\burrowl\models`（或 `BURROWL_MODELS_DIR`） | 嵌入模型变化会改变指纹，向量投影要重建 |
 

@@ -3,6 +3,7 @@ import { useOp } from "./api";
 import { Home } from "./features/Home";
 import { Hub } from "./features/Hub";
 import { Maintenance } from "./features/Maintenance";
+import { useNoteCounts } from "./features/Notes";
 import { Owners, OwnerView, RecordView } from "./features/Memory";
 import { ReadingDetail } from "./features/reading/ReadingDetail";
 import { ReadingList } from "./features/reading/ReadingList";
@@ -80,15 +81,22 @@ export function App() {
   const route = useRoute();
   const waiting = useOp<{ pending_requests: number }[]>("reading.list", { status: "waiting_user", limit: 50 });
   // 待处理数字要跟上 AI 新发起或用户刚处理完的请求：与阅读列表同样每 5 秒、以及窗口回到前台时刷新
+  // R15：关系图旁显示等你处理的工作台笔记（待你确认 + 需要你回答）
+  const notes = useNoteCounts();
   useEffect(() => {
-    const timer = window.setInterval(waiting.reload, 5_000);
-    window.addEventListener("focus", waiting.reload);
+    const refresh = () => {
+      waiting.reload();
+      notes.reload();
+    };
+    const timer = window.setInterval(refresh, 5_000);
+    window.addEventListener("focus", refresh);
     return () => {
       window.clearInterval(timer);
-      window.removeEventListener("focus", waiting.reload);
+      window.removeEventListener("focus", refresh);
     };
-  }, [waiting.reload]);
+  }, [waiting.reload, notes.reload]);
   const pending = waiting.data?.reduce((sum, s) => sum + s.pending_requests, 0) ?? 0;
+  const badges: Record<string, number> = { reading: pending, relations: notes.proposed + notes.needsUser };
   const current = route[0] ?? "";
   return (
     <div className="app">
@@ -110,7 +118,7 @@ export function App() {
               <a key={key} href={key ? href(key) : "#/"} className={current === key ? "on" : ""} aria-current={current === key ? "page" : undefined}>
                 <Icon name={key} />
                 <span>{text}</span>
-                {key === "reading" && pending ? <span className="dot">{pending}</span> : null}
+                {badges[key] ? <span className="dot">{badges[key]}</span> : null}
               </a>
             ))}
           </div>

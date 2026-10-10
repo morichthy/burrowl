@@ -211,3 +211,33 @@ test("新增页面：维护与监测、原始材料、依据与影响、关系�
   await page.getByRole("button", { name: /^添加/ }).click();
   await expect(page.getByText("下一步：对照成对求和")).toBeVisible();
 });
+
+test("工作台笔记（R15）：交给 AI → AI 方案只预演 → 用户执行后才写入", async ({ page, request }) => {
+  await page.goto("#/relations");
+  await page.getByPlaceholder("标题", { exact: true }).fill("顺序实验与补偿求和是否同一类问题");
+  await page.getByRole("button", { name: /^添加/ }).click();
+  const draft = page.locator(".claims li", { hasText: "顺序实验与补偿求和是否同一类问题" });
+  await draft.getByRole("button", { name: "交给 AI" }).click();
+  await expect(page.getByText("AI 处理中（1）")).toBeVisible();
+
+  // 模拟 AI：读 queued 笔记，用两条记录的固定引用提出建关联的方案
+  const [note] = await op(request, "relations.notes", { status: ["queued"] });
+  const graph = await op(request, "relations.graph", { node_types: ["record"], limit: 50 });
+  const [a, b] = graph.nodes.filter((n: { ref?: unknown }) => n.ref);
+  const before = (await op(request, "relations.associations", {})).length ?? 0;
+  const reply = await op(request, "relations.note_reply", {
+    note_id: note.id, outcome: "proposal", message: "两者都在讨论误差来源，建议建一条导航关联",
+    steps: [{ op: "relations.decide", owner_id: a.owner_id, payload: { from: a.ref, to: b.ref, explanation: "都在讨论误差来源" } }],
+  });
+  expect(reply.status).toBe("proposed");
+  expect(((await op(request, "relations.associations", {})).length ?? 0)).toBe(before);  // 只预演，没有写入
+
+  await page.reload();
+  const card = page.locator(".note-card", { hasText: "顺序实验与补偿求和是否同一类问题" });
+  await expect(card.getByRole("list", { name: "写入预览" })).toContainText("都在讨论误差来源");
+  await card.getByRole("button", { name: "执行" }).click();
+  await expect(page.getByText(/已处理（\d+）/)).toBeVisible();
+  const [done] = (await op(request, "relations.notes", {})).filter((n: { id: string }) => n.id === note.id);
+  expect(done.status).toBe("handled");
+  expect(done.result.writes[0].record_ids.length).toBe(1);
+});

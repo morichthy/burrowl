@@ -9,7 +9,8 @@ import louvain from "graphology-communities-louvain";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useAction, useOp } from "../api";
 import { KINDS, label, MATURITY, REVIEW_BADGES } from "../labels";
-import { Empty, ErrorBox, href, Loading, Panel, Tag, Time, useDebounced } from "../ui";
+import { Empty, ErrorBox, href, Loading, Panel, Tag, useDebounced } from "../ui";
+import { Notes } from "./Notes";
 
 interface GraphNode {
   id: string;
@@ -54,15 +55,6 @@ interface CandidateLink {
   score: number;
   method: string;
   title: string;
-}
-interface Note {
-  id: string;
-  kind: string;
-  title: string;
-  text: string;
-  refs: string[];
-  status: string;
-  created_at: string;
 }
 
 // 节点类型色：在浅色和深色画布上都可辨认
@@ -129,7 +121,6 @@ const RELATIONS = [
   { value: "similar_structure", label: "结构相似" },
   { value: "analogous_to", label: "类比（需写共享结构与迁移边界）" },
 ];
-const NOTE_KINDS = { "cluster-name": "分组命名", "bridge-question": "桥接问题", "relation-idea": "关系设想" };
 
 interface View {
   center?: string | null;
@@ -194,6 +185,8 @@ export function Relations() {
   const [history, setHistory] = useState<string[]>([]);
   const [focus, setFocus] = useState<GraphNode>();
   const [linkFrom, setLinkFrom] = useState<GraphNode>();
+  // 隐藏节点的标题只用于"已隐藏"栏显示；不保存到视图，重载后退回显示 ID
+  const [hiddenTitles, setHiddenTitles] = useState<Record<string, string>>({});
   const [loadedSaved, setLoadedSaved] = useState(false);
   useEffect(() => {
     if (saved.data && !loadedSaved) {
@@ -339,12 +332,23 @@ export function Relations() {
           </div>
         </div>
         {view.excluded?.length ? (
-          <p className="hint">
-            已隐藏：{view.excluded.join("、")}{" "}
+          <div className="hidden-bar" role="group" aria-label="已隐藏的节点">
+            <span className="hint">已隐藏 {view.excluded.length} 个：</span>
+            {view.excluded.map((id) => (
+              <button
+                key={id}
+                type="button"
+                className="hidden-chip"
+                title={`恢复显示 ${id}`}
+                onClick={() => setView({ ...view, excluded: view.excluded?.filter((x) => x !== id) })}
+              >
+                {(hiddenTitles[id] ?? id).slice(0, 20)} <span aria-hidden="true">×</span>
+              </button>
+            ))}
             <button type="button" className="link" onClick={() => setView({ ...view, excluded: [] })}>
               全部恢复
             </button>
-          </p>
+          </div>
         ) : null}
         <ErrorBox error={graph.error ?? saveView.error} />
         <Loading show={graph.loading} />
@@ -369,7 +373,10 @@ export function Relations() {
           node={focus}
           candidates={suggestions}
           onCenter={(id) => setCenter(id)}
-          onHide={(id) => setView({ ...view, excluded: [...(view.excluded ?? []), id] })}
+          onHide={(id) => {
+            if (focus?.id === id) setHiddenTitles((t) => ({ ...t, [id]: focus.title }));
+            setView({ ...view, excluded: [...(view.excluded ?? []), id] });
+          }}
           reloadCandidates={candidates.reload}
           candidatesLoading={candidates.stale && candidates.loading}
           linkFrom={linkFrom}
@@ -858,7 +865,7 @@ function EdgeSample({ color, dash, width, arrow }: { color?: string; dash: numbe
   );
 }
 
-function Focus(props: {
+export function Focus(props: {
   node: GraphNode | undefined;
   candidates: CandidateLink[];
   onCenter: (id: string) => void;
@@ -938,9 +945,18 @@ function Focus(props: {
             </button>
           </>
         ) : (
-          <button type="button" className="small" disabled={!node.ref || !node.owner_id} onClick={() => props.setLinkFrom(node)}>
-            {linkFrom?.id === node.id ? "已选为关联起点（再点另一个节点）" : "从这里添加关联"}
-          </button>
+          <>
+            <button
+              type="button"
+              className={linkFrom?.id === node.id ? "small primary" : "small"}
+              disabled={!node.ref || !node.owner_id}
+              aria-pressed={linkFrom?.id === node.id}
+              onClick={() => props.setLinkFrom(linkFrom?.id === node.id ? undefined : node)}
+            >
+              {linkFrom?.id === node.id ? "取消关联起点" : "从这里添加关联"}
+            </button>
+            {linkFrom?.id === node.id ? <span className="hint">已选为起点，再点图中另一个节点</span> : null}
+          </>
         )}
       </div>
       <ErrorBox error={decide.error} />
@@ -982,62 +998,3 @@ function Focus(props: {
   );
 }
 
-function Notes({ focus }: { focus: GraphNode | undefined }) {
-  const notes = useOp<Note[]>("relations.notes");
-  const add = useAction("relations.note_add");
-  const resolve = useAction("relations.note_resolve");
-  const [kind, setKind] = useState<keyof typeof NOTE_KINDS>("bridge-question");
-  const [title, setTitle] = useState("");
-  const [text, setText] = useState("");
-  const open = notes.data?.filter((n) => n.status === "open") ?? [];
-  return (
-    <Panel title={`随手笔记（${open.length}）`}>
-      <p className="hint">记下分组名、想验证的桥接问题或关系设想；只保存在本机，不是研究记录。</p>
-      <ErrorBox error={notes.error ?? add.error ?? resolve.error} />
-      <div className="form">
-        <select value={kind} onChange={(e) => setKind(e.target.value as keyof typeof NOTE_KINDS)}>
-          {Object.entries(NOTE_KINDS).map(([k, v]) => (
-            <option key={k} value={k}>
-              {v}
-            </option>
-          ))}
-        </select>
-        <input placeholder="标题" value={title} onChange={(e) => setTitle(e.target.value)} />
-        <textarea placeholder="内容（可选）" value={text} onChange={(e) => setText(e.target.value)} />
-        <button
-          type="button"
-          disabled={!title.trim() || add.busy}
-          onClick={async () => {
-            if (await add.run({ kind, title, text, refs: focus ? [focus.id] : [] })) {
-              setTitle("");
-              setText("");
-              notes.reload();
-            }
-          }}
-        >
-          添加{focus ? `（关联 ${focus.title.slice(0, 12)}）` : ""}
-        </button>
-      </div>
-      <ul className="claims">
-        {open.map((n) => (
-          <li key={n.id}>
-            <div className="claim-body">
-              <Tag>{NOTE_KINDS[n.kind as keyof typeof NOTE_KINDS] ?? n.kind}</Tag> <strong>{n.title}</strong>
-              {n.text ? <div className="hint">{n.text}</div> : null}
-              <div className="hint">
-                <Time value={n.created_at} /> {n.refs.join("、")}
-              </div>
-            </div>
-            <div className="actions">
-              {(["done", "dismissed"] as const).map((status) => (
-                <button key={status} type="button" className="small" onClick={async () => (await resolve.run({ note_id: n.id, status })) && notes.reload()}>
-                  {status === "done" ? "完成" : "放弃"}
-                </button>
-              ))}
-            </div>
-          </li>
-        ))}
-      </ul>
-    </Panel>
-  );
-}

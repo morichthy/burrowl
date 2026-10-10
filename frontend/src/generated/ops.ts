@@ -342,14 +342,24 @@ export declare namespace RelationsViewSave {
 
 export declare namespace RelationsNotes {
   /**
-   * 关系图上的随手笔记（分组名、桥接问题、关系设想）。
+   * 工作台笔记（R15）：用户在关系图旁写下的分组名、桥接问题、关系设想。queued 表示用户交给 AI 处理，
+   * 用 relations_note_reply 回写方案、提问或说明不处理。笔记不是研究记录。
    */
-  export interface Args {}
+  export interface Args {
+    /**
+     * 只看这些状态；AI 处理用户交给你的笔记时用 ['queued']
+     */
+    status?: ("open" | "queued" | "proposed" | "needs_user" | "handled" | "done" | "dismissed")[] | null;
+    /**
+     * 只看引用了该对象或其记录的笔记
+     */
+    owner_id?: string | null;
+  }
 }
 
 export declare namespace RelationsNoteAdd {
   /**
-   * 添加关系图笔记。
+   * （仅用户）新建工作台笔记（草稿）。
    */
   export interface Args {
     kind: "cluster-name" | "bridge-question" | "relation-idea";
@@ -361,12 +371,75 @@ export declare namespace RelationsNoteAdd {
 
 export declare namespace RelationsNoteResolve {
   /**
-   * 更新关系图笔记状态。
+   * （仅用户）交给 AI（queued）、收回或重新打开（open）、完成（无需 AI）、放弃。
    */
   export interface Args {
     note_id: string;
-    status: "open" | "done" | "dismissed";
+    status: "open" | "queued" | "done" | "dismissed";
   }
+}
+
+export declare namespace RelationsNoteAnswer {
+  /**
+   * （仅用户）回答 AI 在笔记上的提问；笔记回到 queued。
+   */
+  export interface Args {
+    note_id: string;
+    text: string;
+  }
+}
+
+export declare namespace RelationsNoteReply {
+  /**
+   * 回写用户交给你的工作台笔记（只能作用于 queued 的笔记）。写入方案须由用户在工作台执行，不能替用户确认或执行。
+   */
+  export interface Args {
+    note_id: string;
+    /**
+     * proposal：写入方案（先预演，用户在工作台执行后才写入）；question：向用户提问；declined：说明不需要或不能写入
+     */
+    outcome: "proposal" | "question" | "declined";
+    /**
+     * 给用户看的一句说明、问题或理由
+     */
+    message: string;
+    /**
+     * 仅 proposal：最多 10 步，每步 {op:'memory.commit', owner_id, operations, expected_head} 或 {op:'relations.decide', owner_id, payload, reason}；参数与对应操作相同。同一对象只提交一次；服务端逐步 dry_run 预检并生成预览，不会写入
+     */
+    steps?:
+      | {
+          [k: string]: unknown;
+        }[]
+      | null;
+  }
+}
+
+export declare namespace RelationsNoteApply {
+  /**
+   * （仅用户）执行笔记上的 AI 方案：核对依据未变后按预览原样写入；依据变化或某步失败时退回 AI。
+   */
+  export interface Args {
+    note_id: string;
+    proposal_id: string;
+  }
+}
+
+export declare namespace RelationsNoteReject {
+  /**
+   * （仅用户）退回 AI 方案并附意见；笔记回到 queued。
+   */
+  export interface Args {
+    note_id: string;
+    proposal_id: string;
+    comment?: string;
+  }
+}
+
+export declare namespace RelationsNoteClear {
+  /**
+   * （仅用户）删除已处理、已完成和已放弃的笔记。编号不复用。
+   */
+  export interface Args {}
 }
 
 export declare namespace MaintenancePlan {
@@ -923,6 +996,7 @@ export declare namespace MemoryResume {
   /**
    * 续接对象的工作上下文：目标→检查点→最新概览/经过/技术→路线/问题/经验（只读）。
    * 不建立阅读会话；用户查询主题相关知识、找已有经验时默认先 reading_start。
+   * workbench_notes 列出与该对象相关、尚未结束的工作台笔记；queued 的由你用 relations_note_reply 回写。
    */
   export interface Args {
     /**
@@ -1719,6 +1793,11 @@ export interface OpArgs {
   "relations.notes": RelationsNotes.Args;
   "relations.note_add": RelationsNoteAdd.Args;
   "relations.note_resolve": RelationsNoteResolve.Args;
+  "relations.note_answer": RelationsNoteAnswer.Args;
+  "relations.note_reply": RelationsNoteReply.Args;
+  "relations.note_apply": RelationsNoteApply.Args;
+  "relations.note_reject": RelationsNoteReject.Args;
+  "relations.note_clear": RelationsNoteClear.Args;
   "maintenance.plan": MaintenancePlan.Args;
   "maintenance.review": MaintenanceReview.Args;
   "maintenance.apply": MaintenanceApply.Args;
@@ -1841,6 +1920,11 @@ export const OP_EFFECTS: Record<OpName, string> = {
   "relations.notes": "read",
   "relations.note_add": "user",
   "relations.note_resolve": "user",
+  "relations.note_answer": "user",
+  "relations.note_reply": "write",
+  "relations.note_apply": "user",
+  "relations.note_reject": "user",
+  "relations.note_clear": "user",
   "maintenance.plan": "write",
   "maintenance.review": "write",
   "maintenance.apply": "write",

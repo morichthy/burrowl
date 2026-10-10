@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { useOp } from "../api";
 import { label, SESSION_STATUS } from "../labels";
 import { ErrorBox, href, Panel, Tag, Time } from "../ui";
+import { useNoteCounts } from "./Notes";
 import type { SessionSummary } from "./reading/ReadingList";
 
 // R13：关键操作记录（memory.activity）的一条；ref 指向可追溯的对象、提交、Run 或发布记录。
@@ -111,6 +112,7 @@ export function Home() {
           <ErrorBox error={review.error} />
           {counts ? <ReviewSummary counts={counts} /> : null}
         </Panel>
+        <NotesCard />
         <Panel title="运行环境" actions={<a href={href("settings")}>设置 →</a>}>
           <ErrorBox error={caps.error} />
           {caps.data ? (
@@ -218,4 +220,32 @@ function dayLabel(date: Date): string {
   if (days === 0) return "今天";
   if (days === 1) return "昨天";
   return date.toLocaleDateString("zh-CN", { year: "numeric", month: "long", day: "numeric" });
+}
+
+/** R15：工作台笔记的状态卡。待你确认、需要你回答的排在前面，AI 待处理的放最后。 */
+function NotesCard() {
+  const counts = useNoteCounts();
+  useEffect(() => {
+    const timer = window.setInterval(counts.reload, 5_000);
+    return () => window.clearInterval(timer);
+  }, [counts.reload]);
+  const rows = [
+    ["待你确认", counts.proposed, "warn"],
+    ["需要你回答", counts.needsUser, "warn"],
+    ["AI 待处理", counts.queued, "muted"],
+  ] as const;
+  return (
+    <Panel title="工作台笔记" actions={<a href={href("relations")}>去处理 →</a>}>
+      <ErrorBox error={counts.error} />
+      <ul className="status-list">
+        {rows.map(([text, n, tone]) => (
+          <li key={text}>
+            <span className={`status-dot ${n ? tone : "muted"}`} />
+            <span>{text}</span>
+            <strong className={n ? "" : "hint"}>{n}</strong>
+          </li>
+        ))}
+      </ul>
+    </Panel>
+  );
 }
