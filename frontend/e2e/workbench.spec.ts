@@ -24,11 +24,12 @@ test("关系图筛选：分类不重复，节点可见性、空选与保存重�
   const types = page.getByRole("group", { name: "节点类型" });
   const kinds = page.getByRole("group", { name: "记录分类" });
   await expect(types.getByRole("checkbox")).toHaveCount(6);
-  await expect(kinds.getByRole("checkbox")).toHaveCount(7);
+  // 七个分类外加显式的"全部"；它替代了原先的"不选＝全部"文字提示
+  await expect(kinds.getByRole("checkbox")).toHaveCount(8);
   await expect(types.getByRole("checkbox", { name: "内容块（L1）" })).not.toBeChecked();
-  // 筛选区改为"组名＋选项"两列：分类只筛选记录的说明放在组名的悬停提示中，未选任何分类时提示"不选＝全部"
+  // 筛选区为"组名＋选项"两列：分类只筛选记录的说明放在组名的悬停提示中；未选任何分类时"全部"处于选中态
   await expect(page.locator(".filter-label", { hasText: "记录分类" })).toHaveAttribute("title", /只筛选记录节点/);
-  await expect(kinds.getByText("不选＝全部")).toBeVisible();
+  await expect(kinds.getByRole("checkbox", { name: "全部" })).toBeChecked();
   await page.screenshot({ path: "test-results/relations-filters.png", fullPage: true });
 
   // 浏览器请求走真实服务；检查分类只限制记录，结论仍保留导航上下文。

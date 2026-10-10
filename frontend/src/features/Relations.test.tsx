@@ -33,10 +33,17 @@ describe("关系图筛选（R12 T-P2.8）", () => {
     render(<Relations />);
     await screen.findByText(/5 个节点、0 条关系/);
     const kinds = within(screen.getByRole("group", { name: "记录分类" }));
-    expect(kinds.getAllByRole("checkbox")).toHaveLength(7);
+    // 七个分类外加一个显式的"全部"（替代原先的"不选＝全部"提示），未选分类时"全部"处于选中态
+    expect(kinds.getAllByRole("checkbox")).toHaveLength(8);
+    expect(kinds.getByRole("checkbox", { name: "全部" })).toBeChecked();
     for (const name of ["概览（L4）", "经验（L3）", "经过（L2）", "技术单元（L1）", "原始依据（L0）", "文稿", "章节"]) {
       expect(kinds.getByRole("checkbox", { name })).toBeInTheDocument();
     }
+    fireEvent.click(kinds.getByRole("checkbox", { name: "经验（L3）" }));
+    await waitFor(() => expect(latestGraph().kinds).toEqual(["experience"]));
+    expect(kinds.getByRole("checkbox", { name: "全部" })).not.toBeChecked();
+    fireEvent.click(kinds.getByRole("checkbox", { name: "全部" }));
+    await waitFor(() => expect(latestGraph().kinds ?? null).toBeNull());
     fireEvent.click(kinds.getByRole("checkbox", { name: "经验（L3）" }));
     await waitFor(() => expect(latestGraph().kinds).toEqual(["experience"]));
     expect(latestGraph()).not.toHaveProperty("levels");

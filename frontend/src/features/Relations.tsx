@@ -307,17 +307,20 @@ export function Relations() {
               </label>
             ))}
           </div>
-          <span className="filter-label" title="只筛选记录节点；不选表示全部记录。结论、来源等其他节点由上一行控制">
+          <span className="filter-label" title="只筛选记录节点；选“全部”或不选任何分类时显示全部记录。结论、来源等其他节点由上一行控制">
             记录分类
           </span>
           <div className="chips" role="group" aria-label="记录分类">
+            <label className={view.kinds?.length ? "" : "on"}>
+              <input type="checkbox" checked={!view.kinds?.length} onChange={() => setView({ ...view, kinds: [] })} />
+              全部
+            </label>
             {KIND_FILTERS.map((k) => (
               <label key={k.value} className={view.kinds?.includes(k.value) ? "on" : ""}>
                 <input type="checkbox" checked={!!view.kinds?.includes(k.value)} onChange={() => toggle("kinds", k.value)} />
                 {k.label}
               </label>
             ))}
-            {!view.kinds?.length ? <span className="hint">不选＝全部</span> : null}
           </div>
           <span className="filter-label" title="勾选的类别显示在图中；颜色即连线颜色">
             关系类别
