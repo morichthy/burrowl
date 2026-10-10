@@ -299,7 +299,7 @@ export declare namespace RelationsDecide {
   export interface Args {
     owner_id: string;
     /**
-     * {from, to, relation, explanation, shared_structure, transfer_limits[], basis_refs[], status, certainty?(speculative|plausible|supported), origin?, observed_in?}；快速添加只给 {from, to, explanation}：自动设为 related_to + speculative + accepted
+     * {from, to, relation, explanation, shared_structure, transfer_limits[], basis_refs[], status, certainty?(speculative|plausible|supported), origin?, observed_in?}；快速添加只给 {from, to, explanation}：自动设为 related_to + speculative + accepted。from/to/basis_refs 都是固定引用对象 {target_kind, target_id, revision, sha256, locator, relation}，不能只写 ID
      */
     payload: {
       [k: string]: unknown;
@@ -1154,6 +1154,9 @@ export declare namespace MemoryFeedback {
      */
     owner_id: string;
     query_id: string;
+    /**
+     * 被反馈的固定引用对象（检索命中的 ref），不能只写 ID
+     */
     target: {
       [k: string]: unknown;
     };

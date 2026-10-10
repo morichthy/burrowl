@@ -5,6 +5,7 @@ from typing import Any
 
 from ...core.errors import BurrowlError
 from ...core.hashing import canonical_hash, sha256_file
+from ...core.records import require_ref
 from ...storage.layout import Workspace
 from ...storage.memory_store import MemoryStore
 from ...storage.owners import SENSITIVITY_RANK, Owner, OwnerIndex, OwnerRegistry
@@ -42,6 +43,7 @@ class RefResolver:
     claim_lookup: Any = None  # 可选：claim 解析回调（由复核图提供）
 
     def __call__(self, ref: dict) -> Any:
+        require_ref(ref, "引用")
         key = canonical_hash(ref)
         if key not in self._cache:
             self._cache[key] = self._resolve(ref)

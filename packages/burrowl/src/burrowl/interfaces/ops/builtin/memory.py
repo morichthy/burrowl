@@ -222,7 +222,8 @@ def summary_save(ctx: Ctx, owner_id: OwnerId, draft: dict, basis_heads: dict[str
 
 
 @op("memory.feedback", effect="write")
-def feedback(ctx: Ctx, owner_id: OwnerId, query_id: str, target: dict,
+def feedback(ctx: Ctx, owner_id: OwnerId, query_id: str,
+             target: Annotated[dict, Field(description="被反馈的固定引用对象（检索命中的 ref），不能只写 ID")],
              label: Literal["missing", "irrelevant", "invalid_analogy", "lost_boundary", "stale", "adopted", "outcome"],
              note: str = "", adopted_in: dict | None = None,
              request_id: Annotated[str | None, Field(description="UUID；重试时沿用同一个，不会重复记录")] = None) -> dict:

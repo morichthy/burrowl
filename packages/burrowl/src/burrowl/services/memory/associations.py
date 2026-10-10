@@ -12,6 +12,7 @@ from copy import deepcopy
 
 from ...core.errors import BurrowlError
 from ...core.hashing import canonical_hash
+from ...core.records import require_ref
 from .claims import ClaimGraph
 from .context import Storage
 from .reader import fixed_ref
@@ -90,6 +91,8 @@ def decide(memory: MemoryService, owner_id: str, payload: dict, *, actor: dict, 
     """保存一条关联判断（candidate / accepted / rejected / withdrawn）。payload 只含 from/to/explanation
     （可选 observed_in、certainty）时按快速添加处理。"""
     payload = deepcopy(payload)
+    for end in ("from", "to"):  # 先于查重：_identity 需要两端的 target_id
+        require_ref(payload.get(end), f"payload.{end}")
     if set(payload) <= QUICK_FIELDS:
         payload = quick_payload(payload, actor)
     if "origin" not in payload and actor.get("kind") in {"human", "ai"}:

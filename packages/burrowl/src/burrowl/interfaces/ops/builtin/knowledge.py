@@ -117,7 +117,8 @@ def association_list(ctx: Ctx, status: Literal["candidate", "accepted", "rejecte
 def association_decide(ctx: Ctx, owner_id: str, payload: Annotated[dict, Field(description=(
         "{from, to, relation, explanation, shared_structure, transfer_limits[], basis_refs[], status, "
         "certainty?(speculative|plausible|supported), origin?, observed_in?}；"
-        "快速添加只给 {from, to, explanation}：自动设为 related_to + speculative + accepted"))],
+        "快速添加只给 {from, to, explanation}：自动设为 related_to + speculative + accepted。"
+        "from/to/basis_refs 都是固定引用对象 {target_kind, target_id, revision, sha256, locator, relation}，不能只写 ID"))],
         reason: str, dry_run: bool = False) -> dict:
     """保存关联判断（candidate/accepted/rejected/withdrawn）；只能是导航关系。
     "A 会影响 B"这类可以验证的判断写成结论（inference），不要写成关联。"""
