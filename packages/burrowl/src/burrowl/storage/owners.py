@@ -12,10 +12,13 @@ Owner 是记忆的归属单位：Research、Project、核心算法、Run、数�
 
 首次提交记忆时才写入 <memory_home>/owner.json；扫描只解析业务卡，不读其他 JSON。
 """
+import contextlib
 import json
 import os
 import re
 import uuid
+from collections.abc import Iterator
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -41,6 +44,8 @@ OWNER_TYPES = tuple(dict.fromkeys(CONTENT_ROOTS.values()))
 SENSITIVITY_RANK = {"public": 0, "internal": 1, "confidential": 2, "restricted": 3}
 # 指纹排除复核/封存字段：给对象登记复核不应让所有引用它的固定版本失效。
 _FINGERPRINT_EXCLUDED = {"review", "review_history", "finalization", "finalization_history"}
+# 一次操作内复用的扫描结果（数据目录 → OwnerIndex），见 OwnerRegistry.request_scope；作用域外为 None
+_SCAN_MEMO: ContextVar[dict[str, "OwnerIndex"] | None] = ContextVar("burrowl_owner_scan", default=None)
 
 
 def card_fingerprint(card: Any) -> str:
@@ -162,7 +167,40 @@ class OwnerRegistry:
         self.ws = workspace
 
     # ---------- 发现 ----------
-    def scan(self) -> OwnerIndex:
+    @staticmethod
+    @contextlib.contextmanager
+    def request_scope() -> Iterator[None]:
+        """一次操作（接口层的一次 call）内只扫描一次内容树，之后的 scan() 复用同一结果。
+
+        扫描要遍历全部业务卡并逐段做路径检查，成本随对象数线性增长；同一请求里重复扫描得到的是同一份
+        对象列表。写业务卡或 owner.json 的代码调用 invalidate()；发布前的依据复核用 scan(fresh=True)
+        重新扫描，所以请求开头之后别的进程改了对象，仍会在发布前被拦下。新线程不继承作用域。
+        """
+        if _SCAN_MEMO.get() is not None:  # 嵌套调用沿用外层作用域
+            yield
+            return
+        token = _SCAN_MEMO.set({})
+        try:
+            yield
+        finally:
+            _SCAN_MEMO.reset(token)
+
+    def invalidate(self) -> None:
+        """本进程刚写过业务卡或 owner.json：丢弃本次操作内复用的扫描结果。"""
+        if (memo := _SCAN_MEMO.get()) is not None:
+            memo.pop(str(self.ws.root), None)
+
+    def scan(self, *, fresh: bool = False) -> OwnerIndex:
+        """当前全部对象。在 request_scope 内复用本次操作已有的结果；fresh=True 总是重新扫描并更新复用结果。"""
+        memo, key = _SCAN_MEMO.get(), str(self.ws.root)
+        if memo is not None and not fresh and key in memo:
+            return memo[key]
+        index = self._scan()
+        if memo is not None:
+            memo[key] = index
+        return index
+
+    def _scan(self) -> OwnerIndex:
         scope = ReadScope()
         root = self.ws.root
         cards: dict[str, Owner] = {}
@@ -262,10 +300,11 @@ class OwnerRegistry:
         target = self.ws.path(rel)
         if target.parent.exists():
             raise BurrowlError("VERSION_CONFLICT", "同名对象目录已存在", {"path": f"{base}/{slug}"})
-        if self.scan().find(card[key]):
+        if self.scan(fresh=True).find(card[key]):  # 身份唯一性检查不用复用结果
             raise BurrowlError("VERSION_CONFLICT", "对象身份已存在", {"owner_id": card[key]})
         target.parent.mkdir(parents=True)
         write_new(target, json.dumps(card, ensure_ascii=False, indent=2).encode("utf-8") + b"\n")
+        self.invalidate()
         return self.scan().get(card[key])
 
     def adopt(self, path: str, expected_sha256: str, actor: dict) -> Owner:
@@ -277,7 +316,7 @@ class OwnerRegistry:
             raise BurrowlError("INVALID_ARGUMENT", "只能采用内容树中的普通文件", {"path": rel})
         if sha256_bytes(native.read_bytes()) != expected_sha256:
             raise BurrowlError("STALE_BASIS", "采用目标已变化", {"path": rel})
-        index = self.scan()
+        index = self.scan(fresh=True)  # 判断是否已被采用，不用复用结果
         for owner in index.owners:
             if owner.native_path == rel:
                 return owner
@@ -297,4 +336,5 @@ class OwnerRegistry:
             write_new(descriptor, canonical_bytes(owner.descriptor()))
         except FileExistsError:
             pass
+        self.invalidate()
         return self.scan().get(owner.owner_id)

@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError, create_model
 
 from ...app import App
 from ...core.errors import BurrowlError
+from ...storage.owners import OwnerRegistry
 
 # user：只给人在工作台/CLI 使用（如批准全文补偿、改判），不暴露为 MCP 工具，agent 不能替用户批准。
 Effect = Literal["read", "write", "admin", "user"]
@@ -95,7 +96,8 @@ def call(ctx: Ctx, name: str, arguments: dict | None) -> Any:
                        [{"code": "INVALID_ARGUMENT", "path": "/" + "/".join(map(str, e["loc"])), "message": e["msg"]}
                         for e in exc.errors()]) from exc
     values = {field: getattr(parsed, field) for field in spec.model.model_fields}
-    return jsonable(spec.fn(ctx, **values))
+    with OwnerRegistry.request_scope():  # 一次操作只扫描一次对象目录
+        return jsonable(spec.fn(ctx, **values))
 
 
 _LOADED = False
