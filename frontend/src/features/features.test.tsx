@@ -302,6 +302,60 @@ describe("维护与监测", () => {
   });
 });
 
+describe("维护计划交给 AI（R16）", () => {
+  it("勾选候选生成计划；待你确认时显示修订稿，执行与退回走用户操作", async () => {
+    const { Maintenance } = await import("./Maintenance");
+    let status = "planned";
+    const item = {
+      target: { target_id: "MEM-1", revision: 1 }, owner_id: "RES-A", kind: "narrative", title: "第一轮经过", content: "旧正文",
+      formal_dependency: true,
+      get decision() {
+        return status === "planned" ? null : { action: "revise", reason: "来源数据更正", draft: { title: "第一轮经过", body_markdown: "更正后的正文" } };
+      },
+    };
+    handlers["monitor.observations"] = () => [];
+    handlers["monitor.candidates"] = () => [{ target_id: "MEM-1", status: "open", first_seen: "2026-10-11T00:00:00Z", last_seen: "2026-10-11T00:00:00Z", reasons: [["SRC-1", "MEM-1"]] }];
+    handlers["sources.list"] = () => [];
+    handlers["sources.roots"] = () => ({ roots: [], work_dir: null });
+    handlers["runs.search"] = () => [];
+    handlers["runs.trash"] = () => [];
+    handlers["maintenance.plans"] = () => [{ plan_id: "MP-1", status, changed_ids: ["SRC-1"], items: 1, updated_at: "2026-10-11T00:00:00Z" }];
+    handlers["maintenance.plan_from_candidates"] = () => ({ plan_id: "MP-1" });
+    handlers["maintenance.status"] = () => ({
+      plan_id: "MP-1", status, revision: 3, changed_ids: ["SRC-1"], items: [item], applied: {}, thread: [],
+      preview: status === "reviewed" ? [{ owner_id: "RES-A", ok: true }] : undefined,
+    });
+    handlers["maintenance.handoff"] = () => {
+      status = "queued";
+      return {};
+    };
+    handlers["maintenance.apply"] = () => {
+      status = "applied";
+      return { status: "applied", applied: {} };
+    };
+    vi.stubGlobal("prompt", vi.fn(() => "理由再具体些"));
+    render(<Maintenance />);
+    fireEvent.click(await screen.findByRole("checkbox", { name: "选择 MEM-1" }));
+    expect(screen.getByText(/原因：SRC-1 → MEM-1/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "为所选生成维护计划" }));
+    await waitFor(() => expect(calls.find((c) => c.name === "maintenance.plan_from_candidates")?.args).toEqual({ target_ids: ["MEM-1"] }));
+    fireEvent.click(await screen.findByRole("button", { name: "交给 AI" }));
+    await waitFor(() => expect(calls.find((c) => c.name === "maintenance.handoff")?.args).toEqual({ plan_id: "MP-1", note: "" }));
+
+    status = "reviewed"; // AI 写好处置
+    fireEvent.click(screen.getByRole("button", { name: "SRC-1" }));
+    expect(await screen.findByText("更正后的正文")).toBeInTheDocument();
+    expect(screen.getByText("理由：来源数据更正")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: /JSON/ })).not.toBeInTheDocument(); // 不再手写 JSON 草稿
+    fireEvent.click(screen.getByRole("button", { name: "退回" }));
+    await waitFor(() => expect(calls.filter((c) => c.name === "maintenance.handoff").at(-1)?.args).toEqual({ plan_id: "MP-1", note: "理由再具体些" }));
+    status = "reviewed";
+    fireEvent.click(screen.getByRole("button", { name: "SRC-1" }));
+    fireEvent.click(await screen.findByRole("button", { name: "执行" }));
+    await waitFor(() => expect(calls.find((c) => c.name === "maintenance.apply")?.args).toEqual({ plan_id: "MP-1", expected_revision: 3 }));
+  });
+});
+
 describe("维护页的 Run（R14）", () => {
   it("列出未写成记录的 Run，丢弃需写理由，回收站可恢复与清空", async () => {
     const { Maintenance } = await import("./Maintenance");

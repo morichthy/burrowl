@@ -388,3 +388,16 @@ input.narrow { min-width: 0; width: 64px; }
 .note-group .claims li, .closed-notes .claims li { flex-direction: column; align-items: stretch; gap: 6px; }
 .note-group .claims li > button, .closed-notes .claims li > button { align-self: flex-start; }
 .note-card .hint, .note-group .hint { overflow-wrap: anywhere; }
+.note-edit { float: right; font-size: 12px; }
+.note-editor { display: grid; gap: 6px; }
+
+/* R16 维护计划：计划列表、逐条处置与修订稿预览 */
+.plan-list { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 4px; }
+.plan-list li { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 6px; }
+.plan-list li.on { background: var(--accent-soft); }
+.plan-list li .hint { margin-left: auto; }
+.plan-detail { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 10px; display: grid; gap: 10px; }
+.plan-detail h3 { margin: 0; }
+.plan-item { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px 12px; display: grid; gap: 6px; }
+.plan-item header { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.plan-draft { background: var(--panel-2); border-left: 3px solid var(--warn); border-radius: 0 6px 6px 0; padding: 6px 10px; }

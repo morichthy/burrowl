@@ -1,7 +1,7 @@
 // 工作台笔记（R15）：用户写下的分组名、桥接问题、关系设想，可以交给 AI 处理。
 // AI 只能回写方案、提问或说明不处理；方案由用户在这里看预览后执行，服务端按预览原样写入。
 // 笔记不是研究记录：不进检索和复核。状态与转换见 docs/design/R15_WORKBENCH_NOTES.md §3。
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
 import { useAction, useOp } from "../api";
 import { label } from "../labels";
 import { Empty, ErrorBox, href, Panel, Tag, Time } from "../ui";
@@ -71,6 +71,17 @@ export interface Note {
 }
 
 /** 等用户处理的笔记数（待你确认 + 需要你回答），供导航和首页显示。 */
+// 编辑状态经上下文传给各张卡片的标题区，避免在每种卡片间层层传参
+interface EditApi {
+  editing: string | undefined;
+  start: (id: string) => void;
+  cancel: () => void;
+  save: (note: Note, patch: { kind: string; title: string; text: string }) => Promise<void>;
+  busy: boolean;
+}
+const EditContext = createContext<EditApi | undefined>(undefined);
+const EDITABLE = new Set(["open", "queued", "proposed", "needs_user"]);
+
 export function useNoteCounts() {
   const notes = useOp<Note[]>("relations.notes", { status: ["proposed", "needs_user", "queued"] });
   const count = (status: string) => notes.data?.filter((n) => n.status === status).length ?? 0;
@@ -85,6 +96,22 @@ export function Notes({ focus }: { focus?: { id: string; title: string } }) {
   const apply = useAction<Note>("relations.note_apply");
   const reject = useAction("relations.note_reject");
   const clear = useAction("relations.note_clear");
+  const edit = useAction("relations.note_edit");
+  const [editing, setEditing] = useState<string>();
+  const editApi: EditApi = {
+    editing,
+    start: setEditing,
+    cancel: () => setEditing(undefined),
+    busy: edit.busy,
+    save: async (note, patch) => {
+      // 待你确认的方案是按旧内容写的：改了内容就作废，先让用户知道
+      if (note.status === "proposed" && !window.confirm("修改后当前方案会作废，笔记退回 AI 重新处理。继续？")) return;
+      if (await edit.run({ note_id: note.id, kind: patch.kind as "bridge-question", title: patch.title, text: patch.text })) {
+        setEditing(undefined);
+        notes.reload();
+      }
+    },
+  };
   const [kind, setKind] = useState("bridge-question");
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
@@ -99,8 +126,9 @@ export function Notes({ focus }: { focus?: { id: string; title: string } }) {
     if (await pending) notes.reload();
   };
   const move = (id: string, status: "open" | "queued" | "done" | "dismissed") => after(resolve.run({ note_id: id, status }));
-  const error = notes.error ?? add.error ?? resolve.error ?? answer.error ?? apply.error ?? reject.error ?? clear.error;
+  const error = notes.error ?? add.error ?? resolve.error ?? answer.error ?? apply.error ?? reject.error ?? clear.error ?? edit.error;
   return (
+    <EditContext.Provider value={editApi}>
     <Panel title={`工作台笔记（${drafts.length + queued.length + mine.length}）`}>
       <p className="hint">
         看图时的工作便签：给一组节点起名、记下想验证的桥接问题或关系设想。不是研究记录，不进检索和复核。
@@ -225,13 +253,21 @@ export function Notes({ focus }: { focus?: { id: string; title: string } }) {
         </details>
       ) : null}
     </Panel>
+    </EditContext.Provider>
   );
 }
 
 function NoteHead({ note }: { note: Note }) {
   const last = note.thread.at(-1);
+  const edit = useContext(EditContext);
+  if (edit?.editing === note.id) return <NoteEditor note={note} edit={edit} />;
   return (
     <div className="claim-body">
+      {edit && EDITABLE.has(note.status) ? (
+        <button type="button" className="link note-edit" onClick={() => edit.start(note.id)} aria-label={`编辑 ${note.id}`}>
+          编辑
+        </button>
+      ) : null}
       <Tag>{NOTE_KINDS[note.kind] ?? note.kind}</Tag>
       {note.status !== "open" ? <Tag tone={note.status === "handled" || note.status === "done" ? "good" : "muted"}>{label(STATUS, note.status)}</Tag> : null}
       <strong>{note.title}</strong> <code>{note.id}</code>
@@ -359,6 +395,34 @@ function Writes({ writes }: { writes: Write[] }) {
             : `${w.owner_id} `}
         </span>
       ))}
+    </div>
+  );
+}
+
+function NoteEditor({ note, edit }: { note: Note; edit: EditApi }) {
+  const [kind, setKind] = useState(note.kind);
+  const [title, setTitle] = useState(note.title);
+  const [text, setText] = useState(note.text);
+  return (
+    <div className="claim-body note-editor">
+      <select value={kind} onChange={(e) => setKind(e.target.value)} aria-label="笔记类型">
+        {Object.entries(NOTE_KINDS).map(([k, v]) => (
+          <option key={k} value={k}>
+            {v}
+          </option>
+        ))}
+      </select>
+      <input value={title} onChange={(e) => setTitle(e.target.value)} aria-label="笔记标题" />
+      <textarea value={text} onChange={(e) => setText(e.target.value)} aria-label="笔记内容" />
+      {note.status === "proposed" ? <p className="hint">保存后当前方案作废，笔记退回 AI 重新处理。</p> : null}
+      <div className="actions">
+        <button type="button" className="small primary" disabled={!title.trim() || edit.busy} onClick={() => edit.save(note, { kind, title, text })}>
+          保存
+        </button>
+        <button type="button" className="small" onClick={edit.cancel}>
+          取消
+        </button>
+      </div>
     </div>
   );
 }

@@ -33,6 +33,7 @@ query_*、memory_owners、memory_owner_route、memory_resume 不会建立阅读�
 写操作返回 activity 行时，在回复末尾以"关键操作"为题原样逐行列出（不展开）。
 用户可在工作台把笔记交给 AI：续接或收口时用 relations_notes(status=['queued']) 查看，用 relations_note_reply 回写方案、提问或说明不处理；
 方案只预演不写入，由用户在工作台执行（规则第 8 节"工作台笔记"）。
+用户交给 AI 的维护计划用 maintenance_plans(status=['queued']) 查看，用 maintenance_review 写处置；执行由用户在工作台完成。
 要点：候选不是已读正文；保存≠复核≠索引就绪；引用一律用固定版本（提交回执给出 fixed_ref）；
 AI 自查不能登记为已确认；全文补偿必须先 reading_ask_user 获得用户批准。"""
 

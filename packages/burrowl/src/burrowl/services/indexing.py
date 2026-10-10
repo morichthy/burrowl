@@ -74,6 +74,31 @@ class IndexService:
         self.db.mark_pending(owner_id, head)
         self.sync_owner(owner_id)
 
+    def on_access_change(self, target_ids: list[str]) -> list[str]:
+        """来源停用、恢复或改敏感级别后，重新投影直接或间接依赖它们的对象，返回这些对象 ID。
+
+        投影的新鲜度只看对象 HEAD、业务卡指纹和投影版本，来源登记的变化不会让它过期；不在这里补，
+        依赖受限来源的记录读取时被拒，却仍留在检索条目和关系图里（标题、摘录可见）。
+        沿引用反向遍历时不看可读性：受限后变得不可读的依赖者正是需要重新投影、从投影中隐去的对象。
+        """
+        index = self.storage.owners.scan()
+        graph = ClaimGraph(self.storage, index)
+        reverse: dict[str, set[str]] = {}
+        for rid, record in graph.records.items():
+            for ref in iter_refs([record["sources"], record["payload"]]):
+                reverse.setdefault(ref.get("target_id", ""), set()).add(rid)
+        seen: set[str] = set()
+        queue = list(target_ids)
+        while queue:
+            for dependent in reverse.get(queue.pop(), ()):
+                if dependent not in seen:
+                    seen.add(dependent)
+                    queue.append(dependent)
+        owners = sorted({graph.records[rid]["owner_id"] for rid in seen})
+        for owner_id in owners:
+            self.sync_owner(owner_id, graph=graph, index=index)
+        return owners
+
     def status(self, owner_id: str) -> dict[str, Any]:
         owner = self.storage.owners.scan().find(owner_id)
         head = self.storage.store.read_head(owner).head if owner and owner.persisted else None

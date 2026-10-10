@@ -1,6 +1,6 @@
 // 工作台端到端：阅读会话双向交互、一键复核后检索过滤生效、知识中枢预览与发布。
 import { expect, type APIRequestContext, test } from "@playwright/test";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 interface State {
@@ -240,4 +240,32 @@ test("工作台笔记（R15）：交给 AI → AI 方案只预演 → 用户执�
   const [done] = (await op(request, "relations.notes", {})).filter((n: { id: string }) => n.id === note.id);
   expect(done.status).toBe("handled");
   expect(done.result.writes[0].record_ids.length).toBe(1);
+});
+
+test("维护计划（R16）：勾选候选生成计划 → 交给 AI → AI 写处置 → 用户执行", async ({ page, request }) => {
+  const { data } = state();
+  await op(request, "monitor.run", {});                                         // 建立（或刷新）基线
+  writeFileSync(join(data, "research", "order-demo", "data", "result.txt"), "升序误差 0.0（已更正）\n", "utf8");
+  await page.goto("#/maintenance");
+  await page.getByRole("button", { name: "扫描并记录" }).click();
+  const box = page.getByRole("checkbox", { name: /^选择 / }).and(page.locator(":enabled")).first();
+  await expect(box).toBeVisible({ timeout: 20_000 });
+  await box.check();
+  await page.getByRole("button", { name: "为所选生成维护计划" }).click();
+  await page.getByRole("button", { name: "交给 AI" }).click();
+  await expect(page.getByText(/AI 会在下次对话中写好处置/)).toBeVisible();
+
+  // 模拟 AI：读 queued 计划并逐条写处置（保留）
+  const [queued] = await op(request, "maintenance.plans", { status: ["queued"] });
+  const plan = await op(request, "maintenance.status", { plan_id: queued.plan_id });
+  expect(plan.items.length).toBeGreaterThan(0);                                 // 结论候选也落到记录上，计划不为空
+  await op(request, "maintenance.review", {
+    plan_id: plan.plan_id, message: "更正不影响结论",
+    decisions: plan.items.map((i: { target: { target_id: string } }) => ({ target_id: i.target.target_id, action: "retain", reason: "更正只改了说明文字" })),
+  });
+
+  await expect(page.getByRole("button", { name: "执行" })).toBeVisible({ timeout: 12_000 });   // 页面自动刷新到"待你确认"
+  await expect(page.getByText("理由：更正只改了说明文字").first()).toBeVisible();
+  await page.getByRole("button", { name: "执行" }).click();
+  await expect(page.locator(".plan-detail").getByText("已执行")).toBeVisible();
 });

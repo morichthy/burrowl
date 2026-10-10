@@ -81,7 +81,7 @@ core         记录模型与校验、契约说明、哈希、原子写与锁、�
 | QUERY 材料查询 | `services/query/`（search、page、assemble、expand、deepen、documents，以及预算） | 检索页；read Skill 的片段模式；context_reach 语义 |
 | READ 阅读会话 | `services/reading/`（service、screening、notes、text、session） | 阅读会话页（SSE）；read Skill；配置中的阅读默认值与预算 |
 | HUB 知识中枢 | `services/hub.py`、`storage/hub_state.py`、`connectors/`（spi、registry、fake、mdvault），以及独立包 `burrowl-connector-weknora`、`burrowl-connector-lightrag`（图模式，按需重建） | 发布策略与复核类别；中枢页；wiki_page 记录；合约测试；LightRAG 版本锁定在 1.5.7，升级前重跑 `tests/connectors/test_lightrag.py` |
-| MAINT 维护与监测 | `services/maintenance.py`、`services/monitor.py`、`services/relations.py`（读取图投影、关联候选） | 维护页、关系图页；consolidate Skill |
+| MAINT 维护与监测 | `services/maintenance.py`（计划状态 planned → queued → reviewed → applied / partial，执行仅限用户，R16）、`services/monitor.py`、`services/relations.py`（读取图投影、关联候选） | 维护页与导航计数、关系图页；consolidate Skill 与 MCP 说明；`maintenance.plan_from_candidates` 依赖候选记下的影响路径 |
 | NOTE 工作台笔记 | `services/notes.py`（R15：用户交给 AI 的待办；状态转换、AI 方案的预演与预览、用户执行时核对依据 HEAD 后按方案写入） | 关系图页笔记面板、首页状态卡与导航计数；`memory.resume` 的 `workbench_notes`；RULES 第 8 节、work 与 consolidate Skill；方案步骤依赖 `memory.commit` 与 `relations.decide` 的参数和 dry_run |
 | CFG 配置 | `core/config.py`（BurrowlConfig）、`services/config.py`（CAS 与影响提示）、`storage/config_store.py`、`storage/secrets.py` | 所有读取默认值的服务；设置页；MCP 工具组 |
 | PORT 可移植包 | `portable/bundle.py`（burrowl-bundle 备份、校验、恢复） | 数据目录布局变化；排除规则 |
@@ -113,6 +113,7 @@ core         记录模型与校验、契约说明、哈希、原子写与锁、�
 | 交换包 | 数据目录的 `exports/<名称>/`（manifest、vault、graph），由 `exchange.export` 生成 | 派生数据，可以删除重建；不进备份包；在其中的修改不会回到 burrowl |
 | 外部中枢内容 | WeKnora 等；LightRAG 的暂存表、构建目录与嵌入缓存在连接器 `options.path` 下 | 派生副本，可以由本地重新发布；LightRAG 每次有修改或删除时整体重建，切换成功前旧构建照常可查 |
 | 工作台偏好 | `.burrowl/workbench/view.json`（关系图视图） | 本机偏好，不是研究记录 |
+| 检索与图投影的访问一致性 | 投影时隐去读取会被拒的记录；来源停用或改敏感级别时由 `IndexService.on_access_change` 重新投影依赖者（投影新鲜度不含来源登记，E9） | 读取被拒的记录不能出现在检索结果和关系图中 |
 | 工作台笔记 | `.burrowl/workbench/notes.json`（R15：笔记、往来、待确认方案与执行结果） | 用户交给 AI 的待办，不是研究记录；随备份带走；每个状态只由一方推进，读改写在同一把锁内；写入记忆只经用户执行方案 |
 | 当前任务上下文 | 任务的 Markdown 工作清单，由 AI 编辑 | 不是后台同步的状态；检查点保存交接时点 |
 | 模型 | `%LOCALAPPDATA%\burrowl\models`（或 `BURROWL_MODELS_DIR`） | 嵌入模型变化会改变指纹，向量投影要重建 |

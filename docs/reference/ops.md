@@ -43,9 +43,12 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 
 | 操作 | 类型 | 说明 | 参数 |
 |---|---|---|---|
-| `maintenance.apply` | 写入 | 按对象逐个提交计划中的修订与撤回；可重试，部分完成会如实报告。 | `plan_id`*: string，`expected_revision`*: integer |
-| `maintenance.plan` | 写入 | 来源变化或新反证后：列出受影响记录及其完整正文，生成维护计划。 | `changed_ids`*: array，`note`: string |
-| `maintenance.review` | 写入 | 记录逐项处置与修订草案，并逐对象预检（不写记忆）。 | `plan_id`*: string，`decisions`*: array，`expected_revision`: integer|null |
+| `maintenance.apply` | 仅用户（不暴露给 agent） | （仅用户）执行已写好处置的计划：按对象逐个提交修订与撤回；可重试，部分完成会如实报告。 | `plan_id`*: string，`expected_revision`*: integer |
+| `maintenance.handoff` | 仅用户（不暴露给 agent） | （仅用户）把计划交给 AI 起草处置，或把待确认 / 部分完成的计划退回 AI（附意见）。 | `plan_id`*: string，`note`: string |
+| `maintenance.plan` | 写入 | 来源变化或新反证后：列出受影响记录及其完整正文，生成维护计划。 | `changed_ids`*: array，`note`: string，`targets`: array|null |
+| `maintenance.plan_from_candidates` | 仅用户（不暴露给 agent） | （仅用户）为所选维护候选生成计划：变化来源取自候选记下的影响路径，计划只含所选记录；候选标为 planned。 | `target_ids`*: array，`note`: string |
+| `maintenance.plans` | 只读 | 维护计划概况（最近有变化的在前）。queued 表示用户交给 AI 起草处置。 | `status`: array|null |
+| `maintenance.review` | 写入 | 记录逐项处置与修订草案，并逐对象预检（不写记忆）。之后由用户在工作台预览并执行。 | `plan_id`*: string，`decisions`*: array，`expected_revision`: integer|null，`message`: string |
 | `maintenance.status` | 只读 | 维护计划的当前状态。 | `plan_id`*: string |
 
 ## memory
@@ -81,7 +84,7 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 
 | 操作 | 类型 | 说明 | 参数 |
 |---|---|---|---|
-| `monitor.candidates` | 只读 | 来源变化影响到的维护候选；用 maintenance_plan 把它们纳入语义维护。 | `status`: string|null |
+| `monitor.candidates` | 只读 | 来源变化影响到的维护候选；用 maintenance_plan 把它们纳入语义维护。 每项附 kind、title、record_id（结论落到包含它的记录）与 editable（能否放进计划修订）。 | `status`: string|null |
 | `monitor.observations` | 只读 | 最近的监测观察记录。 | `limit`: integer |
 | `monitor.resolve` | 仅用户（不暴露给 agent） | （仅用户）处置维护候选。 | `target_id`*: string，`status`*: string，`note`: string |
 | `monitor.run` | 写入 | 扫描一次：对象 HEAD 与来源文件指纹的变化，并给出维护候选（观察不改变任何证据或复核状态）。 | `dry_run`: boolean |
@@ -143,6 +146,7 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | `relations.note_answer` | 仅用户（不暴露给 agent） | （仅用户）回答 AI 在笔记上的提问；笔记回到 queued。 | `note_id`*: string，`text`*: string |
 | `relations.note_apply` | 仅用户（不暴露给 agent） | （仅用户）执行笔记上的 AI 方案：核对依据未变后按预览原样写入；依据变化或某步失败时退回 AI。 | `note_id`*: string，`proposal_id`*: string |
 | `relations.note_clear` | 仅用户（不暴露给 agent） | （仅用户）删除已处理、已完成和已放弃的笔记。编号不复用。 | 无 |
+| `relations.note_edit` | 仅用户（不暴露给 agent） | （仅用户）修改笔记内容。已处理的先重新打开；待你确认的方案会作废，笔记退回 AI。 | `note_id`*: string，`kind`: string|null，`title`: string|null，`text`: string|null |
 | `relations.note_reject` | 仅用户（不暴露给 agent） | （仅用户）退回 AI 方案并附意见；笔记回到 queued。 | `note_id`*: string，`proposal_id`*: string，`comment`: string |
 | `relations.note_reply` | 写入 | 回写用户交给你的工作台笔记（只能作用于 queued 的笔记）。写入方案须由用户在工作台执行，不能替用户确认或执行。 | `note_id`*: string，`outcome`*: string，`message`*: string，`steps`: array|null |
 | `relations.note_resolve` | 仅用户（不暴露给 agent） | （仅用户）交给 AI（queued）、收回或重新打开（open）、完成（无需 AI）、放弃。 | `note_id`*: string，`status`*: string |
@@ -186,7 +190,7 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | `sources.relocate` | 写入 | 原件搬家：新位置的字节必须与登记时一致，旧路径记入 relocated_from，已有固定引用继续有效。 | `source_id`*: string，`new_path`*: string |
 | `sources.relocate_root` | 写入 | 工作目录整体搬家：逐个核对新位置下已登记文件的指纹，全部一致才改根的位置；已有固定引用不变。 | `root_id`*: string，`new_path`*: string，`allow_missing`: boolean |
 | `sources.roots` | 只读 | 已登记的工作根（工作目录）与本次会话的工作目录。工作根下的来源记为"根 + 相对路径"，目录搬家只改根。 | 无 |
-| `sources.update` | 仅用户（不暴露给 agent） | （仅用户）启用/停用来源或调整敏感级别。停用后引用它的记录会在读取时被隐去。 | `source_id`*: string，`enabled`: boolean|null，`sensitivity`: string|null |
+| `sources.update` | 仅用户（不暴露给 agent） | （仅用户）启用/停用来源或调整敏感级别。停用或设为 restricted 后，读取被拒的记录在检索和关系图中也同时隐去。 | `source_id`*: string，`enabled`: boolean|null，`sensitivity`: string|null |
 
 ## system
 

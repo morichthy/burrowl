@@ -1238,6 +1238,68 @@
   }
  },
  {
+  "name": "relations.note_edit",
+  "group": "relations",
+  "effect": "user",
+  "summary": "（仅用户）修改笔记内容。已处理的先重新打开；待你确认的方案会作废，笔记退回 AI。",
+  "input": {
+   "additionalProperties": false,
+   "description": "（仅用户）修改笔记内容。已处理的先重新打开；待你确认的方案会作废，笔记退回 AI。",
+   "properties": {
+    "note_id": {
+     "title": "Note Id",
+     "type": "string"
+    },
+    "kind": {
+     "anyOf": [
+      {
+       "enum": [
+        "cluster-name",
+        "bridge-question",
+        "relation-idea"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Kind"
+    },
+    "title": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Title"
+    },
+    "text": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Text"
+    }
+   },
+   "required": [
+    "note_id"
+   ],
+   "title": "relations_note_edit_input",
+   "type": "object"
+  }
+ },
+ {
   "name": "relations.note_answer",
   "group": "relations",
   "effect": "user",
@@ -1408,6 +1470,22 @@
      "default": "",
      "title": "Note",
      "type": "string"
+    },
+    "targets": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "只把这些受影响的记录放进计划；省略时放入全部",
+     "title": "Targets"
     }
    },
    "required": [
@@ -1418,13 +1496,105 @@
   }
  },
  {
+  "name": "maintenance.plan_from_candidates",
+  "group": "maintenance",
+  "effect": "user",
+  "summary": "（仅用户）为所选维护候选生成计划：变化来源取自候选记下的影响路径，计划只含所选记录；候选标为 planned。",
+  "input": {
+   "additionalProperties": false,
+   "description": "（仅用户）为所选维护候选生成计划：变化来源取自候选记下的影响路径，计划只含所选记录；候选标为 planned。",
+   "properties": {
+    "target_ids": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Target Ids",
+     "type": "array"
+    },
+    "note": {
+     "default": "",
+     "title": "Note",
+     "type": "string"
+    }
+   },
+   "required": [
+    "target_ids"
+   ],
+   "title": "maintenance_plan_from_candidates_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "maintenance.plans",
+  "group": "maintenance",
+  "effect": "read",
+  "summary": "维护计划概况（最近有变化的在前）。queued 表示用户交给 AI 起草处置。",
+  "input": {
+   "additionalProperties": false,
+   "description": "维护计划概况（最近有变化的在前）。queued 表示用户交给 AI 起草处置。",
+   "properties": {
+    "status": {
+     "anyOf": [
+      {
+       "items": {
+        "enum": [
+         "planned",
+         "queued",
+         "reviewed",
+         "applied",
+         "partial"
+        ],
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "只看这些状态；AI 处理用户交给你的计划时用 ['queued']",
+     "title": "Status"
+    }
+   },
+   "title": "maintenance_plans_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "maintenance.handoff",
+  "group": "maintenance",
+  "effect": "user",
+  "summary": "（仅用户）把计划交给 AI 起草处置，或把待确认 / 部分完成的计划退回 AI（附意见）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "（仅用户）把计划交给 AI 起草处置，或把待确认 / 部分完成的计划退回 AI（附意见）。",
+   "properties": {
+    "plan_id": {
+     "title": "Plan Id",
+     "type": "string"
+    },
+    "note": {
+     "default": "",
+     "title": "Note",
+     "type": "string"
+    }
+   },
+   "required": [
+    "plan_id"
+   ],
+   "title": "maintenance_handoff_input",
+   "type": "object"
+  }
+ },
+ {
   "name": "maintenance.review",
   "group": "maintenance",
   "effect": "write",
-  "summary": "记录逐项处置与修订草案，并逐对象预检（不写记忆）。",
+  "summary": "记录逐项处置与修订草案，并逐对象预检（不写记忆）。之后由用户在工作台预览并执行。",
   "input": {
    "additionalProperties": false,
-   "description": "记录逐项处置与修订草案，并逐对象预检（不写记忆）。",
+   "description": "记录逐项处置与修订草案，并逐对象预检（不写记忆）。之后由用户在工作台预览并执行。",
    "properties": {
     "plan_id": {
      "title": "Plan Id",
@@ -1450,6 +1620,12 @@
      ],
      "default": null,
      "title": "Expected Revision"
+    },
+    "message": {
+     "default": "",
+     "description": "给用户看的一句说明（改了什么、为什么）",
+     "title": "Message",
+     "type": "string"
     }
    },
    "required": [
@@ -1463,11 +1639,11 @@
  {
   "name": "maintenance.apply",
   "group": "maintenance",
-  "effect": "write",
-  "summary": "按对象逐个提交计划中的修订与撤回；可重试，部分完成会如实报告。",
+  "effect": "user",
+  "summary": "（仅用户）执行已写好处置的计划：按对象逐个提交修订与撤回；可重试，部分完成会如实报告。",
   "input": {
    "additionalProperties": false,
-   "description": "按对象逐个提交计划中的修订与撤回；可重试，部分完成会如实报告。",
+   "description": "（仅用户）执行已写好处置的计划：按对象逐个提交修订与撤回；可重试，部分完成会如实报告。",
    "properties": {
     "plan_id": {
      "title": "Plan Id",
@@ -1531,10 +1707,10 @@
   "name": "monitor.candidates",
   "group": "monitor",
   "effect": "read",
-  "summary": "来源变化影响到的维护候选；用 maintenance_plan 把它们纳入语义维护。",
+  "summary": "来源变化影响到的维护候选；用 maintenance_plan 把它们纳入语义维护。 每项附 kind、title、record_id（结论落到包含它的记录）与 editable（能否放进计划修订）。",
   "input": {
    "additionalProperties": false,
-   "description": "来源变化影响到的维护候选；用 maintenance_plan 把它们纳入语义维护。",
+   "description": "来源变化影响到的维护候选；用 maintenance_plan 把它们纳入语义维护。\n每项附 kind、title、record_id（结论落到包含它的记录）与 editable（能否放进计划修订）。",
    "properties": {
     "status": {
      "anyOf": [
@@ -2155,10 +2331,10 @@
   "name": "sources.update",
   "group": "sources",
   "effect": "user",
-  "summary": "（仅用户）启用/停用来源或调整敏感级别。停用后引用它的记录会在读取时被隐去。",
+  "summary": "（仅用户）启用/停用来源或调整敏感级别。停用或设为 restricted 后，读取被拒的记录在检索和关系图中也同时隐去。",
   "input": {
    "additionalProperties": false,
-   "description": "（仅用户）启用/停用来源或调整敏感级别。停用后引用它的记录会在读取时被隐去。",
+   "description": "（仅用户）启用/停用来源或调整敏感级别。停用或设为 restricted 后，读取被拒的记录在检索和关系图中也同时隐去。",
    "properties": {
     "source_id": {
      "title": "Source Id",

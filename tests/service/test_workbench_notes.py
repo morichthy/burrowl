@@ -158,3 +158,20 @@ def test_list_by_owner_matches_owner_or_its_records(lab):
     by_record = notes.add("relation-idea", "记录上的想法", "", [refs["narrative"]["target_id"]])
     notes.add("relation-idea", "别的对象", "", [other])
     assert [n["id"] for n in notes.items(owner_id=owner)] == [by_record["id"]]
+
+
+def test_edit_rules(lab):
+    """编辑：草稿和进行中的笔记可改；待你确认时原方案作废并退回 AI；已处理的先重新打开。"""
+    _, memory, notes, owner, _, _ = lab
+    note = notes.add("bridge-question", "初稿", "", [owner])
+    assert notes.edit(note["id"], title="改过的标题", text="补充说明")["title"] == "改过的标题"
+    notes.resolve(note["id"], "queued")
+    notes.reply(note["id"], "proposal", "补目标", [_goal_step(memory, owner)], actor=AI)
+    edited = notes.edit(note["id"], text="换个方向")
+    assert edited["status"] == "queued" and "proposal" not in edited
+    assert "原方案作废" in edited["thread"][-1]["text"]
+    notes.resolve(note["id"], "done")
+    with pytest.raises(BurrowlError):
+        notes.edit(note["id"], title="已完成后再改")
+    with pytest.raises(BurrowlError):
+        notes.edit(notes.resolve(note["id"], "open")["id"], title="  ")

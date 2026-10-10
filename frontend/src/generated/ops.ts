@@ -379,6 +379,18 @@ export declare namespace RelationsNoteResolve {
   }
 }
 
+export declare namespace RelationsNoteEdit {
+  /**
+   * （仅用户）修改笔记内容。已处理的先重新打开；待你确认的方案会作废，笔记退回 AI。
+   */
+  export interface Args {
+    note_id: string;
+    kind?: ("cluster-name" | "bridge-question" | "relation-idea") | null;
+    title?: string | null;
+    text?: string | null;
+  }
+}
+
 export declare namespace RelationsNoteAnswer {
   /**
    * （仅用户）回答 AI 在笔记上的提问；笔记回到 queued。
@@ -449,12 +461,48 @@ export declare namespace MaintenancePlan {
   export interface Args {
     changed_ids: string[];
     note?: string;
+    /**
+     * 只把这些受影响的记录放进计划；省略时放入全部
+     */
+    targets?: string[] | null;
+  }
+}
+
+export declare namespace MaintenancePlanFromCandidates {
+  /**
+   * （仅用户）为所选维护候选生成计划：变化来源取自候选记下的影响路径，计划只含所选记录；候选标为 planned。
+   */
+  export interface Args {
+    target_ids: string[];
+    note?: string;
+  }
+}
+
+export declare namespace MaintenancePlans {
+  /**
+   * 维护计划概况（最近有变化的在前）。queued 表示用户交给 AI 起草处置。
+   */
+  export interface Args {
+    /**
+     * 只看这些状态；AI 处理用户交给你的计划时用 ['queued']
+     */
+    status?: ("planned" | "queued" | "reviewed" | "applied" | "partial")[] | null;
+  }
+}
+
+export declare namespace MaintenanceHandoff {
+  /**
+   * （仅用户）把计划交给 AI 起草处置，或把待确认 / 部分完成的计划退回 AI（附意见）。
+   */
+  export interface Args {
+    plan_id: string;
+    note?: string;
   }
 }
 
 export declare namespace MaintenanceReview {
   /**
-   * 记录逐项处置与修订草案，并逐对象预检（不写记忆）。
+   * 记录逐项处置与修订草案，并逐对象预检（不写记忆）。之后由用户在工作台预览并执行。
    */
   export interface Args {
     plan_id: string;
@@ -465,12 +513,16 @@ export declare namespace MaintenanceReview {
       [k: string]: unknown;
     }[];
     expected_revision?: number | null;
+    /**
+     * 给用户看的一句说明（改了什么、为什么）
+     */
+    message?: string;
   }
 }
 
 export declare namespace MaintenanceApply {
   /**
-   * 按对象逐个提交计划中的修订与撤回；可重试，部分完成会如实报告。
+   * （仅用户）执行已写好处置的计划：按对象逐个提交修订与撤回；可重试，部分完成会如实报告。
    */
   export interface Args {
     plan_id: string;
@@ -502,6 +554,7 @@ export declare namespace MonitorRun {
 export declare namespace MonitorCandidates {
   /**
    * 来源变化影响到的维护候选；用 maintenance_plan 把它们纳入语义维护。
+   * 每项附 kind、title、record_id（结论落到包含它的记录）与 editable（能否放进计划修订）。
    */
   export interface Args {
     status?: ("open" | "planned" | "dismissed") | null;
@@ -727,7 +780,7 @@ export declare namespace SourcesRelocate {
 
 export declare namespace SourcesUpdate {
   /**
-   * （仅用户）启用/停用来源或调整敏感级别。停用后引用它的记录会在读取时被隐去。
+   * （仅用户）启用/停用来源或调整敏感级别。停用或设为 restricted 后，读取被拒的记录在检索和关系图中也同时隐去。
    */
   export interface Args {
     source_id: string;
@@ -1793,12 +1846,16 @@ export interface OpArgs {
   "relations.notes": RelationsNotes.Args;
   "relations.note_add": RelationsNoteAdd.Args;
   "relations.note_resolve": RelationsNoteResolve.Args;
+  "relations.note_edit": RelationsNoteEdit.Args;
   "relations.note_answer": RelationsNoteAnswer.Args;
   "relations.note_reply": RelationsNoteReply.Args;
   "relations.note_apply": RelationsNoteApply.Args;
   "relations.note_reject": RelationsNoteReject.Args;
   "relations.note_clear": RelationsNoteClear.Args;
   "maintenance.plan": MaintenancePlan.Args;
+  "maintenance.plan_from_candidates": MaintenancePlanFromCandidates.Args;
+  "maintenance.plans": MaintenancePlans.Args;
+  "maintenance.handoff": MaintenanceHandoff.Args;
   "maintenance.review": MaintenanceReview.Args;
   "maintenance.apply": MaintenanceApply.Args;
   "maintenance.status": MaintenanceStatus.Args;
@@ -1920,14 +1977,18 @@ export const OP_EFFECTS: Record<OpName, string> = {
   "relations.notes": "read",
   "relations.note_add": "user",
   "relations.note_resolve": "user",
+  "relations.note_edit": "user",
   "relations.note_answer": "user",
   "relations.note_reply": "write",
   "relations.note_apply": "user",
   "relations.note_reject": "user",
   "relations.note_clear": "user",
   "maintenance.plan": "write",
+  "maintenance.plan_from_candidates": "user",
+  "maintenance.plans": "read",
+  "maintenance.handoff": "user",
   "maintenance.review": "write",
-  "maintenance.apply": "write",
+  "maintenance.apply": "user",
   "maintenance.status": "read",
   "monitor.run": "write",
   "monitor.candidates": "read",

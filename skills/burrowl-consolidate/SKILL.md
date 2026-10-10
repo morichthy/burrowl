@@ -1,7 +1,7 @@
 ---
 name: burrowl-consolidate
 description: 用户要求记录或整理当前成果、阶段总结、交接，或结果/反例/适用范围/方向发生实质变化时使用：完整阅读概览与文稿，核对上次文稿以来的变化，修订内容与文稿，处理来源变化后的语义维护、复核整理与关联，并可发布到知识中枢。
-requires_tools: [memory_inspect, memory_document, memory_timeline, memory_contract, memory_commit, memory_summary_materials, memory_summary_save, memory_owner_create, review_queue, review_history, review_submit, provenance_impact, provenance_lineage, relations_associations, relations_similar, relations_candidates, relations_decide, index_gaps, config_get, config_update, maintenance_plan, maintenance_review, maintenance_apply, maintenance_status, monitor_candidates, hub_plan, hub_status]
+requires_tools: [memory_inspect, memory_document, memory_timeline, memory_contract, memory_commit, memory_summary_materials, memory_summary_save, memory_owner_create, review_queue, review_history, review_submit, provenance_impact, provenance_lineage, relations_associations, relations_similar, relations_candidates, relations_decide, index_gaps, config_get, config_update, maintenance_plan, maintenance_plans, maintenance_review, maintenance_status, monitor_candidates, hub_plan, hub_status]
 ---
 # 整理成果
 
@@ -38,14 +38,16 @@ requires_tools: [memory_inspect, memory_document, memory_timeline, memory_contra
    - 每条新建或修订的记录都按 RECORDING 第 2 节逐条回读。
    - 预期长期复用的对象要有一条当前、自足的 L4。
 4. **来源变化与语义维护**（依据变化、出现反证、监测给出候选时）：
-   - 用 `monitor_candidates` 或 `provenance_impact` 找到受影响的记录，用 `maintenance_plan(changed_ids)` 生成计划，并逐项阅读计划给出的正文与新旧依据。
+   - 先用 `maintenance_plans(status=['queued'])` 查看用户在工作台交给你的计划（计划的 `thread` 里有用户的说明和退回意见）。
+   - 需要新计划时，用 `monitor_candidates` 或 `provenance_impact` 找到受影响的记录，用 `maintenance_plan(changed_ids, targets?)` 生成计划。逐项阅读计划给出的正文与新旧依据。
    - 对每项给出处置和具体理由：
      - **retain**：依据变化不影响结论；
      - **revise**：修订，附新的完整草案；
      - **resynthesize**：基于新依据重新综合，附草案；
      - **retract**：撤回；
      - **defer**：暂缓，未知或超出范围时使用。
-   - 用 `maintenance_review` 记录处置并预检，在授权范围内 `maintenance_apply` 提交，再用 `maintenance_status` 核对。它按对象逐个提交，可能部分完成，要如实报告。
+   - 用 `maintenance_review`（带一句 `message` 说明改了什么）记录处置并预检。**执行只能由用户在工作台完成**：告诉用户计划编号，请他在"维护与监测"页预览后执行或退回；之后用 `maintenance_status` 核对结果。它按对象逐个提交，可能部分完成，要如实报告。
+   - 原件内容变了时，修订稿引用的应是用新来源 ID 登记的新版本（RULES 第 9 节：原件不修改，新版本用新 ID）。
 5. **复核与溯源**：
    - 用 `review_queue(owner_id=…)` 列出未复核、已失效、有争议、依据受阻的结论，写进待复核清单并说明理由。
    - 复核本身由用户在工作台完成。只有符合 RULES 第 4 节的情况才由 AI 代为 `review_submit`。

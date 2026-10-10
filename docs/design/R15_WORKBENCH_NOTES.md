@@ -50,6 +50,7 @@
 | D-10 | **默认不删除**：已处理（handled / done / dismissed）的笔记移到折叠的"已处理"区，可重新打开；"清除已处理"由用户手动执行并二次确认 | 写入的记录在保存原因里引用笔记编号，保留笔记才能追溯；规则要求不静默删除 |
 | D-11 | **编号不重复**：文件改为 `{next_seq, notes}`，编号取 `WN-{next_seq}` 后自增；读取旧的列表格式时按已有最大编号续上 | 清除后编号仍唯一，记录里的引用不会指错 |
 | D-12 | **读改写在同一把锁内完成** | AI 回写与用户点击可能同时发生，避免互相覆盖 |
+| D-13 | **用户可以编辑未结束的笔记**（`relations.note_edit`，类型、标题、内容）：草稿、AI 处理中、需要你回答的直接改；待你确认时改动会作废方案、笔记退回 queued；已处理的先重新打开 | 用户反馈添加后无法修改；方案按旧内容写成，内容变了不能再执行旧方案 |
 
 ## 3. 状态与操作
 
@@ -72,6 +73,7 @@
 | `relations.note_add` | 用户 | 新建草稿（open） |
 | `relations.note_resolve(status)` | 用户 | open↔queued（交给 AI / 收回）、→ done / dismissed、已处理 → open |
 | `relations.note_answer(text)` | 用户 | needs_user → queued |
+| `relations.note_edit(kind?, title?, text?)` | 用户 | 改写未结束笔记的内容；proposed 时方案作废 → queued（D-13） |
 | `relations.note_reply(outcome, message, steps?)` | AI | 只作用于 queued；见 D-04、D-05 |
 | `relations.note_apply(proposal_id)` | 用户 | 执行方案，见 D-06、D-07 |
 | `relations.note_reject(proposal_id, comment)` | 用户 | proposed → queued，意见进入笔记往来 |
@@ -132,4 +134,5 @@
 | T-P2.1 | 已完成 | `frontend/src/features/Notes.tsx`：按"等你处理 / 草稿 / AI 处理中 / 已处理"分组，方案卡逐条显示服务端预览；首页"工作台笔记"状态卡；导航"关系图"显示待你处理数。组件测试 `Notes.test.tsx`（4 项）；端到端用真实后端走完交给 AI → 方案（确认未写入）→ 执行 → 已写入 |
 | T-P2.2 | 已完成 | RULES 第 8 节"工作台笔记"；burrowl-work 第 2 步、burrowl-consolidate 第 5 步；MCP 说明 |
 | T-P2.3 | 已完成 | CORE §5、ARCHITECTURE（模块表 NOTE、分层、状态表）、README、GLOSSARY、TESTING、DEVELOPMENT_HISTORY、docs/README、AGENTS |
+| D-13 编辑（2026-10-11） | 已完成 | 用户反馈添加后无法编辑。`relations.note_edit`；面板上未结束的笔记有"编辑"，待你确认时保存前提示方案作废。服务测试 1 项、组件测试 1 项 |
 | 待确认 | — | 本文 §2 的各项决定与界面细节；尚未用真实 AI 对话走一遍（只用接口模拟 AI 回写） |

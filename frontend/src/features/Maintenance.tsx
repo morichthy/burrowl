@@ -1,6 +1,6 @@
-// 维护与监测：来源变化监测 → 维护候选 → 语义维护计划（逐项处置 → 预检 → 提交）；来源登记管理。
+// 维护与监测：来源变化监测 → 勾选候选生成维护计划 → 交给 AI 起草处置 → 预览后执行或退回（R16）；来源登记管理。
 // 观察和候选不改变任何证据或复核状态；只有维护计划提交后才产生新修订。
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAction, useOp } from "../api";
 import { KINDS, label } from "../labels";
 import { Empty, ErrorBox, href, Loading, Markdown, Panel, Tag, Time } from "../ui";
@@ -19,6 +19,13 @@ interface Candidate {
   status: string;
   first_seen: string;
   last_seen: string;
+  reasons?: string[][];
+  // R16：候选是什么、能否放进计划修订（结论落到包含它的记录上）
+  kind?: string | null;
+  title?: string;
+  record_id?: string | null;
+  owner_id?: string | null;
+  editable?: boolean;
 }
 
 interface PlanItem {
@@ -28,7 +35,7 @@ interface PlanItem {
   title: string;
   content: string;
   formal_dependency: boolean;
-  decision: { action: string; reason: string } | null;
+  decision: { action: string; reason: string; draft?: unknown } | null;
 }
 
 interface Plan {
@@ -37,22 +44,26 @@ interface Plan {
   revision: number;
   changed_ids: string[];
   items: PlanItem[];
-  applied: Record<string, unknown>;
+  applied: Record<string, { ok: boolean; error?: { message: string } }>;
+  thread?: { at: string; by: string; kind: string; text: string }[];
+  preview?: { owner_id: string; ok: boolean; error?: { message: string } }[];
 }
 
-const ACTIONS = [
-  { value: "retain", label: "保留（依据变化不影响）" },
-  { value: "revise", label: "修订（需提供新草案）" },
-  { value: "resynthesize", label: "重新综合（需提供新草案）" },
-  { value: "retract", label: "撤回" },
-  { value: "defer", label: "暂缓" },
-];
+interface PlanSummary {
+  plan_id: string;
+  status: string;
+  changed_ids: string[];
+  items: number;
+  updated_at: string;
+}
 
 export function Maintenance() {
+  // 候选生成计划后直接在下方打开这份计划
+  const [planId, setPlanId] = useState("");
   return (
     <>
-      <MonitorPanel />
-      <PlanPanel />
+      <MonitorPanel onPlan={setPlanId} />
+      <PlanPanel planId={planId} setPlanId={setPlanId} />
       <RunsPanel />
       <RootsPanel />
       <SourcesPanel />
@@ -60,28 +71,38 @@ export function Maintenance() {
   );
 }
 
-function MonitorPanel() {
+function MonitorPanel({ onPlan }: { onPlan: (planId: string) => void }) {
   const observations = useOp<Observation[]>("monitor.observations", { limit: 10 });
   const candidates = useOp<Candidate[]>("monitor.candidates", { status: "open" });
   const run = useAction<Observation>("monitor.run");
   const resolve = useAction("monitor.resolve");
+  const fromCandidates = useAction<Plan>("maintenance.plan_from_candidates");
   const [preview, setPreview] = useState<Observation>();
+  const [picked, setPicked] = useState<Set<string>>(new Set());
   const refresh = () => {
     observations.reload();
     candidates.reload();
   };
+  const toggle = (id: string) =>
+    setPicked((now) => {
+      const next = new Set(now);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   return (
     <Panel
       title="来源变化监测"
       actions={
         <>
-          <button type="button" disabled={run.busy} onClick={async () => setPreview(await run.run({ dry_run: true }))}>
+          <button type="button" disabled={run.busy} onClick={async () => setPreview(await run.run({ dry_run: true }))} title="只比较，不记录、不更新基线">
             预览扫描
           </button>
           <button
             type="button"
             className="primary"
             disabled={run.busy}
+            title="记录本次观察、更新基线，并登记受影响的记录为维护候选"
             onClick={async () => {
               if (await run.run({ dry_run: false })) {
                 setPreview(undefined);
@@ -94,8 +115,11 @@ function MonitorPanel() {
         </>
       }
     >
-      <p className="hint">比较各对象记忆与所引用原件的指纹。观察只提示“需要关注”，不改动任何记录或复核状态。</p>
-      <ErrorBox error={run.error ?? resolve.error ?? observations.error} />
+      <p className="hint">
+        比较各对象记忆与所引用原件的指纹。"预览扫描"只看有几处变化，不记录；"扫描并记录"会更新基线，并把受原件变化影响的记录登记为维护候选。
+        观察和候选都不改动任何记录或复核状态。
+      </p>
+      <ErrorBox error={run.error ?? resolve.error ?? observations.error ?? fromCandidates.error} />
       {preview ? (
         <div className="notice">
           预览（未记录）：{preview.changes.length} 处变化，{preview.maintenance_candidates.length} 个受影响记录
@@ -103,24 +127,53 @@ function MonitorPanel() {
       ) : null}
       <h3>待处理的维护候选（{candidates.data?.length ?? 0}）</h3>
       {candidates.data && !candidates.data.length ? <Empty>没有待处理的候选。</Empty> : null}
+      {candidates.data?.length ? (
+        <div className="batchbar">
+          <span>已选 {picked.size} 个</span>
+          <button
+            type="button"
+            className="small primary"
+            disabled={!picked.size || fromCandidates.busy}
+            onClick={async () => {
+              const plan = await fromCandidates.run({ target_ids: [...picked] });
+              if (plan) {
+                setPicked(new Set());
+                candidates.reload();
+                onPlan(plan.plan_id);
+              }
+            }}
+          >
+            为所选生成维护计划
+          </button>
+        </div>
+      ) : null}
       <ul className="claims">
         {candidates.data?.map((c) => (
           <li key={c.target_id}>
+            <input
+              type="checkbox"
+              aria-label={`选择 ${c.target_id}`}
+              checked={picked.has(c.target_id)}
+              disabled={c.editable === false}
+              onChange={() => toggle(c.target_id)}
+            />
             <div className="claim-body">
-              <code>{c.target_id}</code> <span className="hint">首次发现 <Time value={c.first_seen} /></span>
+              <Tag>{c.kind === "claim" ? "结论" : label(KINDS, c.kind ?? "")}</Tag>
+              {c.record_id && c.owner_id ? <a href={href("memory", c.owner_id, c.record_id)}>{c.title}</a> : <span>{c.title}</span>}{" "}
+              <code>{c.target_id}</code>
+              <div className="hint">
+                首次发现 <Time value={c.first_seen} />
+                {c.reasons?.[0]?.length ? ` · 原因：${c.reasons[0].join(" → ")}` : ""}
+              </div>
+              {c.editable === false ? <div className="hint">这一项不能修订（如 L0 原件记录），确认后点"无需处理"即可。</div> : null}
             </div>
-            <div className="actions">
-              {(["planned", "dismissed"] as const).map((status) => (
-                <button
-                  key={status}
-                  type="button"
-                  className="small"
-                  onClick={async () => (await resolve.run({ target_id: c.target_id, status })) && candidates.reload()}
-                >
-                  {status === "planned" ? "已纳入计划" : "无需处理"}
-                </button>
-              ))}
-            </div>
+            <button
+              type="button"
+              className="small"
+              onClick={async () => (await resolve.run({ target_id: c.target_id, status: "dismissed" })) && candidates.reload()}
+            >
+              无需处理
+            </button>
           </li>
         ))}
       </ul>
@@ -140,126 +193,182 @@ function MonitorPanel() {
   );
 }
 
-function PlanPanel() {
-  const [changed, setChanged] = useState("");
-  const [planId, setPlanId] = useState("");
-  const make = useAction<Plan>("maintenance.plan");
+// R16 D-02：计划状态的中文名
+const PLAN_STATUS: Record<string, { label: string; tone: string }> = {
+  planned: { label: "已生成", tone: "muted" },
+  queued: { label: "AI 处理中", tone: "muted" },
+  reviewed: { label: "待你确认", tone: "warn" },
+  applied: { label: "已执行", tone: "good" },
+  partial: { label: "部分完成", tone: "bad" },
+};
+const ACTION_LABELS: Record<string, { label: string; tone: string }> = {
+  retain: { label: "保留", tone: "good" },
+  revise: { label: "修订", tone: "warn" },
+  resynthesize: { label: "重新综合", tone: "warn" },
+  retract: { label: "撤回", tone: "bad" },
+  defer: { label: "暂缓", tone: "muted" },
+};
+
+function PlanPanel({ planId, setPlanId }: { planId: string; setPlanId: (id: string) => void }) {
+  const plans = useOp<PlanSummary[]>("maintenance.plans", {});
   const plan = useOp<Plan>("maintenance.status", { plan_id: planId }, !!planId);
-  const review = useAction<{ revision: number; checks?: unknown }>("maintenance.review");
-  const apply = useAction<{ status: string; applied: Record<string, unknown> }>("maintenance.apply");
-  const [decisions, setDecisions] = useState<Record<string, { action: string; reason: string; draft: string }>>({});
-  const [result, setResult] = useState<unknown>();
-
-  const submitReview = async () => {
-    if (!plan.data) return;
-    const list = Object.entries(decisions).map(([target_id, d]) => {
-      const draft = d.draft.trim() ? JSON.parse(d.draft) : undefined;
-      return { target_id, action: d.action, reason: d.reason, ...(draft ? { draft } : {}) };
-    });
-    const reviewed = await review.run({ plan_id: plan.data.plan_id, decisions: list, expected_revision: plan.data.revision });
-    if (reviewed) {
-      setResult(reviewed);
-      plan.reload();
-    }
+  const make = useAction<Plan>("maintenance.plan");
+  const handoff = useAction("maintenance.handoff");
+  const apply = useAction<{ status: string; applied: Record<string, { ok: boolean; error?: { message: string } }> }>("maintenance.apply");
+  const [changed, setChanged] = useState("");
+  const refresh = () => {
+    plans.reload();
+    plan.reload();
   };
-
+  // AI 在对话中写好处置后，计划会从"AI 处理中"变为"待你确认"：与其他页面一样每 5 秒刷新
+  const reloadPlans = plans.reload;
+  const reloadPlan = plan.reload;
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      reloadPlans();
+      if (planId) reloadPlan();
+    }, 5_000);
+    return () => window.clearInterval(timer);
+  }, [reloadPlans, reloadPlan, planId]);
+  const p = plan.data;
   return (
     <Panel title="语义维护计划">
       <p className="hint">
-        来源变化或出现新反证时，列出受影响记录及其正文，逐项决定：保留、修订、重新综合、撤回或暂缓。修订需要新的记录草案（通常由
-        AI 按 consolidate 流程写好）。提交按对象逐个进行，可能部分完成。
+        原件变化或出现新反证时，列出受影响记录，逐条决定保留、修订、重新综合、撤回或暂缓。处置和修订稿由 AI 起草：把计划"交给 AI"后，AI
+        在下次对话中写好处置，计划变为"待你确认"；你在这里看过预览后"执行"，或附意见"退回"。只有执行后才写入记忆。
       </p>
-      <div className="row">
-        <input
-          placeholder="变化的记录或来源 ID，逗号分隔（可从上方候选复制）"
-          value={changed}
-          onChange={(e) => setChanged(e.target.value)}
-        />
-        <button
-          type="button"
-          className="primary"
-          disabled={!changed.trim() || make.busy}
-          onClick={async () => {
-            const created = await make.run({ changed_ids: changed.split(/[,，\s]+/).filter(Boolean) });
-            if (created) setPlanId(created.plan_id);
-          }}
-        >
-          生成计划
-        </button>
-        <input placeholder="或输入已有计划 ID（MP-…）" value={planId} onChange={(e) => setPlanId(e.target.value.trim())} />
-      </div>
-      <ErrorBox error={make.error ?? plan.error ?? review.error ?? apply.error} />
-      {plan.data ? (
-        <>
-          <p>
-            <Tag>{plan.data.status}</Tag> 第 {plan.data.revision} 版 · 变化：{plan.data.changed_ids.join("、")}
-          </p>
-          {plan.data.items.map((item) => {
-            const id = item.target.target_id;
-            const d = decisions[id] ?? { action: item.decision?.action ?? "retain", reason: item.decision?.reason ?? "", draft: "" };
-            const set = (patch: Partial<typeof d>) => setDecisions({ ...decisions, [id]: { ...d, ...patch } });
-            return (
-              <article key={id} className="owner-card">
-                <header>
-                  <h3>
-                    <a href={href("memory", item.owner_id, id)}>{item.title}</a> <Tag>{label(KINDS, item.kind)}</Tag>
-                    {item.formal_dependency ? <Tag tone="warn">正式依赖</Tag> : null}
-                  </h3>
-                </header>
-                {item.content ? (
-                  <details>
-                    <summary>当前正文</summary>
-                    <Markdown text={item.content} />
-                  </details>
-                ) : null}
-                <div className="form">
-                  <label>
-                    处置
-                    <select value={d.action} onChange={(e) => set({ action: e.target.value })}>
-                      {ACTIONS.map((a) => (
-                        <option key={a.value} value={a.value}>
-                          {a.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    理由
-                    <input value={d.reason} onChange={(e) => set({ reason: e.target.value })} />
-                  </label>
-                  {d.action === "revise" || d.action === "resynthesize" ? (
-                    <label>
-                      新草案（JSON，字段见 memory.contract）
-                      <textarea value={d.draft} onChange={(e) => set({ draft: e.target.value })} />
-                    </label>
-                  ) : null}
-                </div>
-              </article>
-            );
-          })}
+      <ErrorBox error={plans.error ?? make.error ?? plan.error ?? handoff.error ?? apply.error} />
+      {plans.data?.length ? (
+        <ul className="plan-list">
+          {plans.data.map((s) => (
+            <li key={s.plan_id} className={s.plan_id === planId ? "on" : ""}>
+              <button type="button" className="link" onClick={() => setPlanId(s.plan_id)}>
+                {s.changed_ids.join("、")}
+              </button>
+              <Tag tone={PLAN_STATUS[s.status]?.tone}>{PLAN_STATUS[s.status]?.label ?? s.status}</Tag>
+              <span className="hint">
+                {s.items} 条 · <Time value={s.updated_at} />
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <Empty>还没有维护计划。可以在上方勾选维护候选生成，也可以手动输入变化的 ID。</Empty>
+      )}
+      <details>
+        <summary>手动输入变化的记录或来源 ID 生成计划</summary>
+        <div className="row">
+          <input placeholder="逗号分隔" value={changed} onChange={(e) => setChanged(e.target.value)} aria-label="变化的 ID" />
+          <button
+            type="button"
+            disabled={!changed.trim() || make.busy}
+            onClick={async () => {
+              const created = await make.run({ changed_ids: changed.split(/[,，\s]+/).filter(Boolean) });
+              if (created) {
+                setChanged("");
+                setPlanId(created.plan_id);
+                plans.reload();
+              }
+            }}
+          >
+            生成计划
+          </button>
+        </div>
+      </details>
+
+      {p ? (
+        <section className="plan-detail">
+          <h3>
+            <Tag tone={PLAN_STATUS[p.status]?.tone}>{PLAN_STATUS[p.status]?.label ?? p.status}</Tag> 变化：{p.changed_ids.join("、")}{" "}
+            <code>{p.plan_id}</code>
+          </h3>
+          {(p.thread ?? []).slice(-3).map((e, i) => (
+            <div key={i} className="hint">
+              <Time value={e.at} /> {e.by === "ai" ? "AI" : e.by === "human" ? "你" : "系统"}：{e.text}
+            </div>
+          ))}
+          {p.items.map((item) => (
+            <PlanItemView key={item.target.target_id} item={item} />
+          ))}
+          {p.preview?.some((r) => !r.ok) ? (
+            <div className="error">
+              预检未通过：
+              {p.preview
+                .filter((r) => !r.ok)
+                .map((r) => `${r.owner_id}：${r.error?.message ?? "未知错误"}`)
+                .join("；")}
+            </div>
+          ) : null}
+          {Object.entries(p.applied ?? {}).some(([, v]) => !v.ok) ? (
+            <div className="error">
+              写入失败：
+              {Object.entries(p.applied)
+                .filter(([, v]) => !v.ok)
+                .map(([k, v]) => `${k}：${v.error?.message ?? ""}`)
+                .join("；")}
+            </div>
+          ) : null}
           <div className="actions">
-            <button type="button" disabled={review.busy} onClick={submitReview}>
-              记录处置并预检
-            </button>
-            <button
-              type="button"
-              className="primary"
-              disabled={apply.busy || plan.data.status === "planned"}
-              onClick={async () => {
-                const applied = await apply.run({ plan_id: plan.data!.plan_id, expected_revision: plan.data!.revision });
-                if (applied) {
-                  setResult(applied);
-                  plan.reload();
-                }
-              }}
-            >
-              提交修订
-            </button>
+            {p.status === "planned" ? (
+              <button type="button" className="primary" disabled={handoff.busy} onClick={async () => (await handoff.run({ plan_id: p.plan_id, note: "" })) && refresh()}>
+                交给 AI
+              </button>
+            ) : null}
+            {p.status === "queued" ? <span className="hint">AI 会在下次对话中写好处置；也可以直接对 AI 说"处理维护计划"。</span> : null}
+            {p.status === "reviewed" || p.status === "partial" ? (
+              <>
+                <button
+                  type="button"
+                  className="primary"
+                  disabled={apply.busy || p.preview?.some((r) => !r.ok)}
+                  onClick={async () => (await apply.run({ plan_id: p.plan_id, expected_revision: p.revision })) && refresh()}
+                >
+                  {p.status === "partial" ? "重试执行" : "执行"}
+                </button>
+                <button
+                  type="button"
+                  disabled={handoff.busy}
+                  onClick={async () => {
+                    const note = window.prompt("退回给 AI 的意见", "");
+                    if (note !== null && (await handoff.run({ plan_id: p.plan_id, note }))) refresh();
+                  }}
+                >
+                  退回
+                </button>
+              </>
+            ) : null}
           </div>
-          {result ? <pre className="notice">{JSON.stringify(result, null, 2)}</pre> : null}
-        </>
+        </section>
       ) : null}
     </Panel>
+  );
+}
+
+function PlanItemView({ item }: { item: PlanItem }) {
+  const decision = item.decision;
+  const action = decision ? ACTION_LABELS[decision.action] : undefined;
+  const draft = decision?.draft as { title?: string; body_markdown?: string } | undefined;
+  return (
+    <article className="plan-item">
+      <header>
+        {action ? <Tag tone={action.tone}>{action.label}</Tag> : <Tag>待处置</Tag>}
+        <a href={href("memory", item.owner_id, item.target.target_id)}>{item.title}</a> <Tag>{label(KINDS, item.kind)}</Tag>
+        {item.formal_dependency ? <Tag tone="warn">正式依赖</Tag> : null}
+      </header>
+      {decision ? <div className="note-ai">理由：{decision.reason}</div> : null}
+      {draft ? (
+        <div className="plan-draft">
+          <div className="hint">修订后{draft.title && draft.title !== item.title ? `（标题改为「${draft.title}」）` : ""}：</div>
+          <Markdown text={draft.body_markdown || "（正文为空，内容在结构化字段中）"} />
+        </div>
+      ) : null}
+      {item.content ? (
+        <details>
+          <summary>当前正文</summary>
+          <Markdown text={item.content} />
+        </details>
+      ) : null}
+    </article>
   );
 }
 
@@ -455,7 +564,7 @@ function SourcesPanel() {
   return (
     <Panel title={`来源登记（${sources.data?.length ?? 0}）`}>
       <p className="hint">
-        原始文件只有在这里登记、启用且未限制时才能被引用和读取。停用或设为 restricted 后，依据它的记录会在读取时被隐去。
+        原始文件只有在这里登记、启用且未限制时才能被引用和读取。停用或设为 restricted 后，读取时被隐去的记录在检索和关系图中也会同时隐去；恢复后重新出现。
       </p>
       <div className="toolbar">
         <input placeholder="按 ID、路径或标题筛选" value={filter} onChange={(e) => setFilter(e.target.value)} />

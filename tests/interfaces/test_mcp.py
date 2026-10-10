@@ -76,7 +76,8 @@ def test_prompts_carry_rules_and_contract_tool(server):
             text = "".join(getattr(m.content, "text", "") for m in work.messages)
             assert "以下为 RULES.md 全文" in text and "谁可以确认" in text
             tools = {t.name for t in (await client.list_tools()).tools}
-            assert {"memory_contract", "sources_register", "maintenance_apply", "relations_decide"} <= tools
+            assert {"memory_contract", "sources_register", "maintenance_review", "maintenance_plans", "relations_decide"} <= tools
+            assert "maintenance_apply" not in tools  # R16 D-03：维护计划只能由用户在工作台执行
             contract = await client.call_tool("memory_contract", {"kind": "experience"})
             body = json.loads(text_of(contract))
             assert body["level"] == "L3" and body["example_operation"]["draft"]["kind"] == "experience"

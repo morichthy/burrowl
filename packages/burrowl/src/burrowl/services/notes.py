@@ -119,6 +119,27 @@ class WorkbenchNotes:
             return note
         return self._update(change)
 
+    def edit(self, note_id: str, *, kind: str | None = None, title: str | None = None, text: str | None = None) -> dict:
+        """改写笔记内容。已处理的先重新打开；待你确认时，方案按旧内容写成，改后作废并退回 AI 重做。"""
+        if kind is not None and kind not in NOTE_KINDS:
+            raise BurrowlError("INVALID_ARGUMENT", "笔记类型无效", {"kinds": sorted(NOTE_KINDS)})
+        if title is not None and not title.strip():
+            raise BurrowlError("INVALID_ARGUMENT", "标题不能为空")
+
+        def change(data: dict) -> dict:
+            note = self._find(data, note_id)
+            if note["status"] not in OPEN_STATES:
+                raise BurrowlError("INVALID_STATE", "已处理的笔记先重新打开再编辑", {"id": note_id})
+            for field, value in (("kind", kind), ("title", title), ("text", text)):
+                if value is not None:
+                    note[field] = value
+            withdrawn = note.pop("proposal", None) if note["status"] == "proposed" else None
+            if withdrawn:
+                note["status"] = "queued"
+            self._event(note, "user", "edited", "内容已修改" + ("，原方案作废，等待 AI 重新处理" if withdrawn else ""))
+            return note
+        return self._update(change)
+
     def answer(self, note_id: str, text: str) -> dict:
         if not text.strip():
             raise BurrowlError("INVALID_ARGUMENT", "回答不能为空")

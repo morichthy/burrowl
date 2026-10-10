@@ -194,7 +194,7 @@ finish：交接文本 = 有效综合稿或逐对象笔记；陈旧笔记、超�
 - 方案的步骤只能是 `memory.commit` 或 `relations.decide`，最多 10 步，同一对象只提交一次；服务端逐步 dry_run，并从操作本身生成预览（新建或修订的记录、结论原文、关联两端）。
 - 写入者是起草方案的 AI，记录的保存原因带"依据工作台笔记 WN-n 起草，经用户在工作台批准后写入"。
 - AI 在续接（`memory.resume` 的 `workbench_notes`）和收口时查看 queued 笔记；新建、交给 AI、执行、退回、清除都只能由用户在工作台完成。
-- 已处理的笔记默认折叠保留，"清除已处理"由用户手动执行；编号不复用。
+- 草稿和未结束的笔记可以编辑；待你确认时编辑会作废方案、退回 AI。已处理的笔记默认折叠保留，可重新打开后编辑，"清除已处理"由用户手动执行；编号不复用。
 
 实现：`index/graph.py`、`services/relations.py`、`services/notes.py`、`services/memory/associations.py`、`services/memory/concepts.py`、`services/memory/links.py`、`core/links.py`。
 
@@ -225,15 +225,19 @@ assemble(已选候选)：
 ## 8. 来源变化后怎样维护
 
 ```text
-监测：比较对象 HEAD 与所引原件的指纹（可 dry_run）→ 观察记录 + 维护候选（open/planned/dismissed）
+监测：比较对象 HEAD 与所引原件的指纹（可 dry_run）→ 观察记录；原件指纹变化时登记维护候选（open/planned/dismissed）
 影响：provenance.impact 沿依赖找到下游（supports/input 是正式依赖，导航只提示）
-计划：maintenance.plan 列出受影响记录及其完整正文
-处置：AI/人逐项决定 retain / revise（附草案）/ resynthesize / retract / defer → maintenance.review 预检
-提交：maintenance.apply 按对象逐个提交（依据版本不一致则拒绝），可能部分完成
+计划：工作台勾选候选 → maintenance.plan_from_candidates（只含所选记录，候选标为 planned）；
+      或 maintenance.plan(changed_ids, targets?) 列出受影响记录及其完整正文
+处置：用户把计划交给 AI（queued）→ AI 逐项决定 retain / revise（附草案）/ resynthesize / retract / defer
+      → maintenance.review 预检 → 待你确认（reviewed）；用户可附意见退回（回到 queued，处置保留）
+提交：只由用户在工作台执行 maintenance.apply，按对象逐个提交（依据版本不一致则拒绝），可能部分完成；
+      修订署名为写处置的 AI，修订原因带计划编号；撤回结论的复核署名为执行的用户
 回读：再按 consolidate 流程检查概览、文稿和上下文
 ```
 
 - 观察和候选不改变任何证据或复核状态。
+- 工作台上不手写修订稿：处置与修订稿由 AI 起草，用户看逐条预览（修订后的正文、当前正文、预检结果）后执行或退回（R16）。
 - 复核在内容变化后自动失效，需要重新复核。
 
 实现：`services/monitor.py`、`services/maintenance.py`、`services/memory/provenance.py`。

@@ -170,6 +170,13 @@ def note_resolve(ctx: Ctx, note_id: str, status: Literal["open", "queued", "done
     return ctx.app.notes.resolve(note_id, status)
 
 
+@op("relations.note_edit", effect="user")
+def note_edit(ctx: Ctx, note_id: str, kind: Literal["cluster-name", "bridge-question", "relation-idea"] | None = None,
+              title: str | None = None, text: str | None = None) -> dict:
+    """（仅用户）修改笔记内容。已处理的先重新打开；待你确认的方案会作废，笔记退回 AI。"""
+    return ctx.app.notes.edit(note_id, kind=kind, title=title, text=text)
+
+
 @op("relations.note_answer", effect="user")
 def note_answer(ctx: Ctx, note_id: str, text: str) -> dict:
     """（仅用户）回答 AI 在笔记上的提问；笔记回到 queued。"""
@@ -208,22 +215,63 @@ def note_clear(ctx: Ctx) -> dict:
 
 # ---------- 语义维护 ----------
 @op("maintenance.plan", effect="write")
-def maintenance_plan(ctx: Ctx, changed_ids: list[str], note: str = "") -> dict:
+def maintenance_plan(ctx: Ctx, changed_ids: list[str], note: str = "",
+                     targets: Annotated[list[str] | None, Field(description="只把这些受影响的记录放进计划；省略时放入全部")] = None) -> dict:
     """来源变化或新反证后：列出受影响记录及其完整正文，生成维护计划。"""
-    return ctx.app.maintenance.plan(changed_ids, actor=ctx.actor, note=note)
+    return ctx.app.maintenance.plan(changed_ids, actor=ctx.actor, note=note, targets=targets)
+
+
+@op("maintenance.plan_from_candidates", effect="user")
+def maintenance_plan_from_candidates(ctx: Ctx, target_ids: list[str], note: str = "") -> dict:
+    """（仅用户）为所选维护候选生成计划：变化来源取自候选记下的影响路径，计划只含所选记录；候选标为 planned。"""
+    candidates = {c["target_id"]: c for c in ctx.app.monitor.candidates(None)}
+    missing = [t for t in target_ids if t not in candidates]
+    if not target_ids or missing:
+        raise BurrowlError("INVALID_ARGUMENT", "请选择现有的维护候选", {"missing": missing})
+    # 影响路径的第一项就是变化的来源（provenance.impact 从 changed_ids 出发）
+    changed = sorted({path[0] for t in target_ids for path in candidates[t].get("reasons", []) if path})
+    if not changed:
+        raise BurrowlError("INVALID_ARGUMENT", "所选候选没有记下变化来源，请用 maintenance.plan 手动指定", {"target_ids": target_ids})
+    # 结论落到包含它的记录上修订；L0 原件记录等不可修订的不进计划（R16 D-01）
+    described = ctx.app.maintenance.describe(target_ids)
+    records = sorted({d["record_id"] for d in described.values() if d["editable"]})
+    if not records:
+        raise BurrowlError("INVALID_ARGUMENT", "所选候选都不能修订（例如 L0 原件记录）；确认后点“无需处理”即可",
+                           {"target_ids": target_ids})
+    plan = ctx.app.maintenance.plan(changed, actor=ctx.actor, note=note or "由维护候选生成", targets=records)
+    for target in target_ids:
+        if described[target]["editable"]:  # 不可修订的候选留在 open，由用户确认无需处理
+            ctx.app.monitor.resolve(target, "planned", plan["plan_id"])
+    return plan
+
+
+@op("maintenance.plans")
+def maintenance_plans(ctx: Ctx, status: Annotated[
+        list[Literal["planned", "queued", "reviewed", "applied", "partial"]] | None,
+        Field(description="只看这些状态；AI 处理用户交给你的计划时用 ['queued']")] = None) -> list:
+    """维护计划概况（最近有变化的在前）。queued 表示用户交给 AI 起草处置。"""
+    return ctx.app.maintenance.plans(status)
+
+
+@op("maintenance.handoff", effect="user")
+def maintenance_handoff(ctx: Ctx, plan_id: str, note: str = "") -> dict:
+    """（仅用户）把计划交给 AI 起草处置，或把待确认 / 部分完成的计划退回 AI（附意见）。"""
+    return ctx.app.maintenance.handoff(plan_id, note, actor=ctx.actor)
 
 
 @op("maintenance.review", effect="write")
 def maintenance_review(ctx: Ctx, plan_id: str, decisions: Annotated[list[dict], Field(description=(
         "[{target_id, action: retain|revise|resynthesize|retract|defer, reason, draft?}]"))],
-        expected_revision: int | None = None) -> dict:
-    """记录逐项处置与修订草案，并逐对象预检（不写记忆）。"""
-    return ctx.app.maintenance.review(plan_id, decisions, expected_revision=expected_revision)
+        expected_revision: int | None = None,
+        message: Annotated[str, Field(description="给用户看的一句说明（改了什么、为什么）")] = "") -> dict:
+    """记录逐项处置与修订草案，并逐对象预检（不写记忆）。之后由用户在工作台预览并执行。"""
+    return ctx.app.maintenance.review(plan_id, decisions, expected_revision=expected_revision, actor=ctx.actor,
+                                      message=message)
 
 
-@op("maintenance.apply", effect="write")
+@op("maintenance.apply", effect="user")
 def maintenance_apply(ctx: Ctx, plan_id: str, expected_revision: int) -> dict:
-    """按对象逐个提交计划中的修订与撤回；可重试，部分完成会如实报告。"""
+    """（仅用户）执行已写好处置的计划：按对象逐个提交修订与撤回；可重试，部分完成会如实报告。"""
     return activity.annotate(ctx.app.storage, ctx.app.maintenance.apply(plan_id, actor=ctx.actor, expected_revision=expected_revision))
 
 
@@ -242,8 +290,11 @@ def monitor_run(ctx: Ctx, dry_run: Annotated[bool, Field(description="只比较�
 
 @op("monitor.candidates")
 def monitor_candidates(ctx: Ctx, status: Literal["open", "planned", "dismissed"] | None = "open") -> list:
-    """来源变化影响到的维护候选；用 maintenance_plan 把它们纳入语义维护。"""
-    return ctx.app.monitor.candidates(status)
+    """来源变化影响到的维护候选；用 maintenance_plan 把它们纳入语义维护。
+    每项附 kind、title、record_id（结论落到包含它的记录）与 editable（能否放进计划修订）。"""
+    items = ctx.app.monitor.candidates(status)
+    described = ctx.app.maintenance.describe([c["target_id"] for c in items])
+    return [{**c, **described[c["target_id"]]} for c in items]
 
 
 @op("monitor.resolve", effect="user")
@@ -385,8 +436,11 @@ def sources_register(ctx: Ctx, source_id: Annotated[str, Field(pattern=r"^SRC-")
     工作目录里的文件自动记为"工作根 + 相对路径"，迁移时随根重定向。
     同一 ID 重复登记同一文件是幂等的；内容变了请用新 ID；文件搬家用 sources.relocate / sources.relocate_root。"""
     path = _check_owner_access(ctx, path)
-    return ctx.app.storage.sources.register(source_id, path, title=title, sensitivity=sensitivity,
-                                            work_dir=ctx.app.work_dir)
+    entry = ctx.app.storage.sources.register(source_id, path, title=title, sensitivity=sensitivity,
+                                             work_dir=ctx.app.work_dir)
+    if sensitivity == "restricted":  # 重复登记可能把已被引用的来源提升为 restricted，同样要从投影中隐去依赖者
+        ctx.app.index.on_access_change([source_id])
+    return entry
 
 
 @op("sources.register_many", effect="write")
@@ -404,6 +458,9 @@ def sources_register_many(ctx: Ctx, items: Annotated[list[dict], Field(descripti
         except (BurrowlError, KeyError, OSError) as exc:
             results.append({"source_id": item.get("source_id"), "ok": False,
                             "error": exc.problem() if isinstance(exc, BurrowlError) else str(exc)})
+    restricted = [i["source_id"] for i, r in zip(items, results, strict=True) if r["ok"] and i.get("sensitivity") == "restricted"]
+    if restricted:  # 同 sources.register：提升为 restricted 的来源要从投影中隐去依赖者
+        ctx.app.index.on_access_change(restricted)
     return {"succeeded": sum(r["ok"] for r in results), "failed": sum(not r["ok"] for r in results),
             "results": results}
 
@@ -417,7 +474,9 @@ def sources_relocate(ctx: Ctx, source_id: str, new_path: str) -> dict:
 
 @op("sources.update", effect="user")
 def sources_update(ctx: Ctx, source_id: str, enabled: bool | None = None, sensitivity: Sensitivity | None = None) -> dict:
-    """（仅用户）启用/停用来源或调整敏感级别。停用后引用它的记录会在读取时被隐去。"""
-    return ctx.app.storage.sources.update(source_id, enabled=enabled, sensitivity=sensitivity)
+    """（仅用户）启用/停用来源或调整敏感级别。停用或设为 restricted 后，读取被拒的记录在检索和关系图中也同时隐去。"""
+    entry = ctx.app.storage.sources.update(source_id, enabled=enabled, sensitivity=sensitivity)
+    # 投影不会因来源登记变化而过期，必须在这里重新投影依赖它的对象，否则检索和关系图仍显示被隐去的记录
+    return {**entry, "reindexed_owners": ctx.app.index.on_access_change([source_id])}
 
 

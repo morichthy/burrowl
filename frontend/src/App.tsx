@@ -83,10 +83,13 @@ export function App() {
   // 待处理数字要跟上 AI 新发起或用户刚处理完的请求：与阅读列表同样每 5 秒、以及窗口回到前台时刷新
   // R15：关系图旁显示等你处理的工作台笔记（待你确认 + 需要你回答）
   const notes = useNoteCounts();
+  // R16：维护计划写好处置、等你确认（或部分完成待重试）时在"维护与监测"旁提示
+  const plans = useOp<unknown[]>("maintenance.plans", { status: ["reviewed", "partial"] });
   useEffect(() => {
     const refresh = () => {
       waiting.reload();
       notes.reload();
+      plans.reload();
     };
     const timer = window.setInterval(refresh, 5_000);
     window.addEventListener("focus", refresh);
@@ -94,9 +97,9 @@ export function App() {
       window.clearInterval(timer);
       window.removeEventListener("focus", refresh);
     };
-  }, [waiting.reload, notes.reload]);
+  }, [waiting.reload, notes.reload, plans.reload]);
   const pending = waiting.data?.reduce((sum, s) => sum + s.pending_requests, 0) ?? 0;
-  const badges: Record<string, number> = { reading: pending, relations: notes.proposed + notes.needsUser };
+  const badges: Record<string, number> = { reading: pending, relations: notes.proposed + notes.needsUser, maintenance: plans.data?.length ?? 0 };
   const current = route[0] ?? "";
   return (
     <div className="app">

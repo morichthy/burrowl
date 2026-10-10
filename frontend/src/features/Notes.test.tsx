@@ -20,6 +20,11 @@ beforeEach(() => {
     let body: unknown = {};
     if (name === "relations.notes") body = notes;
     if (name === "relations.note_resolve") body = Object.assign(find(), { status: args.status });
+    if (name === "relations.note_edit") {
+      const note = find();
+      body = Object.assign(note, { title: args.title, text: args.text, kind: args.kind },
+        note.status === "proposed" ? { status: "queued", proposal: undefined } : {});
+    }
     if (name === "relations.note_answer") body = Object.assign(find(), { status: "queued" });
     if (name === "relations.note_reject") body = Object.assign(find(), { status: "queued", proposal: undefined });
     if (name === "relations.note_apply") {
@@ -88,5 +93,24 @@ describe("工作台笔记（R15）", () => {
     await waitFor(() => expect(lastCall("relations.note_clear")).toEqual({}));
     await waitFor(() => expect(screen.queryByText("已处理（1）")).not.toBeInTheDocument());
     expect(confirm).toHaveBeenCalledTimes(2);
+  });
+  it("已添加的笔记可以编辑；改动待确认的方案会先确认并作废方案", async () => {
+    notes = [base("WN-7", "open"), base("WN-8", "proposed", { proposal: { id: "P-3", message: "补目标", created_at: "", preview: [] } })];
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<Notes />);
+    fireEvent.click(await screen.findByRole("button", { name: "编辑 WN-7" }));
+    fireEvent.change(screen.getByLabelText("笔记标题"), { target: { value: "改过的标题" } });
+    fireEvent.change(screen.getByLabelText("笔记内容"), { target: { value: "补充说明" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(lastCall("relations.note_edit")).toMatchObject({ note_id: "WN-7", title: "改过的标题", text: "补充说明" }));
+    expect(await screen.findByText("改过的标题")).toBeInTheDocument();
+    expect(confirm).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "编辑 WN-8" }));
+    expect(screen.getByText(/保存后当前方案作废/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(lastCall("relations.note_edit")).toMatchObject({ note_id: "WN-8" }));
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText("AI 处理中（1）")).toBeInTheDocument();
   });
 });
