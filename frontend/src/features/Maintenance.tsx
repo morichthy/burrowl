@@ -556,6 +556,14 @@ function RootsPanel() {
   );
 }
 
+// 敏感级别的中文说明；restricted 与停用效果相同：不能读取，依据它的记录被隐去
+const SENSITIVITY = [
+  ["public", "public 公开"],
+  ["internal", "internal 内部"],
+  ["confidential", "confidential 机密"],
+  ["restricted", "restricted 受限（不可读取）"],
+] as const;
+
 function SourcesPanel() {
   const sources = useOp<SourceEntry[]>("sources.list");
   const update = useAction("sources.update");
@@ -598,19 +606,34 @@ function SourcesPanel() {
                     (await update.run({ source_id: s.source_id, sensitivity: e.target.value as "internal" })) && sources.reload()
                   }
                 >
-                  {["public", "internal", "confidential", "restricted"].map((v) => (
-                    <option key={v}>{v}</option>
+                  {SENSITIVITY.map(([v, text]) => (
+                    <option key={v} value={v}>
+                      {text}
+                    </option>
                   ))}
                 </select>
               </td>
               <td>
-                <button
-                  type="button"
-                  className={`small ${s.enabled ? "" : "primary"}`}
-                  onClick={async () => (await update.run({ source_id: s.source_id, enabled: !s.enabled })) && sources.reload()}
-                >
-                  {s.enabled ? "停用" : "启用"}
-                </button>
+                {/* 先写当前状态，再给操作按钮：按钮上的字是"要做的事"，单独出现时容易被读成状态 */}
+                <div className="source-state">
+                  {!s.enabled ? (
+                    <Tag tone="bad">已停用</Tag>
+                  ) : s.sensitivity === "restricted" ? (
+                    <Tag tone="warn">受限</Tag>
+                  ) : (
+                    <Tag tone="good">可读取</Tag>
+                  )}
+                  <button
+                    type="button"
+                    className="small"
+                    aria-label={`${s.enabled ? "停用" : "重新启用"} ${s.source_id}`}
+                    title={s.enabled ? "停用后不能读取，依据它的记录在检索和关系图中隐去" : "恢复读取，依据它的记录重新出现"}
+                    onClick={async () => (await update.run({ source_id: s.source_id, enabled: !s.enabled })) && sources.reload()}
+                  >
+                    {s.enabled ? "停用" : "重新启用"}
+                  </button>
+                </div>
+                {s.enabled && s.sensitivity === "restricted" ? <div className="hint">敏感级别为 restricted，不可读取</div> : null}
               </td>
             </tr>
           ))}

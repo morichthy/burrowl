@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ReadingDetail } from "./reading/ReadingDetail";
 import { ReadingList } from "./reading/ReadingList";
@@ -290,13 +290,24 @@ describe("维护与监测", () => {
     handlers["monitor.observations"] = () => [];
     handlers["monitor.candidates"] = () => [{ target_id: "MEM-1", status: "open", first_seen: "2026-10-08T00:00:00Z", last_seen: "2026-10-08T00:00:00Z" }];
     handlers["monitor.run"] = (args) => ({ at: "x", changes: [{ kind: "file", target_id: "SRC-1" }], errors: [], maintenance_candidates: ["MEM-1"], baseline_updated: !args.dry_run, dry_run: args.dry_run });
-    handlers["sources.list"] = () => [{ source_id: "SRC-1", path: "a.txt", title: "a", enabled: true, sensitivity: "internal", sha256: "x" }];
+    handlers["sources.list"] = () => [
+      { source_id: "SRC-1", path: "a.txt", title: "a", enabled: true, sensitivity: "internal", sha256: "x" },
+      { source_id: "SRC-2", path: "b.txt", title: "b", enabled: false, sensitivity: "internal", sha256: "y" },
+      { source_id: "SRC-3", path: "c.txt", title: "c", enabled: true, sensitivity: "restricted", sha256: "z" },
+    ];
     handlers["sources.update"] = () => ({});
     render(<Maintenance />);
     fireEvent.click(await screen.findByRole("button", { name: "预览扫描" }));
     expect(await screen.findByText(/预览（未记录）：1 处变化/)).toBeInTheDocument();
     expect(calls.find((c) => c.name === "monitor.run")!.args).toEqual({ dry_run: true });
-    fireEvent.click(await screen.findByRole("button", { name: "停用" }));
+    // 状态与操作分开：标签写当前状态，按钮写要做的事
+    const row = (id: string) => within(screen.getByText(id).closest("tr")!);
+    expect(await screen.findByText("SRC-2")).toBeInTheDocument();
+    expect(row("SRC-1").getByText("可读取")).toBeInTheDocument();
+    expect(row("SRC-2").getByText("已停用")).toBeInTheDocument();
+    expect(row("SRC-2").getByRole("button", { name: "重新启用 SRC-2" })).toBeInTheDocument();
+    expect(row("SRC-3").getByText("受限")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "停用 SRC-1" }));
     await waitFor(() => expect(calls.some((c) => c.name === "sources.update")).toBe(true));
     expect(calls.find((c) => c.name === "sources.update")!.args).toEqual({ source_id: "SRC-1", enabled: false });
   });
