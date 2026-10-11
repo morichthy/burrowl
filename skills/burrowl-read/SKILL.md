@@ -24,7 +24,7 @@ requires_tools: [reading_start, reading_assess, reading_peek, reading_read, read
 ## 阅读策略（在 reading_start 时选；之后只有用户能切换）
 
 - **standard**（默认）：筛选对象，再逐个完整阅读。
-- **associative**：原问题没有充分解决时，主 Agent 根据笔记中的缺口和线索制定联想方向，用 `reading_recall(mode=association)` 补查。受轮数上限约束。
+- **associative**：在 standard 的基础上可以**联想**（图扩展）：本轮相关对象读完、笔记写好后，从笔记出处出发、只沿跨对象的边走一跳，把新候选交给筛选。受轮数上限约束，见下文"联想（图扩展）"。
 - **quick**：只依据召回片段，不读全文，结论中要写明"非全文覆盖"。
 
 ## 步骤
@@ -39,14 +39,18 @@ requires_tools: [reading_start, reading_assess, reading_peek, reading_read, read
    - **irrelevant**：明确无关。
    - 首批不相关，不代表后面的批次也不相关，要继续判断返回的下一批。
    - quick 策略还要在 `accepted_windows` 列出可以作为笔记依据的窗口。
+   - 窗口按 `kind` 区分：普通记录窗口、**结论**（陈述、范围、复核徽标）、**关联**（两端标题与说明）、**关系线索**（`kind=relation`，图扩展带来的候选，写明经由什么关系与你读过的材料相连）。它们都是判断相关性的线索，不是已读正文；关联和关系线索不能写进 supports 证据。矛盾（contradicts）线索优先考虑：反例往往决定结论的适用边界。
 3. **`reading_read`**：standard/associative 逐个读 relevant 对象。第 1 页附目录，按 `unread_pages` 读完全部页；quick 跳过此步，只用已采纳的窗口写笔记。
    - 图片、L0、Run 先保留固定引用，需要解释图形或复算时再展开。没展开的不能写成"已核验"。
    - 返回 STALE_BASIS 说明对象刚有新提交，从第 1 页重读。
-4. **`reading_note`**：完整阅读结束后（quick 为采纳窗口后），每个对象写一篇研究笔记（写法见下）；quick 明确写出“非全文覆盖”。跨对象的新认识用 `reading_synthesize`。
+   - 图扩展带来的对象默认**定点阅读**（`scope=targets`）：只交付被关系指到的节点及其必要上下文，读完定点页即可写笔记，笔记只能引用这些节点。只有定点内容不足以判断、且确有必要了解整个对象时，才 `reading_read(scope=full)` 升级为整读，并在笔记中说明原因；整读计入会话的整读对象上限。
+4. **`reading_note`**：完整阅读结束后（quick 为采纳窗口后），每个对象写一篇研究笔记（写法见下）；quick 明确写出“非全文覆盖”。跨对象的新认识用 `reading_synthesize`，并写明各对象经由哪种关系联系起来。
+   - **出处要细**：`sources` 引用到真正支撑内容的 L1 块（`MEM-…#块`）或结论（`CLM-…`），不要只写整条记录。出处也是联想的出发点，把整个对象的记录都列进去，等于放弃了筛选。
+   - **扩展锚点**（可选，associative 才有用）：值得顺着关系去追的出处写进 `expand_from`（最多 3 个，每个写明 why，例如"该块引用了另一项目的实测结果""该结论有待查的反例"）。没有值得追的就不写。
 5. **依据不足时**：
    - 响应中 `fulltext_available=true`（说明发现召回不可用、不完整或不足）时，可以 `reading_ask_user(kind=fulltext)` 申请全文补偿。用户批准后，用得到的 `approval_id` 调 `reading_recall(mode=fulltext)`。
-   - associative 策略：先制定具体的子问题和关键词，再 `reading_recall(mode=association, association_text=…)`。
-   - 想换一种问法重新找：新开一个 `reading_start`。`reading_recall` 不做改写重查。
+   - associative 策略：本轮相关对象都已读完、笔记已写时，`reading_recall(mode=association, focus=…)` 做一轮联想，见下文。
+   - 需要扩大检索（放宽条件、去掉限定词或型号、换更宽的问题）：先 `reading_ask_user(kind=broaden)` 写清新问法、理由与预期，用户批准后用 `approval_id` 调 `reading_recall(mode=broaden, question=…)`。等义改写、补保护词、改错别字不算扩大。不要新开 `reading_start` 绕过审批。
    - 达到轮数或范围上限、或者没有新的有效依据时，保留缺口并停止。
 6. **`reading_finish(outcome=…)`**：结束会话，取回交接内容（笔记、固定出处、缺口）。
    - 陈旧的笔记（对象在写笔记后有新提交）不会交付。
@@ -66,11 +70,14 @@ requires_tools: [reading_start, reading_assess, reading_peek, reading_read, read
 - **写完自查**：核心公式是否完整，变量、单位、条件是否保留，数字和图是否有出处，反例和限制是否遗漏。缺的先补，原文没有的写进限制，不编造。
 - 笔记有 token 上限，超出会被整篇省略。先删重复和无关内容，不要把连贯论述压成提纲。
 
-## 联想的边界
+## 联想（图扩展）
 
-- 联想问题和关键词由主 Agent 制定，阅读者只按给定文本检索，并报告材料中的线索。
-- 联想线索不能写进 supports 证据，采纳导航也不会提升复核状态。
-- 跨领域类比要写明共享的问题结构和不能迁移的边界。
+- **是什么**：从你在笔记中引用的出处出发（`expand_from` 锚点优先，其余出处权重较低），只沿跨对象的边走一跳，按与焦点的相关度给新对象打分，取前几个作为下一批候选。对象内部的关系已经包含在整读里，不扩展；已在会话中的对象不再提议。
+- **时机**：只在 associative 策略下；本轮判为相关的对象都已读完、笔记已写，问题仍有缺口时。没写笔记就没有种子，调用会被拒绝。
+- **焦点**：`focus` 写一句**当前还缺什么**（例如"缺少长记录上 late 与 windows 的实测对比"），不要重复原问题。它只用于给图邻居排序，不召回新范围，不需要审批。用户在工作台补充的方向会自动作为焦点。
+- **之后**：对新候选照常 `reading_assess`；判为相关的默认定点阅读；新笔记的出处成为下一轮的种子。每次只走一跳。
+- **停止**：达到轮数上限、没有新候选、新候选都判为无关，或连续一轮没有得到新的有效依据。保留缺口并结束，不要为了"找全"无限扩展。
+- **边界**：关系线索和联想得到的线索不能写进 supports 证据，采纳导航也不会提升复核状态；跨领域类比要写明共享的问题结构和不能迁移的边界。
 
 ## 委派
 

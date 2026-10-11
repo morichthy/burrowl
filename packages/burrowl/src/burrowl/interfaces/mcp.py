@@ -35,7 +35,9 @@ query_*、memory_owners、memory_owner_route、memory_resume 不会建立阅读�
 方案只预演不写入，由用户在工作台执行（规则第 8 节"工作台笔记"）。
 用户交给 AI 的维护计划用 maintenance_plans(status=['queued']) 查看，用 maintenance_review 写处置；执行由用户在工作台完成。
 要点：候选不是已读正文；保存≠复核≠索引就绪；引用一律用固定版本（提交回执给出 fixed_ref）；
-AI 自查不能登记为已确认；全文补偿必须先 reading_ask_user 获得用户批准。"""
+AI 自查不能登记为已确认；全文补偿与扩大检索（放宽条件、换更宽的问题）必须先 reading_ask_user 获得用户批准。
+联想 = 图扩展：associative 策略下读完并写好笔记后，从笔记出处出发沿跨对象的边扩展一跳；扩展来的对象默认定点阅读。
+关系按判断问题选（规则第 6 节）；记录的 discovery 一般不写，知识记录默认全库可见。"""
 
 AUTO = """burrowl 已为本对话启用（{why}）：AI 研发工作区的版本化记忆、材料阅读、复核与知识中枢。
 - 数据目录：{data}。记忆记录、文稿、阅读会话、Run 登记都存在这里，只能通过本服务的工具读写，不要直接改其中的文件。

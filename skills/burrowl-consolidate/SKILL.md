@@ -57,6 +57,8 @@ requires_tools: [memory_inspect, memory_document, memory_timeline, memory_contra
 6. **关联与概念**：
    - 用 `relations_candidates(owner_id=…)` 看保存后自动算出的线索（正文提到概念却没链接、向量近邻），也可以用 `relations_similar` 补充。逐条判断：该链接的改写正文加 `[[…]]`，值得放在一起看的 `relations_decide` 保存（带 certainty），不相关的保存为 rejected（以后不再出现）。
    - 类比（analogous_to）必须写共享结构和迁移边界；"A 会影响 B"写成结论，不写成关联。关联只是导航，不进入证据。
+   - 关联的说明会进入检索：只写"相关"的旧关联，读过两端后补写为什么值得一起看（RECORDING 第 6 节）。
+   - `memory_consolidate_prepare` 的候选里 `relation_vocabulary` 是使用了非推荐关系名的记录：按 RULES 第 6 节的判断问题改用推荐关系名后修订；确有理由保留的在修订原因里写明，或保持不动。
    - **维护概念库**（全库唯一的 knowledge 对象；配置 `graph.concept_owner_id` 为空时，先问用户后用 `memory_owner_create(owner_type="knowledge")` 建立并用 `config_update` 填入）：
      - `index_gaps` 里的 missing_concept 是写了链接但还没有概念页的名字。只为被实质讨论过、或至少出现在两条记录中的概念建页，正文可以只是一句定义加适用领域（`domains`）。
      - 建页前先查名称、别名和相近概念，按"相关不等于相同"判断：相同就加别名或合并（被并页 `status=merged` + `merged_into`），同名不同义用限定名（如"收敛（数值）"），一个概念其实是两个就拆分（`status=split` + `split_into`）。从不删除概念页。

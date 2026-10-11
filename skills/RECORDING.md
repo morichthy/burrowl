@@ -94,10 +94,10 @@ $S_{\mathrm{ref}}=\sum_i \operatorname{Fraction}(x_i)$，$e_{\mathrm{abs}}=|\ope
 需要被复核、被正式引用的判断写进 `payload.claims`（L1 只写 fact / calculation，L2–L4 不限），每条包含：
 
 - `claim_id`：全库唯一，建议 `CLM-<对象>-<短名>`。
-- `statement`：一句可判断真假的话。
+- `statement`：一句可判断真假、能被单独读懂的话：主体、条件、结果都写出来，例如"在有限 binary64、存在大数抵消的输入下，补偿求和仍可能丢失小量"。不写"如上所述""该方法"这类依赖上下文的指代——结论会被单独检索到。
 - `kind`：fact / calculation / inference / recommendation。
 - `scope`：适用范围。
-- `evidence_refs`：支持它的固定引用（relation 用 supports 或 input）。
+- `evidence_refs`：依据的固定引用。relation 只用 supports（能证明）、contradicts（是反例）、input（作为输入的数据）。
 
 - 可选 `relation`：结论是"主体—谓词—对象"形式时填写，例如 `{subject: "[[补偿求和]]", predicate: "fails_on", object: "[[大数抵消]]"}`。谓词用 improves / degrades / causes / prevents / fails_on / applies_to / requires / equivalent_to / contradicts / part_of，或以 `x-` 开头自定义。条件始终留在 scope 里，图上的"补偿求和 → 大数抵消"只是由这条结论派生的快捷边。
 - **scope 要具体**。"有限 binary64 输入、存在大数抵消"是好的；"一般情况下""大多数场景"不是范围。复核时确认的范围必须与 scope 一致。
@@ -114,9 +114,27 @@ $S_{\mathrm{ref}}=\sum_i \operatorname{Fraction}(x_i)$，$e_{\mathrm{abs}}=|\ope
 |---|---|---|
 | 展开 / 组成 | `process_refs`（指向 L2）、`technical_refs`（L1）、`experience_refs`（L3）；章节的 `unit` 块；文稿的 `section_refs` | 怎样从概括展开到细节 |
 | 证据 | 引用的 `relation` 为 supports、input、contradicts；claim 的 `evidence_refs` | 判断依据什么成立或被反驳 |
-| 导航 | association 记录（same_problem、same_failure_mode、analogous_to、related_to…），用 `relations_decide` 保存，带 `certainty`（speculative / plausible / supported） | 相似、对照、可能迁移；**不是证据** |
+| 导航 | association 记录（related_to、same_problem、same_failure_mode、analogous_to），用 `relations_decide` 保存，带 `certainty`（speculative / plausible / supported） | 相似、对照、可能迁移；**不是证据** |
 
-相似度、同一对象、阅读线索都不能自动变成 supports 或复核。"值得放在一起看"写成关联；"A 会影响 B"这类可以验证的判断写成结论（kind=inference），再链接两端。
+相似度、同一对象、阅读线索都不能自动变成 supports 或复核。"值得放在一起看"写成关联；"A 会影响 B"这类可以验证的判断写成结论（kind=inference），再链接两端。怎样按判断问题选关系见 RULES 第 6 节。
+
+**关系名只用这几个**（按写在哪里；其他关系名仍可读取，但提交和 dry_run 会返回 `RELATION_NOT_RECOMMENDED` warning，收口时会被列出）：
+
+| 写在哪里 | 可选 | 默认 |
+|---|---|---|
+| 结论、L2 阶段的 `evidence_refs` | supports、contradicts、input | supports |
+| 记录的 `sources` 与 payload 中其他固定引用 | supports、contradicts、input、references | references |
+| 关联的 `relation` | related_to、same_problem、same_failure_mode、analogous_to | related_to |
+| 结论的 `relation.predicate` | 开放词表，推荐 improves、degrades、causes、prevents、fails_on、applies_to、requires、equivalent_to、contradicts、part_of | — |
+| 正文链接、结构关系（归属、包含、块依赖） | 程序决定，不用选 | — |
+
+收到 warning 时改用推荐的关系名；确有理由保留时，在 `record_reason` 或 `change_reason` 中写明。
+
+**关联的说明要能被单独读懂**（关联会进入检索，被其他项目直接搜到）：
+
+- `explanation` 写清"为什么值得一起看"，并点明两端各自是什么，例如"两者都在长记录上比较切分方式：A 是方案讨论（未实测），B 是评测题集与实测结果"。不要只写"相关""参考"。
+- 确定度：只凭标题或印象 → speculative；读过两端、能说清共同点 → plausible；有材料直接支持这一联系 → supported。
+- analogous_to 必须写 `shared_structure`（共同的问题结构）和 `transfer_limits`（不能迁移的边界）。
 
 **正文链接**（知识节点之间的可读链接，提交时由服务解析并固定版本，写进记录的 `links`；正文里不出现 ID 或哈希）：
 
@@ -150,7 +168,14 @@ $S_{\mathrm{ref}}=\sum_i \operatorname{Fraction}(x_i)$，$e_{\mathrm{abs}}=|\ope
 3. 看回执：`save_status` 和 `index_status` 是两件事。索引 pending 说明内容已保存，**不要换新 request_id 重复提交**，等它补齐或调用 `index_reconcile`。
 4. 用 `memory_inspect` 回读本次修订，按第 2 节逐条检查。
 
-## 8. 文稿
+## 8. 可见范围（discovery）
+
+- **一般不写**，由程序按记录类型给默认值：知识记录（L1–L4、关联、概念页）全库可见（workspace_summary）；目标、检查点、路线、问题等工作状态只在本对象可见（owner_only）。对象策略显式设置时以对象为准。
+- 用户要求保密时显式写 `owner_only`。
+- 不要把工作状态改成全库可见：它们由归属判定和续接按位置读取，不是知识；要跨对象复用就写成 L3 或结论。
+- 修订记录时不写会沿用原值；要改变可见范围就显式写出，并在 `change_reason` 中说明。
+
+## 9. 文稿
 
 - 文稿根（document）按 `section_refs` 的顺序编排章节（document_section）。章节由作者写的衔接文字（prose，带依据）和整块收录的技术单元（unit）组成。
 - research_process 是完整过程稿，research_report 是精简报告。按实际交付需要编写，可以只有一种；交付两种时依据必须一致。

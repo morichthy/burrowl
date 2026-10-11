@@ -60,6 +60,7 @@
 - **关联何时建立**：判定和续接时觉得"可能相关"的对象，不直接写成记录或关联。
   - 已能确定的（用户指定；本次原件已被对方引用，且读过确认）在写第一条相关记录时引用。
   - 其余留在阅读笔记的 `clues` 和工作清单里；某一轮实际读完、验证后，再写记录并引用交接给出的固定引用，或用 `relations_decide`。
+  - 关系怎么选见第 6 节；写成记录时，关系陈述要能被单独读懂（RECORDING 第 5、6 节），因为它们会被检索到。
 - **类型**：
   - `memory_owner_create` 能建 research、project、core-algorithm、data、tool、report；
   - Run 只用 `runs_create` 建立；
@@ -158,7 +159,22 @@ AI 可以自主保存工作记录和候选结论，不需要用户逐次批准"�
 - 关键判断旁就近引用固定依据，三种关系（展开、证据、导航）分开，见 RECORDING 第 6 节。
 - `review_filter`：all（默认，结果带复核徽标）/ reviewed_only / exclude_unsafe / unreviewed_only。正式用途（`purpose=formal`、`provenance_formal`）只用在指定范围内已确认的结论，由程序强制。
 - **来源数不等于独立支持数**：多条引用可能来自同一份原件，用 `provenance_lineage` 查。
-- **关联还是结论**："值得放在一起看"写成关联（`relations_decide`，说不清关系时用 related_to，确定度从 speculative 起）；"A 会影响 B"这类可以验证的判断写成结论（kind=inference，成熟度从 conjecture 起），再用链接连到两端。关联和链接都不是证据。
+- **按判断问题选关系，不按名字猜**（写在哪里、可选哪些见 RECORDING 第 6 节；超出推荐范围的关系名会返回 warning）：
+
+  | 判断问题 | 写成什么 |
+  |---|---|
+  | 这份材料能证明我的判断吗？ | `supports`，写在结论的 `evidence_refs` |
+  | 这份材料与我的判断矛盾、是反例吗？ | `contradicts`，同上；并按第 4 节考虑把对方结论标为 disputed |
+  | 它是分析用的输入数据吗？ | `input` |
+  | 只是参考、背景或出处，不构成证据？ | `references`，写在 `sources` |
+  | 两条材料值得放在一起看，但说不出可验证的关系？ | 关联 `related_to`（`relations_decide`，确定度从 speculative 起） |
+  | 能说清它们是同一个问题、同一种失效模式？ | 关联 `same_problem` / `same_failure_mode` |
+  | 是跨领域的类比？ | 关联 `analogous_to`，必须写共同结构与迁移边界 |
+  | "A 会影响 B"，可以被验证或推翻？ | 结论（kind=inference，成熟度从 conjecture 起），用 `relation` 写主体–谓词–对象，再链接两端 |
+
+  - 不为"多连几条边"而写关系，每条关系都要能回答"为什么"。关联和链接都不是证据。
+  - 结论与关联是**关系陈述**：会进入检索，被其他项目直接搜到；supports 等引用是**关系指向**，在联想（图扩展）时显示为关系线索。
+- **可见范围（discovery）一般不写**：知识记录（L1–L4、关联、概念页）默认全库可见，目标、检查点、路线、问题等工作状态默认只在本对象可见。用户要求保密时显式写 `owner_only`，或请用户在对象策略中整体设定；不要把工作状态改成全库可见（跨对象复用的内容写成 L3 或结论）。修订时不写会沿用原值。
 - 索引 pending 说明结果可能不完整，不能写成"没有相关材料"。
 
 ## 7. 语言与表述
@@ -173,7 +189,8 @@ AI 可以自主保存工作记录和候选结论，不需要用户逐次批准"�
 
 只在方向、成本或权限需要用户决定时才问，不按次数打断。
 
-- 阅读中的全文补偿、联想方向、问题澄清，用 `reading_ask_user`。用户可以在对话里答，也可以在工作台答。
+- 阅读中的全文补偿、扩大检索、联想方向、问题澄清，用 `reading_ask_user`。用户可以在对话里答，也可以在工作台答。
+- **扩大检索要先问用户**：放宽字段条件、去掉限定词或型号、把问题改成更宽泛的主题、换一个不等义的问题，都必须先 `reading_ask_user(kind=broaden)`，说明新问法、理由和预计多带来哪类材料；用户批准后才 `reading_recall(mode=broaden)`。为原问题写等义改写或英文改写、补上漏写的保护词、改错别字不算扩大。不要通过新开 `reading_start` 换更宽的问题绕过审批。
 - 发布到知识中枢、批量修订等影响较大的操作，先给出预览，由用户确认。
 
 ### 工作台笔记
@@ -204,7 +221,9 @@ AI 可以自主保存工作记录和候选结论，不需要用户逐次批准"�
 - **expected_head / expected_revision**：提交时声明看到的版本，不一致就被拒绝。
 - **request_id**：请求的 UUID，重试时沿用。
 - **client_key**：批内新记录的临时名。
-- **discovery**：owner_only 只在指定对象时可见；workspace_summary 全库可见。
+- **discovery**：owner_only 只在指定对象时可见；workspace_summary 全库可见。知识记录默认后者，工作状态默认前者。
+- **关系陈述 / 关系指向**：结论、关联自带文字，进检索；supports、references 等引用只说明谁与谁有关系，在图扩展时显示为关系线索。
+- **联想（图扩展）**：associative 策略下，从笔记出处（扩展锚点优先）出发、只走跨对象的边一跳，把新候选交给筛选；扩展来的对象默认定点阅读。
 - **sensitivity**：public / internal / confidential / restricted，restricted 不进索引、不发布。
 - **筛选包**：判断对象是否相关的 2–4 个窗口。
 - **RS**：阅读会话。
