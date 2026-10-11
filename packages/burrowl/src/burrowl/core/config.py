@@ -35,7 +35,8 @@ class Budget(_Model):
 
 
 def reading_budget() -> Budget:
-    return Budget(candidates=1000, model_calls=20, model_tokens=65536, model_input_tokens=65536, rerank_items=100)
+    return Budget(candidates=1000, model_calls=20, model_tokens=65536, model_input_tokens=65536, rerank_items=100,
+                  graph_edges=1000)
 
 
 class Collaboration(_Model):
@@ -52,8 +53,14 @@ class QueryDefaults(_Model):
 
 
 class Association(_Model):
+    """联想 = 按对象的一跳图扩展（R19 D-06、D-11）。默认值是初值，等真实题集建成后再调。"""
     enabled: bool = True
     max_rounds: int = Field(3, ge=1, le=20)
+    expand_owners: int = Field(5, ge=1, le=20, description="每轮最多新增的候选对象")
+    min_score: float = Field(0.2, ge=0, le=10, description="候选对象的最低分（图分数 × 焦点相关度之和）")
+    concept_max_degree: int = Field(20, ge=0, le=1000, description="度数不超过它的概念、来源才能中转（热门概念不中转）")
+    target_nodes: int = Field(3, ge=1, le=10, description="每个候选对象的关系窗口与定点阅读节点上限")
+    target_pages: int = Field(2, ge=1, le=10, description="每个候选对象定点阅读的页数上限")
 
 
 class ReadingContext(_Model):

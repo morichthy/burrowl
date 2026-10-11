@@ -1,7 +1,7 @@
 """阅读会话服务。agent 侧约 6–9 次调用完成一次标准阅读；用户侧通过工作台写入收件箱。
 
 agent：start → assess（可多批）→ read（逐个相关对象，按页读完）→ note → [synthesize] → finish
-辅助：peek（看不确定对象的更多窗口）、recall（全文补偿需用户批准 / 联想补查）、ask_user、status、delegate
+辅助：peek（看不确定对象的更多窗口）、recall（全文补偿与扩大检索需用户批准 / 联想 = 图扩展）、ask_user、status、delegate
 用户：respond（批准/拒绝/回答）、override（改判对象）、direct（补充联想方向）、configure、abort、archive
 
 程序保证的规则（agent 不需要自己记）：
@@ -11,6 +11,8 @@ agent：start → assess（可多批）→ read（逐个相关对象，按页读
 - note 的出处必须是已交付材料，正文提到的 ID 必须列入出处；保存时补全为固定引用。
 - 交接时重新核对对象 HEAD：陈旧笔记不交付，依据它的综合稿失效。
 - 全文补偿只在发现召回不可用、不完整或不足时可申请，且必须带用户批准的 approval_id。
+- 扩大检索（放宽条件、换更宽的问题）必须带用户批准的 approval_id（R19 D-07）。
+- 联想 = 从笔记出处（锚点优先）出发、只走跨对象边的一跳图扩展；扩展来的对象默认定点阅读（R19 D-06、D-11）。
 - 写操作可带 request_id：重试同一个 request_id 返回原结果，不会重复消耗联想轮数或预算。
 """
 import time
@@ -21,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from ...core.clock import utc_now
-from ...core.config import BurrowlConfig
+from ...core.config import Association, BurrowlConfig
 from ...core.errors import BurrowlError
 from ...core.hashing import canonical_hash
 from ...index import conditions as field_conditions
@@ -31,14 +33,24 @@ from ...storage.owners import require_knowledge_scope
 from ..indexing import IndexService
 from ..memory import concepts
 from ..memory.context import Storage
-from . import notes, screening, text
+from . import expand, notes, screening, text
 from .reuse import ScreenReuse
 from .session import STRATEGIES, VERDICTS, SessionStore, new_session
 
 AGENT_CLOSED = {"finished": "已结束", "aborted": "已被用户中止", "archived": "已归档"}
 DECISION_WORDS = {"approve": "批准", "deny": "拒绝", "answer": "回答"}
 APPLIED_KEEP = 64  # 记住最近多少个 request_id 的结果
-BUDGET_KEYS = ("candidates", "rerank_items", "wall_ms")
+BUDGET_KEYS = ("candidates", "rerank_items", "wall_ms", "graph_edges")
+MAX_ANCHORS = 3  # 每篇笔记最多的扩展锚点（R19 D-06）
+
+
+def _source_ref(refs: dict[str, dict], source: str) -> dict:
+    """笔记出处 → 固定引用：块出处用记录引用加块定位；结论有自己的引用（R19 D-12）。"""
+    record_id, _, block = source.partition("#")
+    ref = refs.get(source) or refs.get(record_id)
+    if ref is None:
+        return {"target_id": source}
+    return ref | {"locator": f"block:{block}"} if block and ref.get("target_kind") == "record" else ref
 
 
 def _event(session: dict, action: str, summary: str, **extra: Any) -> None:
@@ -162,7 +174,7 @@ class ReadingService:
             return result
         owners, gaps = screening.recall(self.index, plan, corpus=corpus, owner_ids=owner_ids,
                                         review_filter=review_filter, exclude=set(exclude),
-                                        graph_route=config.index.graph_route, readiness=state["readiness"])
+                                        graph_route=None, readiness=state["readiness"])  # R19 D-08：阅读不走 RRF 图路线
         packets, diagnostics = screening.packets(self.index, plan, owners, regular=screening_cfg["regular_windows"],
                                                  maximum=screening_cfg["max_windows"], reranking=reranking,
                                                  reranker_path=self.reranker_dir, conditions=conditions)
@@ -219,12 +231,17 @@ class ReadingService:
             if owner_id in session["owners"]:
                 continue
             packet = packets[owner_id]
-            refs = {w["record_id"]: w["ref"] for w in packet["windows"] + packet["extra_windows"]}
+            # 关系窗口（kind=relation）只是线索：不进入可引用身份，也没有固定引用（R19 §4.5）
+            content = [w for w in packet["windows"] + packet["extra_windows"] if w.get("record_id")]
+            refs = {w["record_id"]: w["ref"] for w in content}
             session["owners"][owner_id] = {"title": packet["title"], "round": round_["id"], "rank": rank,
                                            "packet": packet, "verdict": None, "reason": "", "judged_by": None,
-                                           "delivered": sorted({w["record_id"] for w in packet["windows"]}),
+                                           "delivered": sorted({w["record_id"] for w in packet["windows"]
+                                                                if w.get("record_id")}),
                                            "refs": refs, "accepted": [], "basis_head": None,
-                                           "pages_read": [], "total_pages": None, "note": None}
+                                           "pages_read": [], "total_pages": None, "note": None,
+                                           "origin": packet.get("origin", "recall"),
+                                           "targets": packet.get("targets"), "read_scope": None}
             session["queue"].append(owner_id)
         consumed = session.setdefault("consumed", {})
         for key, value in round_.get("cost", {}).items():
@@ -340,7 +357,8 @@ class ReadingService:
         session, extra = self._agent_update(session_id, change)
         return self._envelope(session, extra)
 
-    def read(self, session_id: str, owner_id: str, page: int = 1) -> dict:
+    def read(self, session_id: str, owner_id: str, page: int = 1, *, scope: str | None = None) -> dict:
+        """scope：扩展来的对象默认 targets（定点阅读）；full 升级为整读，计入整读对象上限（R19 D-11）。"""
         session, _revision = self.sessions.read(session_id)
         state = session["owners"].get(owner_id)
         if state is None:
@@ -349,19 +367,40 @@ class ReadingService:
             raise BurrowlError("INVALID_TRANSITION", "quick 模式只依据召回片段，不读全文")
         if state["verdict"] != "relevant":
             raise BurrowlError("INVALID_TRANSITION", "只能完整阅读判为相关的对象（可先 assess 或请用户改判）")
-        opened = [o for o, s in session["owners"].items() if s["pages_read"]]
-        if owner_id not in opened and len(opened) >= session["context"]["max_owners"]:
-            raise BurrowlError("BUDGET_EXCEEDED", "已达到本会话可完整阅读的对象上限", {"max_owners": session["context"]["max_owners"]})
+        if scope not in {None, "targets", "full"}:
+            raise BurrowlError("INVALID_ARGUMENT", "scope 只能是 targets 或 full")
+        targeted = bool(state.get("targets"))
+        if scope == "targets" and not targeted:
+            raise BurrowlError("INVALID_ARGUMENT", "只有图扩展带来的对象可以定点阅读")
+        # 升级前已在阅读中的会话没有 read_scope：有阅读进度的按整读处理，不清空已读页
+        current_scope = state.get("read_scope") or ("full" if state["pages_read"] else None)
+        mode = scope or current_scope or ("targets" if targeted else "full")
+        upgrading = mode == "full" and targeted and current_scope != "full"
+        if upgrading and page != 1:
+            raise BurrowlError("INVALID_ARGUMENT", "升级为整读时从第 1 页读起")
+        if mode == "full":  # 定点阅读不计入整读对象上限
+            opened = [o for o, s in session["owners"].items() if s["pages_read"] and s.get("read_scope") != "targets"]
+            if owner_id not in opened and len(opened) >= session["context"]["max_owners"]:
+                raise BurrowlError("BUDGET_EXCEEDED", "已达到本会话可完整阅读的对象上限",
+                                   {"max_owners": session["context"]["max_owners"]})
         head = self._head(owner_id)
         if head is None:
             raise BurrowlError("ACCESS_DENIED", "该对象当前不可读", {"owner_id": owner_id})
         restarted = state["basis_head"] is not None and state["basis_head"] != head
         if restarted and page != 1:
             raise BurrowlError("STALE_BASIS", "对象在阅读期间有新提交，请从第 1 页重新阅读", {"owner_id": owner_id})
-        content = text.page_of(self.storage, owner_id, page)
+        if mode == "targets":
+            max_pages = session["association"].get("target_pages", self.config().reading.association.target_pages)
+            content = text.target_page_of(self.storage, owner_id, state["targets"], page, max_pages)
+        else:
+            content = text.page_of(self.storage, owner_id, page)
 
         def change(current: dict) -> dict:
             owner = current["owners"][owner_id]
+            if (owner.get("read_scope") or ("full" if owner["pages_read"] else None)) != mode:
+                owner.update(read_scope=mode, pages_read=[], basis_head=None)  # 定点与整读分别从第 1 页读起
+                if upgrading:
+                    _event(current, "read_full", f"{owner_id} 升级为整读")
             if owner["basis_head"] != head:  # 首次阅读或对象更新后从头读：固定新的依据版本
                 owner.update(basis_head=head, pages_read=[])
             owner["pages_read"] = sorted(set(owner["pages_read"]) | {page})
@@ -369,16 +408,29 @@ class ReadingService:
             owner["delivered"] = sorted(set(owner["delivered"]) | set(content["ids"]))
             owner["refs"].update({r["target_id"]: r for r in content["refs"]})
             current["phase"] = "reading"
-            _event(current, "read", f"阅读 {owner_id} 第 {page}/{content['total_pages']} 页")
+            label = "定点阅读" if mode == "targets" else "阅读"
+            _event(current, "read", f"{label} {owner_id} 第 {page}/{content['total_pages']} 页")
             remaining = sorted(set(range(1, content["total_pages"] + 1)) - set(owner["pages_read"]))
-            return content | {"restarted": restarted, "unread_pages": remaining,
+            return content | {"restarted": restarted, "unread_pages": remaining, "scope": mode,
                               "next": f"继续阅读第 {remaining[0]} 页" if remaining else "已读完，写研究笔记（reading_note）"}
         session, extra = self._agent_update(session_id, change)
         return self._envelope(session, extra)
 
     def note(self, session_id: str, owner_id: str, note: str, sources: list[str], *,
-             clues: list[str] | None = None, request_id: str | None = None) -> dict:
+             clues: list[str] | None = None, expand_from: list[dict] | None = None,
+             request_id: str | None = None) -> dict:
+        """expand_from：值得顺着追的出处（扩展锚点，R19 D-06）：[{ref, why}]，ref 必须在 sources 中，最多 3 个。"""
         head = self._head(owner_id)
+        anchors = []
+        for item in expand_from or []:
+            ref, why = (item.get("ref"), str(item.get("why", "")).strip()) if isinstance(item, dict) else (None, "")
+            if ref not in sources or not why:
+                raise BurrowlError("INVALID_ARGUMENT", "扩展锚点必须是本笔记出处中的节点，并写明原因（why）",
+                                   {"anchor": item})
+            anchors.append({"ref": ref, "why": why})
+        if len(anchors) > MAX_ANCHORS:
+            raise BurrowlError("INVALID_ARGUMENT", f"每篇笔记最多 {MAX_ANCHORS} 个扩展锚点，只标最值得追的",
+                               {"count": len(anchors)})
 
         def change(session: dict) -> dict:
             state = session["owners"].get(owner_id)
@@ -398,9 +450,10 @@ class ReadingService:
                     raise BurrowlError("STALE_BASIS", "对象在阅读后有新提交，请重新阅读再写笔记", {"owner_id": owner_id})
                 allowed, basis = set(state["delivered"]), state["basis_head"]
             check = notes.validate(note, sources, allowed, max_tokens=session["context"]["note_max_tokens"])
-            fixed = [state["refs"].get(s.split("#")[0]) or {"target_id": s} for s in sorted(set(sources))]
+            fixed = [_source_ref(state["refs"], s) for s in sorted(set(sources))]
             state["note"] = {"text": note, "sources": sorted(set(sources)), "fixed_sources": fixed,
                              "clues": [c for c in (clues or []) if c.strip()], "basis_head": basis,
+                             "expand_from": anchors,
                              "tokens": check["tokens"], "digest": canonical_hash(note)[:16], "updated_at": utc_now()}
             _event(session, "note", f"保存 {owner_id} 的笔记（约 {check['tokens']} token）")
             return {"owner_id": owner_id, **check}
@@ -429,9 +482,10 @@ class ReadingService:
 
     def ask_user(self, session_id: str, kind: str, prompt: str, options: list[str] | None = None, *,
                  request_id: str | None = None) -> dict:
-        """向用户提问。fulltext：申请全文补偿；direction：请用户定方向；clarify：澄清问题。"""
-        if kind not in {"fulltext", "direction", "clarify"}:
-            raise BurrowlError("INVALID_ARGUMENT", "kind 只能是 fulltext / direction / clarify")
+        """向用户提问。fulltext：申请全文补偿；broaden：申请扩大检索（R19 D-07）；direction：请用户定方向；
+        clarify：澄清问题。"""
+        if kind not in {"fulltext", "broaden", "direction", "clarify"}:
+            raise BurrowlError("INVALID_ARGUMENT", "kind 只能是 fulltext / broaden / direction / clarify")
 
         def change(session: dict) -> dict:
             if kind == "fulltext" and not (reasons := self._fulltext_reasons(session)):
@@ -447,45 +501,82 @@ class ReadingService:
         return self._envelope(session, extra)
 
     def recall(self, session_id: str, mode: str, *, approval_id: str | None = None,
-               association_text: str | None = None, request_id: str | None = None) -> dict:
-        """补充召回。fulltext：在全文投影上补偿，必须带用户批准的 approval_id；
-        association：按主 agent 给定的联想方向补查（仅 associative 策略，受轮数上限）。"""
+               association_text: str | None = None, focus: str | None = None, question: str | None = None,
+               variants: list[dict] | None = None, protected_terms: list[str] | None = None,
+               request_id: str | None = None) -> dict:
+        """补充召回。
+        fulltext：在全文投影上补偿，必须带用户批准的 approval_id；
+        broaden：按用户批准的新问法再召回一轮（R19 D-07），必须带 approval_id 与 question；
+        association：联想 = 图扩展（R19 D-06）。从笔记出处（锚点优先）出发只走跨对象的边一跳，按焦点 focus
+        （当前缺口；不给时用用户补充的方向，再不给用会话问题）给候选排序；仅 associative 策略，受轮数上限。"""
         session, _ = self.sessions.read(session_id)
         if request_id and request_id in session.get("applied", {}):
             return self._envelope(*self._agent_update(session_id, lambda s: None, request_id))
         self._check_budget(session)
-        if mode == "fulltext":
+        if association_text is not None:
+            raise BurrowlError("INVALID_ARGUMENT", "联想已改为图扩展，不再接受联想文本；要换更宽的问法，"
+                               "先 reading_ask_user(kind=broaden) 获得用户批准，再 reading_recall(mode=broaden)")
+        if mode in {"fulltext", "broaden"}:
             if not any(r["approval_id"] == approval_id and r["status"] == "approved" and not r.get("used")
-                       for r in session["requests"]):
-                raise BurrowlError("APPROVAL_REQUIRED", "全文补偿需要用户批准；先用 reading_ask_user(kind=fulltext) 提出申请")
-            plan, kind, corpus = session["plan"], "fulltext", "fulltext"
+                       and r["kind"] == mode for r in session["requests"]):
+                hint = "全文补偿" if mode == "fulltext" else "扩大检索"
+                raise BurrowlError("APPROVAL_REQUIRED", f"{hint}需要用户批准；先用 reading_ask_user(kind={mode}) 提出申请")
+            if mode == "fulltext":
+                plan, kind, corpus = session["plan"], "fulltext", "fulltext"
+            else:
+                if not (question or "").strip():
+                    raise BurrowlError("INVALID_ARGUMENT", "扩大检索要给出用户批准的新问法 question")
+                plan, kind, corpus = self._plan(question, variants=variants, protected_terms=protected_terms), \
+                    "broaden", "discovery"
+            round_ = self._round(session, plan, kind, corpus=corpus)
         elif mode == "association":
             association = session["association"]
             if session["strategy"] != "associative" or not association["enabled"]:
-                raise BurrowlError("INVALID_TRANSITION", "只有 associative 策略可以联想补查")
+                raise BurrowlError("INVALID_TRANSITION", "只有 associative 策略可以联想（图扩展）")
             if association["rounds_used"] >= association["max_rounds"]:
-                raise BurrowlError("BUDGET_EXCEEDED", "联想补查轮数已用完")
-            direction = association_text or association["text"]
-            if not direction.strip():
-                raise BurrowlError("INVALID_ARGUMENT", "需要联想方向文本（由主 agent 或用户给出）")
-            plan, kind, corpus = self._plan(direction), "association", "discovery"
+                raise BurrowlError("BUDGET_EXCEEDED", "联想轮数已用完")
+            if not expand.seeds(session):  # 不消耗轮数：种子来自笔记出处
+                raise BurrowlError("INVALID_TRANSITION", "没有可扩展的种子：先读完相关对象并写笔记，"
+                                   "笔记出处与 expand_from 锚点就是联想的出发点")
+            round_ = self._expansion_round(session, (focus or "").strip()
+                                           or (association.get("focus") or association.get("text") or "").strip()
+                                           or session["question"])
         else:
-            raise BurrowlError("INVALID_ARGUMENT", "mode 只能是 fulltext 或 association")
-        round_ = self._round(session, plan, kind, corpus=corpus)
+            raise BurrowlError("INVALID_ARGUMENT", "mode 只能是 fulltext / broaden / association")
 
         def change(current: dict) -> dict:
-            if mode == "fulltext":
+            if mode in {"fulltext", "broaden"}:
                 for request in current["requests"]:
                     if request["approval_id"] == approval_id:
                         request["used"] = True
             else:
                 current["association"]["rounds_used"] += 1
+                current["association"]["seeded"] = sorted(set(current["association"].get("seeded", []))
+                                                          | set(round_["seeds"]))
             self._apply_round(current, deepcopy(round_))
             current["phase"] = "screening"
             batch = self._batch(current)
-            return {"round": round_["id"], "batch": batch, "gaps": round_["gaps"]}
+            hint = ("对新候选照常判断（reading_assess）；扩展来的对象判为相关后默认定点阅读" if batch and mode == "association"
+                    else "没有新的候选：保留缺口并结束，或向用户申请扩大检索（reading_ask_user kind=broaden）"
+                    if mode == "association" else "对新候选照常判断（reading_assess）")
+            return {"round": round_["id"], "batch": batch, "gaps": round_["gaps"], "next": hint}
         session, extra = self._agent_update(session_id, change, request_id)
         return self._envelope(session, extra)
+
+    def _expansion_round(self, session: dict, focus: str) -> dict:
+        """一轮图扩展（在会话锁外计算），结果与召回轮同形，另带 seeds 与 focus。"""
+        settings = self.config().reading.association.model_dump() | {
+            k: v for k, v in session["association"].items() if k in Association.model_fields}
+        limits, used = session.get("budget") or {}, session.get("consumed") or {}
+        remaining = None if limits.get("graph_edges") is None else limits["graph_edges"] - used.get("graph_edges", 0)
+        started = time.monotonic()
+        result = expand.expand(self.index, session, focus=focus, settings=settings, reranking=session["reranking"],
+                               reranker_path=self.reranker_dir, edge_budget=remaining)
+        cost = result["cost"] | {"wall_ms": round((time.monotonic() - started) * 1000)}
+        return {"id": f"R{len(session['rounds']) + 1}", "kind": "association", "plan_id": None, "corpus": "graph",
+                "at": utc_now(), "owners": result["owners"], "packets": result["packets"], "gaps": result["gaps"],
+                "fulltext_reasons": [], "diagnostics": result.get("diagnostics", {}), "cost": cost,
+                "reused_from": None, "focus": focus, "seeds": result["seeds"]}
 
     def finish(self, session_id: str, outcome: str = "", *, request_id: str | None = None) -> dict:
         session, _ = self.sessions.read(session_id)
@@ -506,7 +597,8 @@ class ReadingService:
             session, extra = self._agent_update(session_id, lambda s: None)
             inbox, revision = extra["inbox"], extra["revision"]
         owners = [{"owner_id": o, "title": s["title"], "verdict": s["verdict"], "judged_by": s["judged_by"],
-                   "pages_read": len(s["pages_read"]), "total_pages": s["total_pages"], "has_note": bool(s["note"])}
+                   "pages_read": len(s["pages_read"]), "total_pages": s["total_pages"], "has_note": bool(s["note"]),
+                   "origin": s.get("origin", "recall"), "read_scope": s.get("read_scope")}
                   for o, s in ((o, session["owners"][o]) for o in session["queue"])]
         return {"session_id": session_id, "question": session["question"], "status": session["status"],
                 "phase": session["phase"], "strategy": session["strategy"], "owners": owners,
@@ -580,9 +672,9 @@ class ReadingService:
                                                          "summary": f"用户把 {owner_id} 改判为 {verdict}"}, change)
 
     def direct(self, session_id: str, text_: str) -> dict:
-        """补充联想方向（associative 策略的下一轮补查会使用）。"""
+        """补充联想方向：作为下一轮图扩展的焦点（R19 D-06），只用于给图邻居排序，不召回新范围。"""
         def change(session: dict) -> None:
-            session["association"]["text"] = text_
+            session["association"]["focus"] = text_
         return self._user_update(session_id, "direction", {"text": text_, "summary": f"联想方向：{text_[:40]}"}, change)
 
     def configure(self, session_id: str, *, strategy: str | None = None) -> dict:

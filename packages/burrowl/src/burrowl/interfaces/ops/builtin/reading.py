@@ -20,7 +20,8 @@ RequestId = Annotated[str | None, Field(description="可选 UUID；网络重试�
 def start(ctx: Ctx, question: Annotated[str, Field(description="要回答的问题，一句话，保留型号与数值原文")],
           conditions: Annotated[list[str] | None, Field(description="问题的前提条件（自然语言），会显示给用户")] = None,
           strategy: Annotated[Strategy | None, Field(description=(
-              "standard=筛选后完整阅读（默认）；associative=不足时按联想方向补查；quick=只依据片段、不读全文"))] = None,
+              "standard=筛选后完整阅读（默认）；associative=读完写笔记后可做联想（从笔记出处出发、只走跨对象边的"
+              "一跳图扩展）；quick=只依据片段、不读全文"))] = None,
           review_filter: Annotated[ReviewFilter | None, Field(description=(
               "all（默认，带复核徽标）/ reviewed_only / exclude_unsafe / unreviewed_only"))] = None,
           variants: Annotated[list[dict] | None, Field(description=(
@@ -59,10 +60,14 @@ def peek(ctx: Ctx, session_id: SessionId, owner_id: str) -> dict:
 
 
 @op("reading.read", effect="write")
-def read(ctx: Ctx, session_id: SessionId, owner_id: str, page: int = 1) -> dict:
-    """完整阅读判为相关的对象：第 1 页附目录，按 unread_pages 读完全部页。quick 策略不可用。
+def read(ctx: Ctx, session_id: SessionId, owner_id: str, page: int = 1,
+         scope: Annotated[Literal["targets", "full"] | None, Field(description=(
+             "不填即可：第一轮召回的对象整读；图扩展带来的对象默认 targets（定点阅读，只交付被关系指到的节点及"
+             "必要上下文）。只有定点内容不足以判断、确有必要了解整个对象时才填 full 升级为整读，并在笔记中说明原因；"
+             "整读计入会话的整读对象上限"))] = None) -> dict:
+    """阅读判为相关的对象：第 1 页附目录，按 unread_pages 读完全部页。quick 策略不可用。
     对象在阅读期间有新提交时要求从第 1 页重读（STALE_BASIS）。"""
-    return ctx.app.reading.read(session_id, owner_id, page)
+    return ctx.app.reading.read(session_id, owner_id, page, scope=scope)
 
 
 @op("reading.note", effect="write")
@@ -71,12 +76,18 @@ def note(ctx: Ctx, session_id: SessionId, owner_id: str,
              "研究笔记（Markdown）：只写材料中的知识——问题如何演进、方法/公式（定义变量与单位）/条件、关键数据、"
              "反例与局限；关键句旁就近标出处 ID；不重复本次问题，不写自己的操作计划"))],
          sources: Annotated[list[str], Field(description=(
-             "出处 ID：必须是本会话交付过的（如 MEM-…、MEM-…#块ID、SRC-…）；quick 下只能是已采纳的窗口"))],
+             "出处 ID：必须是本会话交付过的。要细：引用到真正支撑内容的 L1 块（MEM-…#块ID）或结论（CLM-…），"
+             "不要只写整条记录（MEM-…）；也可以是 SRC-…。quick 下只能是已采纳的窗口。出处也是联想（图扩展）的种子"))],
          clues: Annotated[list[str] | None, Field(description=(
              "可选的探索线索（材料提到但未核实的方向、可能相关的对象）；只作导航，不会成为结论"))] = None,
+         expand_from: Annotated[list[dict] | None, Field(description=(
+             "可选的扩展锚点 [{ref, why}]，最多 3 个：ref 是本笔记 sources 中值得顺着关系去追的节点"
+             "（例如该块引用了另一项目的实测、该结论有待查的反例），why 写原因。没有值得追的就不写；"
+             "写了锚点时，联想优先从锚点出发"))] = None,
          request_id: RequestId = None) -> dict:
-    """保存某对象的研究笔记（standard/associative 须先读完全部页）；出处补全为固定引用。"""
-    return ctx.app.reading.note(session_id, owner_id, note, sources, clues=clues, request_id=request_id)
+    """保存某对象的研究笔记（standard/associative 须先读完全部页；定点阅读读完定点页即可）；出处补全为固定引用。"""
+    return ctx.app.reading.note(session_id, owner_id, note, sources, clues=clues, expand_from=expand_from,
+                                request_id=request_id)
 
 
 @op("reading.synthesize", effect="write")
@@ -87,10 +98,12 @@ def synthesize(ctx: Ctx, session_id: SessionId, note: str, sources: list[str], o
 
 
 @op("reading.ask_user", effect="write")
-def ask_user(ctx: Ctx, session_id: SessionId, kind: Literal["fulltext", "direction", "clarify"], prompt: str,
-             options: list[str] | None = None, request_id: RequestId = None) -> dict:
+def ask_user(ctx: Ctx, session_id: SessionId, kind: Literal["fulltext", "broaden", "direction", "clarify"],
+             prompt: str, options: list[str] | None = None, request_id: RequestId = None) -> dict:
     """向用户提问。fulltext=申请全文补偿（仅当发现召回不可用、不完整或不足，见 fulltext_available；批准后得到
-    approval_id）；direction=请用户定联想方向；clarify=澄清问题。用户可在对话或工作台回答。"""
+    approval_id）；broaden=申请扩大检索：放宽条件、去掉限定词或型号、改问更宽的问题都算，prompt 写清新问法、
+    理由与预计多带来哪类材料（等义改写、补保护词、改错别字不算扩大，不用申请）；direction=请用户给联想方向；
+    clarify=澄清问题。用户可在对话或工作台回答。"""
     result = ctx.app.reading.ask_user(session_id, kind, prompt, options, request_id=request_id)
     if ctx.elicit is not None:  # 宿主支持时直接在对话里询问；否则用户在工作台回答
         answer = ctx.elicit(prompt, kind, options or [])
@@ -103,13 +116,24 @@ def ask_user(ctx: Ctx, session_id: SessionId, kind: Literal["fulltext", "directi
 
 
 @op("reading.recall", effect="write")
-def recall(ctx: Ctx, session_id: SessionId, mode: Literal["fulltext", "association"],
-           approval_id: Annotated[str | None, Field(description="fulltext 模式必填：用户批准后的 approval_id")] = None,
-           association_text: Annotated[str | None, Field(description="association 模式：联想方向（由主 agent 制定）")]
-           = None, request_id: RequestId = None) -> dict:
-    """补充召回：全文补偿（需用户批准）或联想补查（associative 策略，受轮数上限）。
-    想换一种问法重新找，请新开一个 reading_start。"""
+def recall(ctx: Ctx, session_id: SessionId, mode: Literal["fulltext", "broaden", "association"],
+           approval_id: Annotated[str | None, Field(description=(
+               "fulltext、broaden 模式必填：用户批准后的 approval_id（只能用一次）"))] = None,
+           focus: Annotated[str | None, Field(description=(
+               "association 模式：一句话写当前还缺什么（例如“缺少长记录上 late 与 windows 的实测对比”），不要重复原问题；"
+               "只用于给图邻居排序，不召回新范围，不需要审批。不填时用用户补充的方向或会话问题"))] = None,
+           question: Annotated[str | None, Field(description="broaden 模式必填：用户批准的新问法")] = None,
+           variants: Annotated[list[dict] | None, Field(description="broaden 模式可选：新问法的等义改写")] = None,
+           protected_terms: Annotated[list[str] | None, Field(description="broaden 模式可选：必须原样出现的词")] = None,
+           association_text: Annotated[str | None, Field(description=(
+               "已停用：联想改为图扩展；要换更宽的问法先 reading_ask_user(kind=broaden)。传入会返回参数错误"))] = None,
+           request_id: RequestId = None) -> dict:
+    """补充召回。fulltext=全文补偿；broaden=按用户批准的新问法再召回一轮；两者都需要用户批准。
+    association=联想（仅 associative 策略，受轮数上限）：本轮相关对象读完、笔记写好后，从笔记出处（扩展锚点优先）
+    出发只走跨对象的边一跳，把与 focus 相关的新候选加入下一批筛选包；扩展来的对象判为相关后默认定点阅读。
+    不要通过新开 reading_start 换更宽的问题来绕过扩大检索的审批。"""
     return ctx.app.reading.recall(session_id, mode, approval_id=approval_id, association_text=association_text,
+                                  focus=focus, question=question, variants=variants, protected_terms=protected_terms,
                                   request_id=request_id)
 
 

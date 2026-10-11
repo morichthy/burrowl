@@ -170,10 +170,13 @@ def test_digest_reason_required_and_retry_is_idempotent(reading):
         with pytest.raises(BurrowlError) as caught:
             service.assess(sid, [bad])
         assert caught.value.code == "INVALID_ARGUMENT"
-    first = service.recall(sid, "association", association_text="Kahan 补偿", request_id="11111111-1111-1111-1111-111111111111")
-    again = service.recall(sid, "association", association_text="Kahan 补偿", request_id="11111111-1111-1111-1111-111111111111")
+    request = service.ask_user(sid, "broaden", "放宽到所有求和方法")["request"]
+    approval = service.respond(sid, request["request_id"], decision="approve")["approval_id"]
+    retry = {"approval_id": approval, "question": "Kahan 补偿", "request_id": "11111111-1111-1111-1111-111111111111"}
+    first = service.recall(sid, "broaden", **retry)
+    again = service.recall(sid, "broaden", **retry)
     assert again["round"] == first["round"]
-    assert service.view(sid)["association"]["rounds_used"] == 1      # 重试没有重复消耗轮数
+    assert len([r for r in service.view(sid)["rounds"] if r["kind"] == "broaden"]) == 1  # 重试没有重复召回
     assert service.status(sid)["consumed"]["candidates"] >= 1
 
 
