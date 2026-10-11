@@ -54,6 +54,23 @@ def build_embedder(config: IndexConfig, data_root: Path, *, default_model_dir: P
         return None  # 模型缺失：向量通道报告 disabled，关键词检索照常
 
 
+def node_titles(graph: ClaimGraph, node_ids) -> dict[str, str]:
+    """图节点 → 可显示的标题：记录取标题，L1 块为"记录标题 › 块"，结论取陈述。受限记录、不可读对象不给标题。"""
+    titles = {}
+    for node in node_ids:
+        record_id, _, block = node.partition("#")
+        if record_id in graph.claims:
+            claim, record = graph.claims[record_id]
+            text = claim["statement"]
+        else:
+            record = graph.records.get(record_id)
+            text = record and (f"{record['title']} › {block}" if block else record["title"])
+        owner = graph.index.find(record["owner_id"]) if record else None
+        if text and record["sensitivity"] != "restricted" and owner is not None and owner.readable:
+            titles[node] = text
+    return titles
+
+
 class IndexService:
     def __init__(self, storage: Storage, db: IndexDB, *, concept_owner=None):
         self.storage = storage
@@ -149,8 +166,13 @@ class IndexService:
                    if ref.get("target_kind") == "owner" and str(ref.get("target_id", "")).startswith("RUN-")}
         run_titles = {rid: run.title for rid in sorted(run_ids)
                       if (run := graph.index.find(rid)) is not None and run.owner_type == "run" and run.readable}
+        # R19 D-04：关联条目要写出两端的标题；两端可能在其他对象，从全库复核图取（受限或不可读的不给标题）
+        ends = {graph_projection.target_node(r["payload"][end]) for r in records if r["kind"] == "association"
+                for end in ("from", "to")}
+        titles = node_titles(graph, ends)
         return (snapshot.head if snapshot else None,
-                {} if graph_only else {corpus: build(info, records, badges, hidden) for corpus, build in BUILDERS.items()},
+                {} if graph_only else {corpus: build(info, records, badges, hidden, titles)
+                                       for corpus, build in BUILDERS.items()},
                 graph_projection.graph(info, records, badges, hidden, maturity, run_titles))
 
     def ensure_graph(self) -> dict:

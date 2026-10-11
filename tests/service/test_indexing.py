@@ -39,11 +39,11 @@ def test_commit_updates_index_and_review_filter(tmp_path):
     review = ReviewService(storage, memory)
     owner_id = storage.owners.create("research", "order", "顺序").owner_id
     evidence = register_source(storage, "SRC-ORDER-1", "research/order/r.txt", "结果\n")
-    receipt = memory.commit(request(owner_id, None, {"op": "put_record", "client_key": "n",
-                                                     "draft": narrative_draft(owner_id, evidence)}))
+    draft = narrative_draft(owner_id, evidence) | {"discovery": "owner_only"}
+    receipt = memory.commit(request(owner_id, None, {"op": "put_record", "client_key": "n", "draft": draft}))
     assert receipt["index"]["index_status"] == "indexed"
     query, scope = "升序 误差", [owner_id]
-    # 默认策略 discovery=owner_only：只有显式限定到本对象的检索才能看到这些记录。
+    # discovery=owner_only：只有显式限定到本对象的检索才能看到这些记录（知识记录的默认值见 test_discovery_defaults）。
     assert not index.search(query)["items"]
     assert index.search(query, owner_ids=scope, review_filter="unreviewed_only")["items"]
     assert not index.search(query, owner_ids=scope, review_filter="reviewed_only")["items"]

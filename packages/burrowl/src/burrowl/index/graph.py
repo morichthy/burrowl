@@ -30,6 +30,26 @@ CATEGORY = {
 CATEGORIES = ("structure", "evidence", "reference", "navigation", "concept", "claim_relation")
 UNSAFE = {"disputed", "retracted", "superseded", "stale"}
 
+# R19 D-05 统一边标准：关系名 → 读法（{a} 为边的起点，{b} 为终点）。类别仍由 CATEGORY 查表得出；
+# 图扩展、关系窗口与关联条目的文字都只查这里，新增关系名只加一行。未列出的关系名按所属类别的通用读法。
+PHRASES = {
+    "contradicts": "{a} 与 {b} 矛盾", "supports": "{a} 以 {b} 为依据", "input": "{a} 以 {b} 为输入",
+    "supersedes": "{a} 取代 {b}",
+    "references": "{a} 参考了 {b}", "background": "{a} 以 {b} 为背景", "derived_from": "{a} 由 {b} 派生",
+    "refines": "{a} 细化了 {b}", "prerequisite": "{a} 以 {b} 为前提", "used_in": "{a} 用于 {b}",
+    "related_to": "{a} 与 {b} 相关", "same_problem": "{a} 与 {b} 是同一问题",
+    "same_failure_mode": "{a} 与 {b} 是同一失效模式", "analogous_to": "{a} 与 {b} 可以类比",
+    "similar_structure": "{a} 与 {b} 结构相似", "same_entity": "{a} 与 {b} 指同一对象",
+    "mentions": "{a} 讨论 {b}", "subject_of": "{a} 以 {b} 为主体", "object_of": "{a} 以 {b} 为对象",
+}
+CATEGORY_PHRASES = {"evidence": "{a} 以 {b} 为依据", "reference": "{a} 参考了 {b}", "navigation": "{a} 与 {b} 相关",
+                    "concept": "{a} 讨论 {b}", "structure": "{a} 包含 {b}"}
+# 参与图扩展的类别（R19 §4.3）：结构边属于对象内部，不扩展；概念边只经低度数概念中转（见 services/reading/expand.py）
+EXPANDABLE = frozenset({"evidence", "claim_relation", "navigation", "reference", "concept"})
+# 扩展权重（沿用 R12 §4.4 的类别权重；导航按确定度，结论关系另乘成熟度系数）
+EXPAND_WEIGHTS = {"evidence": 1.0, "claim_relation": 0.6, "reference": 0.6, "concept": 0.5}
+CERTAINTY_WEIGHTS = {"supported": 0.7, "plausible": 0.4, "speculative": 0.2}
+
 
 def category(edge_type: str, *, derived: bool = False, field: str = "") -> str:
     if derived:
@@ -37,6 +57,27 @@ def category(edge_type: str, *, derived: bool = False, field: str = "") -> str:
     if field == "association":
         return "navigation"  # 关联只做导航，即使关系名是 supports 也不是证据
     return CATEGORY.get(edge_type, "reference")
+
+
+def phrase(edge_type: str, a: str, b: str, *, edge_category: str | None = None) -> str:
+    """一条边的中文读法。关联里出现的证据类关系名（旧数据）按导航读作"相关"；结论关系读作"主体 谓词 对象"。"""
+    edge_category = edge_category or category(edge_type)
+    if edge_category == "claim_relation":
+        return f"{a} {edge_type} {b}"
+    if edge_category == "navigation" and CATEGORY.get(edge_type) != "navigation":
+        return PHRASES["related_to"].format(a=a, b=b)
+    return (PHRASES.get(edge_type) or CATEGORY_PHRASES.get(edge_category, "{a} → {b}")).format(a=a, b=b)
+
+
+def expand_weight(edge: dict, maturity_factor: float = 0.5) -> float:
+    """图扩展中一条边的基础权重 w_e（R19 §4.3）；0 表示不参与扩展。"""
+    if edge["category"] not in EXPANDABLE:
+        return 0.0
+    if edge["category"] == "navigation":
+        return CERTAINTY_WEIGHTS.get(edge.get("certainty") or "plausible", 0.4)
+    if edge["category"] == "claim_relation":
+        return EXPAND_WEIGHTS["claim_relation"] * maturity_factor
+    return EXPAND_WEIGHTS[edge["category"]]
 
 
 def target_node(ref: dict) -> str:

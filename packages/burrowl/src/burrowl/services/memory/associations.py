@@ -87,9 +87,11 @@ def _identity(payload: dict) -> tuple:
 
 
 def decide(memory: MemoryService, owner_id: str, payload: dict, *, actor: dict, reason: str, title: str = "关联判断",
-           request_id: str | None = None, dry_run: bool = False) -> dict:
+           request_id: str | None = None, dry_run: bool = False, discovery: str | None = None) -> dict:
     """保存一条关联判断（candidate / accepted / rejected / withdrawn）。payload 只含 from/to/explanation
-    （可选 observed_in、certainty）时按快速添加处理。"""
+    （可选 observed_in、certainty）时按快速添加处理。
+
+    discovery 不给时按记录策略取值（R19 D-01：新关联默认全库可见；修订沿用原值）。"""
     payload = deepcopy(payload)
     for end in ("from", "to"):  # 先于查重：_identity 需要两端的 target_id
         require_ref(payload.get(end), f"payload.{end}")
@@ -108,7 +110,9 @@ def decide(memory: MemoryService, owner_id: str, payload: dict, *, actor: dict, 
     draft = {"owner_id": owner_id, "kind": "association", "title": title, "body_markdown": "", "keywords": [],
              "payload": payload, "sources": deepcopy(payload.get("basis_refs", [])),
              "provenance_gap": None if payload.get("basis_refs") else "仅导航关系，尚缺独立依据",
-             "record_reason": reason, "change_reason": reason, "sensitivity": "internal", "discovery": "owner_only"}
+             "record_reason": reason, "change_reason": reason, "sensitivity": "internal"}
+    if discovery is not None:
+        draft["discovery"] = discovery
     operation: dict = {"op": "decide_association", "draft": draft}
     if matches:
         operation |= {"record_id": matches[0]["record_id"], "expected_revision": matches[0]["revision"]}
@@ -118,5 +122,6 @@ def decide(memory: MemoryService, owner_id: str, payload: dict, *, actor: dict, 
     head = memory.snapshot(owner).commit_id if owner.persisted else None
     request = {"schema_version": 3, "request_id": request_id or str(uuid.uuid4()), "actor": actor, "owner_id": owner_id,
                "expected_head": head, "operations": [operation], "dry_run": dry_run}
-    digest = canonical_hash({"operation": "association", "payload": payload, "reason": reason, "owner_id": owner_id})
+    digest = canonical_hash({"operation": "association", "payload": payload, "reason": reason, "owner_id": owner_id,
+                             **({"discovery": discovery} if discovery is not None else {})})
     return memory.commit(request, hash_override=digest)

@@ -14,6 +14,9 @@ WORKSPACE_DEFAULTS = {"mode": "basic", "retain": ["L0", "L1", "L2", "L3", "L4"],
 _RESEARCH = {"mode": "explore", "granularity": "normal", "retain": ["L0", "L1", "L2", "L3", "L4"],
              "auto_summary": False}
 TYPE_DEFAULTS = {"research": _RESEARCH, "project": _RESEARCH, "run": {"mode": "basic"}}
+# R19 D-01：知识类记录默认全库可见（用途就是被复用）；目标、检查点、路线、问题等工作状态与其余记录沿用工作区默认
+# owner_only——它们由判定和续接按位置读取，进入召回会把工作状态混进知识检索。
+KNOWLEDGE_KINDS = frozenset({"detail", "narrative", "experience", "overview", "association", "wiki_page"})
 
 
 def _flatten(value: dict) -> dict:
@@ -26,6 +29,13 @@ def _flatten(value: dict) -> dict:
     out = {k: deepcopy(v) for k, v in value.items() if k not in {"overrides", "missing_refs"}}
     out.update(deepcopy(value.get("overrides", {})))
     return out
+
+
+def discovery_for(kind: str | None, resolved: dict) -> str:
+    """新记录在草案未写 discovery 时的取值（R19 D-01）：对象策略或请求显式设置 > 记录类型默认 > 工作区默认。"""
+    if resolved["sources"].get("discovery") in {"owner", "request"}:
+        return resolved["values"]["discovery"]
+    return "workspace_summary" if kind in KNOWLEDGE_KINDS else resolved["values"]["discovery"]
 
 
 def resolve(owner_type: str, owner_policy: dict | None = None, request: dict | None = None) -> dict[str, Any]:

@@ -130,7 +130,7 @@ class MemoryService:
         """计算本批要写入的完整记录（纯计算，可在锁内重复执行）。"""
         owner_id = request["owner_id"]
         owner = index.get(owner_id).require_readable()
-        effective = self.owner_policy(owner, snapshot)["values"]
+        resolved = self.owner_policy(owner, snapshot)
         resolver = self._resolver(index)
         resolver.checks.append({"kind": "owner_access", "owner_id": owner_id})
         now = self.clock()
@@ -139,7 +139,11 @@ class MemoryService:
         for operation in request["operations"]:
             rid = ids[operation.get("client_key") or operation["record_id"]]
             draft = self._replace_client_keys(deepcopy(operation["draft"]), ids)
-            draft.setdefault("discovery", effective["discovery"])
+            if "discovery" not in draft:
+                # R19 D-02：修订沿用上一修订的可见范围，默认值变化不能静默改变已有记录；新记录按 D-01 取默认
+                previous = snapshot.records.get(rid)
+                draft["discovery"] = previous["discovery"] if previous else policy.discovery_for(draft.get("kind"),
+                                                                                                 resolved)
             if draft.get("owner_id") != owner_id:
                 raise BurrowlError("INVALID_SCHEMA", "单批只允许一个归属对象",
                                errors=[{"path": "/owner_id", "message": "归属不匹配"}])

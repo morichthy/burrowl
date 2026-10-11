@@ -119,10 +119,13 @@ def association_decide(ctx: Ctx, owner_id: str, payload: Annotated[dict, Field(d
         "certainty?(speculative|plausible|supported), origin?, observed_in?}；"
         "快速添加只给 {from, to, explanation}：自动设为 related_to + speculative + accepted。"
         "from/to/basis_refs 都是固定引用对象 {target_kind, target_id, revision, sha256, locator, relation}，不能只写 ID"))],
-        reason: str, dry_run: bool = False) -> dict:
+        reason: str, dry_run: bool = False,
+        discovery: Annotated[Literal["workspace_summary", "owner_only"] | None, Field(description=(
+            "可见范围；不给时新关联默认全库可见、修订沿用原值。只有需要保密时才写 owner_only"))] = None) -> dict:
     """保存关联判断（candidate/accepted/rejected/withdrawn）；只能是导航关系。
     "A 会影响 B"这类可以验证的判断写成结论（inference），不要写成关联。"""
-    return activity.annotate(ctx.app.storage, associations.decide(ctx.app.memory, owner_id, payload, actor=ctx.actor, reason=reason, dry_run=dry_run))
+    return activity.annotate(ctx.app.storage, associations.decide(ctx.app.memory, owner_id, payload, actor=ctx.actor,
+                                                                  reason=reason, dry_run=dry_run, discovery=discovery))
 
 
 @op("relations.candidates")

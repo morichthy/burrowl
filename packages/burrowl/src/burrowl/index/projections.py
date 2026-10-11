@@ -8,10 +8,12 @@ from typing import Any
 
 from ..core.hashing import canonical_hash
 from ..core.technical import description_text
+from . import graph as graph_projection
 
 # v2（R12 P1）：条目带上下文信封 embed_prefix；技术单元的记录级条目包含全部块正文
-FULLTEXT_VERSION = "fulltext-v2"
-DISCOVERY_VERSION = "discovery-v2"
+# v3（R19 D-04）：发现投影收录结论、已采纳的关联、概念页；关联条目有可检索的文字，只收已采纳的
+FULLTEXT_VERSION = "fulltext-v3"
+DISCOVERY_VERSION = "discovery-v3"
 SOURCE_VERSION = "source-v2"
 CORPORA = ("fulltext", "discovery", "source")
 # 不进入全文检索的类型：L0 原文只作追溯；文稿只是编排；复核/表示/策略等是元数据。
@@ -126,25 +128,85 @@ def _sensitivity(owner: OwnerInfo, record: dict) -> str:
     return max(owner.sensitivity, record["sensitivity"], key=lambda v: rank.get(v, 3))
 
 
-def fulltext(owner: OwnerInfo, records: list[dict], badges: dict[str, str], hidden: set[str]) -> list[dict]:
+def _association_ends(record: dict, titles: dict[str, str]) -> list[str]:
+    payload = record["payload"]
+    return [titles.get(graph_projection.target_node(payload[e])) or payload[e]["target_id"] for e in ("from", "to")]
+
+
+def _association_title(record: dict, titles: dict[str, str]) -> str:
+    ends = _association_ends(record, titles)
+    return f"关联：{ends[0]} ↔ {ends[1]}"
+
+
+def _association_text(record: dict, titles: dict[str, str]) -> str:
+    """关联条目的文字（R19 D-04）：读法与确定度、说明、共同结构、迁移边界、差异。说明才是关联承载的知识。"""
+    payload = record["payload"]
+    head = graph_projection.phrase(payload["relation"], *_association_ends(record, titles), edge_category="navigation")
+    lines = [f"{head}（{payload.get('certainty') or 'plausible'}）", payload.get("explanation") or ""]
+    if payload.get("shared_structure"):
+        lines.append(f"共同结构：{payload['shared_structure']}")
+    for label, key in (("迁移边界", "transfer_limits"), ("差异", "differences")):
+        if payload.get(key):
+            lines.append(f"{label}：" + "；".join(_strings(payload[key])))
+    return "\n".join(line for line in lines if line.strip())
+
+
+def _claim_entry(corpus: str, version: str, owner: OwnerInfo, record: dict, claim: dict, badge: str) -> dict:
+    """结论条目：陈述 + 适用范围（+ 有 relation 时"主体 谓词 对象"）。可见范围与敏感级别跟随所在记录。"""
+    relation = claim.get("relation")
+    triple = " ".join([relation["subject"], relation["predicate"], relation["object"]]) if relation else ""
+    text = "\n".join(t for t in (claim["statement"], claim["scope"], triple) if t)
+    return _entry(corpus, version, owner, key=claim["claim_id"], record_id=record["record_id"],
+                  canonical_id=claim["claim_id"], kind="claim", level=record["level"], revision=record["revision"],
+                  content_hash=canonical_hash(claim), title=claim["statement"], text=text,
+                  fixed_ref={"target_kind": "claim", "target_id": claim["claim_id"], "revision": None,
+                             "sha256": canonical_hash(claim), "locator": "statement", "relation": "references"},
+                  discovery=record["discovery"], sensitivity=_sensitivity(owner, record),
+                  review=review_class([badge]), embed_prefix=envelope(owner, record, claim=claim))
+
+
+def _accepted_association(record: dict) -> bool:
+    return record["kind"] == "association" and record["payload"].get("status") == "accepted"
+
+
+def _concept_text(record: dict) -> str | None:
+    """概念页条目（R19 D-04）：active 的 concept / entity 页，标题 + 别名 + 定义 + 领域。"""
+    payload = record["payload"]
+    if record["kind"] != "wiki_page" or payload.get("page_type") not in graph_projection.CONCEPT_PAGE_TYPES \
+            or payload.get("status", "active") != "active":
+        return None
+    parts = (record["title"], "、".join(_strings(payload.get("aliases"))), record["body_markdown"],
+             "、".join(_strings(payload.get("domains"))))
+    return "\n".join(t for t in parts if t.strip())
+
+
+def fulltext(owner: OwnerInfo, records: list[dict], badges: dict[str, str], hidden: set[str],
+             titles: dict[str, str] | None = None) -> list[dict]:
+    """titles：关联两端节点 → 标题（服务层从全库记录给出；受限记录不给）。"""
+    titles = titles or {}
     entries = []
     for record in records:
         if record["kind"] in _FULLTEXT_SKIP or record["record_id"] in hidden or record["sensitivity"] == "restricted":
             continue
+        if record["kind"] == "association" and not _accepted_association(record):
+            continue  # 候选、已拒绝、已撤回的关联不是知识
         payload = record["payload"]
         claim_badges = [badges.get(c["claim_id"], "not-reviewed") for c in payload.get("claims", [])]
         common = {"record_id": record["record_id"], "kind": record["kind"], "level": record["level"],
                   "revision": record["revision"], "discovery": record["discovery"],
                   "sensitivity": _sensitivity(owner, record)}
+        title = record["title"]
         if record["kind"] == "detail":  # 记录级条目 = 检索说明 + 全部块正文（R12 T-P1.4），块级条目另建
             body = "\n\n".join([description_text(record), *(b["markdown"] for b in payload.get("blocks", []))])
             extra = _payload_text({k: v for k, v in payload.items() if k not in {"blocks"}})
+        elif record["kind"] == "association":
+            body, extra, title = _association_text(record, titles), "", _association_title(record, titles)
         else:
             body, extra = record["body_markdown"], _payload_text(payload)
         text = "\n".join(t for t in (body, extra, " ".join(record.get("keywords", []))) if t)
         entries.append(_entry("fulltext", FULLTEXT_VERSION, owner, key=record["record_id"],
                               canonical_id=record["record_id"], content_hash=record["content_hash"],
-                              title=record["title"], text=text, fixed_ref=_ref(record),
+                              title=title, text=text, fixed_ref=_ref(record),
                               review=review_class(claim_badges), embed_prefix=envelope(owner, record), **common))
         if record["kind"] == "detail":
             for block in payload.get("blocks", []):
@@ -154,15 +216,8 @@ def fulltext(owner: OwnerInfo, records: list[dict], badges: dict[str, str], hidd
                                       fixed_ref=_ref(record, "block:" + block["block_id"]), review="none",
                                       embed_prefix=envelope(owner, record, block), **common))
         for claim in payload.get("claims", []):
-            badge = badges.get(claim["claim_id"], "not-reviewed")
-            entries.append(_entry("fulltext", FULLTEXT_VERSION, owner, key=claim["claim_id"],
-                                  canonical_id=claim["claim_id"], content_hash=canonical_hash(claim),
-                                  title=claim["statement"], text=f"{claim['statement']}\n{claim['scope']}",
-                                  fixed_ref={"target_kind": "claim", "target_id": claim["claim_id"], "revision": None,
-                                             "sha256": canonical_hash(claim), "locator": "statement",
-                                             "relation": "references"},
-                                  review=review_class([badge]), embed_prefix=envelope(owner, record, claim=claim),
-                                  **(common | {"kind": "claim"})))
+            entries.append(_claim_entry("fulltext", FULLTEXT_VERSION, owner, record, claim,
+                                        badges.get(claim["claim_id"], "not-reviewed")))
     return entries
 
 
@@ -188,7 +243,10 @@ def _compact(record: dict) -> str | None:
     return None
 
 
-def discovery(owner: OwnerInfo, records: list[dict], badges: dict[str, str], hidden: set[str]) -> list[dict]:
+def discovery(owner: OwnerInfo, records: list[dict], badges: dict[str, str], hidden: set[str],
+              titles: dict[str, str] | None = None) -> list[dict]:
+    """发现面：对象元数据、L1 检索说明、L2 骨架、L3/L4 正文，以及（R19 D-04）结论、已采纳的关联、概念页。"""
+    titles = titles or {}
     owner_ref = {"target_kind": "owner", "target_id": owner.owner_id, "revision": None, "sha256": owner.fingerprint,
                  "locator": "", "relation": "references"}
     meta = "\n".join(v for v in [owner.owner_id, owner.owner_type, owner.description, *owner.keywords] if v)
@@ -197,17 +255,26 @@ def discovery(owner: OwnerInfo, records: list[dict], badges: dict[str, str], hid
                       content_hash=owner.fingerprint, title=owner.title, text=meta, fixed_ref=owner_ref,
                       discovery="workspace_summary", sensitivity=owner.sensitivity, review="none")]
     for record in records:
-        text = _compact(record)
-        if text is None or record["record_id"] in hidden or record["sensitivity"] == "restricted":
+        if record["record_id"] in hidden or record["sensitivity"] == "restricted" or record["kind"] in _FULLTEXT_SKIP:
             continue
+        title, text = record["title"], _compact(record)
+        if _accepted_association(record):
+            title, text = _association_title(record, titles), _association_text(record, titles)
+        elif text is None:
+            text = _concept_text(record)
         claim_badges = [badges.get(c["claim_id"], "not-reviewed") for c in record["payload"].get("claims", [])]
-        entries.append(_entry("discovery", DISCOVERY_VERSION, owner, key=record["record_id"],
-                              record_id=record["record_id"], canonical_id=record["record_id"], kind=record["kind"],
-                              level=record["level"], revision=record["revision"], content_hash=record["content_hash"],
-                              title=record["title"], text=text,
-                              fixed_ref=_ref(record, "retrieval_description" if record["level"] == "L1" else "record"),
-                              discovery=record["discovery"], sensitivity=_sensitivity(owner, record),
-                              review=review_class(claim_badges), embed_prefix=envelope(owner, record)))
+        if text is not None:
+            locator = "retrieval_description" if record["level"] == "L1" else "record"
+            entries.append(_entry("discovery", DISCOVERY_VERSION, owner, key=record["record_id"],
+                                  record_id=record["record_id"], canonical_id=record["record_id"], kind=record["kind"],
+                                  level=record["level"], revision=record["revision"],
+                                  content_hash=record["content_hash"], title=title, text=text,
+                                  fixed_ref=_ref(record, locator), discovery=record["discovery"],
+                                  sensitivity=_sensitivity(owner, record), review=review_class(claim_badges),
+                                  embed_prefix=envelope(owner, record)))
+        for claim in record["payload"].get("claims", []) or []:  # 结论随所在记录可见
+            entries.append(_claim_entry("discovery", DISCOVERY_VERSION, owner, record, claim,
+                                        badges.get(claim["claim_id"], "not-reviewed")))
     return entries
 
 
