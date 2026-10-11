@@ -1,0 +1,22 @@
+{
+  "sequential": {
+    "cases": 6,
+    "exact_matches": 2,
+    "max_absolute_error": 1.0
+  },
+  "kahan": {
+    "cases": 6,
+    "exact_matches": 2,
+    "max_absolute_error": 1.0
+  },
+  "neumaier": {
+    "cases": 6,
+    "exact_matches": 6,
+    "max_absolute_error": 0.0
+  },
+  "math.fsum": {
+    "cases": 6,
+    "exact_matches": 6,
+    "max_absolute_error": 0.0
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "run_id": "RUN-20261011T054947Z-45A17C296DE1",
+  "original_path": "runs/run-20261011t054947z-45a17c296de1",
+  "reason": "标本：沉淀检查无可复用内容",
+  "discarded_at": "2026-10-11T05:49:47.087999Z",
+  "actor": {
+    "kind": "ai",
+    "id": "compat-fixture"
+  }
+}
