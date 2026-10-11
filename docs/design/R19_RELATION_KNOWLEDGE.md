@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 状态 | 用户确认（2026-10-12），实施中 |
+| 状态 | 用户确认（2026-10-12），已实施；§8 的待确认项与 §9 的走查发现待用户决定 |
 | 适用范围 | 记录策略与提交（`services/memory/policy.py`、`services/memory/service.py`）、检索投影（`index/projections.py`、`index/graph.py`）、图投影与图扩展（`services/indexing.py`）、阅读会话（`services/reading/`）、归属判定（只读调用方）、配置（`core/config.py` 的 reading）、契约说明（`core/contract.py`）、RULES、RECORDING、burrowl-work、burrowl-read、burrowl-consolidate、MCP 服务说明 |
 | 关系 | 承接 [R12](R12_KNOWLEDGE_GRAPH_RETRIEVAL.md)（统一边模型、图投影、图路线）与 [R18](R18_ROUTE_READING.md)（判定与阅读的衔接、关联在实际阅读后建立）。修订 R12 §4.11 图路线在阅读中的用法；不修订 R12 D-27（契约只做增量） |
 
@@ -160,12 +160,16 @@
   没有笔记的对象不提供种子；同一节点取最大 σ
 扩展（只走跨对象的边）：
   直接边：N 的入边与出边中"参与扩展"的边，另一端节点 m 满足 owner(m) ≠ owner(种子) 且 owner(m) ∉ S
-  概念中转：N 提及的概念 c（mentions、subject_of、object_of），若 deg(c) ≤ concept_max_degree，
-            则 c 的其他提及者 m（同样满足跨对象条件）视为经 c 一跳到达，权重 = 0.5 × 0.5
+  中转：N 连到的概念页或已登记来源 c，若与 c 相连的不同对象数 k_c ≤ concept_max_degree，
+        则 c 的其他邻居 m（同样满足跨对象条件）视为经 c 一跳到达，第二段权重再除以 log2(2 + k_c)
+        （k_c 按对象数而不是边数：同一记录会从 sources、阶段依据、结论依据各连一条边，记录与它的结论
+        又是不同节点，按边数或节点数会把只被两个对象引用的来源误判为热门）
+去重：同一对节点之间只取最强的一条边（避免同一引用的多个字段重复计分）
 图分数：g(m) = Σ_{种子 n 经边 e 到达 m} σ(n) · w_e / log2(2 + deg(m))       （w_e 查 §4.3）
 焦点相关度：取 g 最高的 3K 个节点，用重排模型（不可用时用向量相似度）计算 m 的发现条目文本（无条目时用关系窗口文字）
            与焦点 F 的相关度 q(m) ∈ [0, 1]
-对象汇总：score(B) = Σ_{m ∈ B} g(m) · q(m)；每个对象最多保留 3 个节点（按 g·q 降序），作为它的关系窗口与定点阅读目标
+对象汇总：同一条记录（含它的块与结论）只计一次，取其中 g·q 最高的节点；
+          score(B) = Σ_{记录 ∈ B} max g·q；每个对象最多保留 target_nodes 条记录，作为它的关系窗口与定点阅读目标
 筛选：score(B) ≥ min_score，按 score 降序取前 expand_owners 个（默认 5）；contradicts 到达的对象排在同分对象之前
 过滤：与第一轮召回相同的范围、敏感级别、owner_only 可见性、复核过滤；restricted 不进入；概念库对象本身不作为候选
 输出：新候选加入队列，标记 origin=expansion 与定点目标节点
@@ -207,8 +211,8 @@
 
 | 写在哪里 | AI 面对的选项 | 默认 |
 |---|---|---|
-| 结论 `evidence_refs`、L2 阶段 `evidence_refs` | supports、contradicts | supports |
-| 记录 `sources`、`technical_refs`、`process_refs` 等其他固定引用 | supports、contradicts、references | references |
+| 结论 `evidence_refs`、L2 阶段 `evidence_refs` | supports、contradicts、input | supports |
+| 记录 `sources`、`technical_refs`、`process_refs` 等其他固定引用 | supports、contradicts、input、references | references |
 | Run 输入 | 程序填 input | — |
 | 关联 `relation` | related_to、same_problem、same_failure_mode、analogous_to | related_to |
 | 结论 `relation.predicate` | 开放词表，推荐 improves、degrades、causes、prevents、fails_on、applies_to、requires、equivalent_to、contradicts、part_of | — |
@@ -283,4 +287,19 @@
 
 | 任务 | 状态 | 说明 |
 |---|---|---|
-| 设计稿 | 草案（2026-10-12） | 待用户确认 §2、§3 与 §8 的两个待确认项 |
+| 设计稿 | 已确认（2026-10-12） | 讨论中种子从"整个对象"改为"笔记出处"再改为"锚点优先"（方案 C），见 DEVELOPMENT_HISTORY R19 |
+| T-01 | 已完成 | `policy.KNOWLEDGE_KINDS`、`discovery_for`；`MemoryService.prepare` 修订沿用原值；`relations.decide` 增加 `discovery` 参数。测试 `tests/service/test_discovery_defaults.py` |
+| T-02 | 已完成 | `projections` v3：发现投影收结论、已采纳关联、概念页；关联条目写两端标题、读法、说明等；候选、已拒绝、已撤回的关联不进检索。两端标题由 `indexing.node_titles` 从全库复核图取。测试 `tests/unit/test_relation_projection.py` |
+| T-03 | 已完成 | `index/graph.py` 的 `PHRASES`、`EXPANDABLE`、`expand_weight`、`phrase` |
+| T-04 | 已完成 | `services/reading/expand.py`。实施中修正：中转节点按"不同对象数"判断热门；同一对节点只取最强边；对象汇总时同一记录只计一次（三处都来自样例测试中的重复计分）。测试 `tests/service/test_graph_expansion.py`（7 项） |
+| T-04b | 已完成 | `text.target_page_of`；`reading.read(scope)`；定点阅读不计入整读上限；旧会话没有 `read_scope` 时按已有进度视为整读 |
+| T-04c | 已完成 | `reading.note(expand_from)`、`reading.recall(focus)`、`reading.direct` 改为焦点；交付身份加入 L1 块与结论，块出处的固定引用带块定位。没有种子时联想直接报错、不消耗轮数 |
+| T-05 | 已完成 | `ask_user(kind=broaden)`、`recall(mode=broaden)`；`association_text` 返回参数错误；`screen` 不传图路线；配置新增 `expand_owners`、`min_score`、`concept_max_degree`、`target_nodes`、`target_pages`，阅读预算增加 `graph_edges`（默认 1000） |
+| T-06 | 已完成 | `services/memory/vocabulary.py`；回执与 dry_run 的 `warnings`（统一为带 code 的字典）；`consolidate_prepare` 的 `relation_vocabulary` 候选。实施中把 `input` 加入推荐范围：现有数据里"作为分析输入的数据文件"普遍写成 input。测试 `tests/unit/test_relation_vocabulary.py` 与服务层 1 项 |
+| T-07 | 已完成 | `contract.py` 的 discovery 与 Ref 说明；契约示例重新生成后无变化（示例没有用到非推荐关系名）；操作参考与前端类型重新生成 |
+| T-08 | 已完成 | 阅读页：扩大检索的批准按钮、图扩展来源与定点阅读标记、关系线索与结论窗口、扩展锚点。组件测试 1 项；端到端测试通过 |
+| T-09 | 已完成 | RULES 第 2、6、8、10 节；RECORDING 第 5、6 节与新增第 8 节（原第 8 节"文稿"顺延为第 9 节）；burrowl-read；burrowl-work；burrowl-consolidate；MCP 服务说明 |
+| T-10 回归 | 已完成 | 浮点样例 13 题，真实嵌入模型（指纹 fe-f3a92c14），改动前后：发现投影 R@10 0.903 / MRR 0.556，全文投影 R@10 0.944 / MRR 0.885，条件错误率 0.077，两边完全一致，无回归。样例只有一个对象、结论少、没有关联与概念页，对本次改动不敏感，只能说明没有变差 |
+| T-10 走查（AC-07） | 已完成 | 测试数据目录副本（含 R18 走查留下的评测对象），真实模型，驱动进程等同 MCP。结果：①第一轮召回中，按旧默认存成 owner_only 的 L3 不出现，全库可见的 L3 出现；②读完后笔记出处可细到 L1 块，固定引用带块定位，锚点保存；③联想一轮没有新候选（其余对象都已在会话中，小库的正常结果），扫描 10 条边、16 ms；④新写的 L3 不写 discovery 时取全库可见，其结论条目能被直接检索到；⑤两端与旧关联相同的新关联成为旧关联的修订，按 D-02 沿用 owner_only，全库检索看不到；两端都新的关联默认全库可见，用它的说明提问时关联窗口排在该对象第一位 |
+| 走查发现 | 待用户决定 | **块级种子走不到指向所在记录的引用**：其他对象引用时通常引用整条记录，而种子细到块后，只走块自身的边，指向所在记录的入边不会被走到。可选：块种子同时带上所在记录（降低权重），只取"指向记录"的入边、不取记录自己的出边 |
+| 已有数据 | 待用户决定 | 见 §8：按旧默认存成 owner_only 的知识记录与关联不会自动改变（走查⑤即为一例） |

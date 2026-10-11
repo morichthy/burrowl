@@ -73,14 +73,14 @@ core         记录模型与校验、契约说明、哈希、原子写与锁、�
 |---|---|---|
 | CORE 记录契约 | `core/records.py`（校验与领域规则）、`core/schema/`（memory.schema.json 与草案示例）、`core/contract.py`（给 AI 的契约说明）、`core/links.py`（链接语法与 handle 生成） | 所有读写记录的服务、`memory.contract`、草案示例测试、前端类型、Skill 与 RECORDING；契约只做增量，已有指纹必须不变（`tests/service/test_links.py`） |
 | STORE 规范存储 | `storage/memory_store.py`（提交、CAS、幂等、暂存回读、恢复；`read_head` 只读 HEAD、提交清单与指定指针记录；`VerifiedRecords` 已校验记录缓存）、`storage/owners.py`（对象发现、业务卡、核心算法准入；对象发现不进入 `runs/`，`RunLocator` 按编号与位置找 Run）、`storage/sources.py`（来源登记）、`core/atomic.py`（锁） | 所有服务；备份恢复；validate |
-| MEM 记忆服务 | `services/memory/`：service（提交与读取过滤、handle）、links（链接解析与重新固定）、concepts（概念库约束与术语扩展）、claims（结论、复核图、成熟度与派生统计）、documents（文稿）、history、raw_materials、provenance（影响与血缘）、associations、consolidation、export | REVIEW、QUERY、READ、HUB 的读取者；工作台记忆页；work 与 consolidate Skill |
+| MEM 记忆服务 | `services/memory/`：service（提交与读取过滤、handle；可见范围默认值见 policy）、vocabulary（两层关系词表与 warning，R19）、links（链接解析与重新固定）、concepts（概念库约束与术语扩展）、claims（结论、复核图、成熟度与派生统计）、documents（文稿）、history、raw_materials、provenance（影响与血缘）、associations、consolidation、export | REVIEW、QUERY、READ、HUB 的读取者；工作台记忆页；work 与 consolidate Skill |
 | REVIEW 复核 | `services/review.py`、`services/memory/claims.py` | 检索的复核类别、正式用途、中枢发布策略、复核页 |
 | IDX 检索 | `index/`（db、projections（含上下文信封）、graph（图投影）、fusion、query_plan、rerank、conditions、extract、embed、late（后切分分组）、model_store）、`services/indexing.py`（同步、图路线、关联候选、缺口） | QUERY、READ 的召回；关系图页；模型安装；索引重建；发现可见性语义；评估脚本 `tools/eval_retrieval.py`、`tools/eval_recall_models.py` |
 | RUN 执行证据 | `services/runs.py`（建立、登记、执行、显式查找、丢弃与回收站）、`storage/owners.py` 的 `RunLocator`（R14：按编号与位置查找，上级按目录位置） | 引用解析、时间线与原始材料、关键操作记录、归属判定、收口的 `unfixed_evidence`、`system.validate`、关系图的 Run 节点；`tests/service/test_run_evidence.py` |
 | ROUTE 归属判定 | `services/routing.py`（`memory.owner_route`：复用 `ReadingService.preview` → `screen` 的召回与筛选包，补充目标、检查点与来源重叠证据；结果可被随后同一问题的 `reading.start` 复用，R18） | 阅读第一轮召回的任何变化都会同步改变归属候选；RULES 第 1、2 节与 work Skill；`tests/service/test_routing.py` |
 | ACT 关键操作记录 | `services/activity.py`（从业务卡、提交回执、复核记录、Run 业务卡、中枢执行记录派生；一行摘要生成函数）；写操作返回值的 `activity` 字段 | 提交回执与记录结构、Run 状态、中枢执行记录的变化；工作台首页；`tests/service/test_activity.py` |
 | QUERY 材料查询 | `services/query/`（search、page、assemble、expand、deepen、documents，以及预算） | 检索页；read Skill 的片段模式；context_reach 语义 |
-| READ 阅读会话 | `services/reading/`（service、screening、notes、text、session、reuse（筛选结果复用，R18）） | 阅读会话页（SSE）；read Skill；配置中的阅读默认值与预算 |
+| READ 阅读会话 | `services/reading/`（service、screening、notes、text（含定点阅读）、session、reuse（筛选结果复用，R18）、expand（联想 = 图扩展，R19）） | 阅读会话页（SSE）；read Skill；配置中的阅读默认值与预算 |
 | HUB 知识中枢 | `services/hub.py`、`storage/hub_state.py`、`connectors/`（spi、registry、fake、mdvault），以及独立包 `burrowl-connector-weknora`、`burrowl-connector-lightrag`（图模式，按需重建） | 发布策略与复核类别；中枢页；wiki_page 记录；合约测试；LightRAG 版本锁定在 1.5.7，升级前重跑 `tests/connectors/test_lightrag.py` |
 | MAINT 维护与监测 | `services/maintenance.py`（计划状态 planned → queued → reviewed → applied / partial，执行仅限用户，R16）、`services/monitor.py`、`services/relations.py`（读取图投影、关联候选） | 维护页与导航计数、关系图页；consolidate Skill 与 MCP 说明；`maintenance.plan_from_candidates` 依赖候选记下的影响路径 |
 | NOTE 工作台笔记 | `services/notes.py`（R15：用户交给 AI 的待办；状态转换、AI 方案的预演与预览、用户执行时核对依据 HEAD 后按方案写入） | 关系图页笔记面板、首页状态卡与导航计数；`memory.resume` 的 `workbench_notes`；RULES 第 8 节、work 与 consolidate Skill；方案步骤依赖 `memory.commit` 与 `relations.decide` 的参数和 dry_run |
@@ -190,6 +190,8 @@ handle 分配和正文链接解析发生在第 1 步（`MemoryService.prepare`�
 ### 已知差距
 
 - Qdrant 服务器适配器未实现：sqlite-vec 是暴力检索，约 10 万向量以上需要它。
+- R19 之前按旧默认存成 owner_only 的知识记录与关联不会自动改为全库可见，在跨对象召回里仍看不到；修订时也沿用原值（R19 §8，待用户决定是否做维护计划）。
+- 图扩展的种子细到 L1 块时，只走块自身的边；其他对象指向所在整条记录的引用走不到（R19 §9 走查发现，待定）。扩展的默认上限与阈值（每轮 5 个对象、阈值 0.2、中转对象数 20）没有真实题集依据。
 - 检索评估只有浮点样例的小题集（13 题，`tools/eval_retrieval.py`），只能看相对变化；基于真实数据目录的 40–60 题评估集待用户抽查后建立（R12 的 T-P0.2）。样例只有一个对象、没有链接和结论，图路线在上面没有可测的收益。
 - 嵌入模型和切分方式的证据还不完整（R17 §7）：jina 在合成中文题集上明显好于 MiniLM，但在浮点样例的 13 题上名次指标更低；英文科研题集（SciFact）上 jina 还没测；后切分与 windows、whole 的对比，需要以中文长 L1 记录为主的题集。fp32 版 jina 在 2 线程 CPU 上编码约每秒 450 token，首次建索引较慢。
 - 交换包尚未在 Obsidian 中人工验收（R12 AC-P3）。

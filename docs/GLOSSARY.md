@@ -82,7 +82,14 @@
 | 后切分 | late chunking：整条记录（连同信封）一次送进嵌入模型，取逐 token 输出后按块或段落区间分别求平均，每段一个向量。每个向量只覆盖一段，但编码时看过全文上下文 | 不是"整条一个向量"（whole），也不是"各段单独编码"（windows）；只适用于平均池化的长上下文模型 | `index.embedding.chunking`、`late_context_tokens`、`span_tokens` |
 | 索引状态 | indexed 已就绪；pending 待更新；stale 落后于当前 HEAD | pending 时结果可能不完整，不能写成"没有材料" | `index_status` |
 | 阅读会话（RS） | 围绕一个问题保存的阅读工作：召回、筛选、阅读进度、笔记和用户请求 | 不是知识，笔记要成为知识须另行提交 | `RS-…`，`reading.*` |
-| 阅读策略 | standard：筛选后完整阅读；associative：不足时按联想方向补查；quick：只依据召回片段 | — | `strategy` |
+| 阅读策略 | standard：筛选后完整阅读；associative：在 standard 基础上可做联想（图扩展）；quick：只依据召回片段 | — | `strategy` |
+| 联想（图扩展） | associative 策略下，读完并写好笔记后，从笔记出处（扩展锚点优先）出发、只沿跨对象的边走一跳，按焦点相关度取几个新对象交给筛选（R19） | 不是 AI 改写问题再检索；不召回新范围 | `reading.recall(mode=association)` |
+| 扩展锚点 | 笔记中标出的"值得顺着关系去追"的出处，最多 3 个，每个写明原因 | 不是证据，不改变复核状态 | `expand_from` |
+| 焦点 | 一句话写当前还缺什么，用来给图扩展的候选排序 | 只用于排序，不召回新范围，不需要审批 | `focus` |
+| 关系线索 | 图扩展带来的候选对象的窗口，写明经由什么关系与已读材料相连 | 只是线索，不能作为笔记出处或证据 | 窗口 `kind=relation` |
+| 定点阅读 | 图扩展带来的对象判为相关后，只读被关系指到的节点及其必要上下文 | 需要了解整个对象时才升级为整读 | `reading.read(scope=targets/full)` |
+| 扩大检索 | 放宽条件、去掉限定词或型号、换更宽的问题再召回；必须经用户批准 | 等义改写、补保护词、改错别字不算 | `ask_user(kind=broaden)`、`recall(mode=broaden)` |
+| 关系陈述 / 关系指向 | 关系陈述是自带文字的关系（结论、关联），进入检索；关系指向是只说明谁与谁有何关系的引用（supports、references 等），在图扩展时显示为关系线索 | 关联与关系线索都不是证据 | — |
 | 筛选包 | 为判断一个 Owner 是否相关而交付的 2–4 个互补命中窗口，带 digest | 不是完整正文 | `packet`、`digest` |
 | 三态判断 | relevant：值得完整阅读；uncertain：信息不足，先 peek 或问用户；irrelevant：明确无关 | uncertain 不会自动扩大阅读范围 | `verdict` |
 | 研究笔记（note） | 阅读后对一个 Owner 写的材料知识，带固定出处 | 不是规范记录或已复核结论 | `reading.note` |

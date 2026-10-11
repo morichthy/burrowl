@@ -102,6 +102,9 @@
 - 读完全部页才能写笔记；quick 只能引用采纳的窗口。
 - 对象更新后笔记与综合稿失效。
 - 全文补偿的前提与一次性批准；request_id 重试不重复执行；重排 required 时缺模型报错。
+- 扩大检索须用户批准、批准只能用一次、别的请求的批准不能借用；联想不接受文本（`tests/service/test_graph_expansion.py`，R19）。
+- 图扩展：种子只来自笔记出处、锚点优先；只走跨对象的边，对象内部与已在会话中的对象不出现；失效结论声明的边不扩展；被很多对象引用的来源不中转；焦点改变排序；没有种子时不消耗轮数；扩展来的对象默认定点阅读、升级整读计入上限；关系线索不可作为出处（同上）。
+- 可见范围默认值、修订沿用、对象策略优先；非推荐关系名只给 warning、收口时列出（`tests/service/test_discovery_defaults.py`、`tests/unit/test_relation_vocabulary.py`）。结论、已采纳关联、概念页进入发现投影（`tests/unit/test_relation_projection.py`）。
 
 **MCP 交付**
 
