@@ -195,7 +195,8 @@ class ReadingService:
     def _round(self, session: dict, plan: dict, kind: str, *, corpus: str = "discovery") -> dict:
         """执行一轮召回，把新对象加入队列并生成筛选包（在会话锁外计算）。"""
         result = self.screen(plan, corpus=corpus, owner_ids=session.get("scope_owner_ids"),
-                             review_filter=session["review_filter"], exclude=set(session["owners"]),
+                             review_filter=session["review_filter"],
+                             exclude=set(session["owners"]) | set(session.get("skip_owner_ids") or []),
                              screening_cfg=session["screening"], reranking=session["reranking"],
                              conditions=session.get("field_conditions") or None,
                              origin=f"reading.{kind}")
@@ -267,8 +268,13 @@ class ReadingService:
         session["field_conditions"] = checked
         session["budget"] = {k: getattr(cfg.budget, k) for k in BUDGET_KEYS}
         session["consumed"] = {}
+        # 所属对象还没有任何记录时只有业务卡，没有可读材料，却因标题与问题高度相似排在最前（R18 走查发现），
+        # 本会话的所有召回轮次都不收它。已有记录的所属对象照常参与：它的 L1 细节可能是 resume 没有展开的。
+        session["skip_owner_ids"] = [owner_id] if owner_id and self._head(owner_id) is None else []
         self._apply_round(session, self._round(session, plan, "discovery"))
         _event(session, "start", f"开始阅读：{question[:60]}")
+        if session["skip_owner_ids"]:
+            _event(session, "skip_owner", f"所属对象 {owner_id} 尚无记录，不参与召回")
         self.sessions.create(session)
         last = session["rounds"][-1]
         batch = self._batch(session)
@@ -276,7 +282,7 @@ class ReadingService:
                 "plan": {"variants": [v["question"] for v in plan["variants"]], "matched_terms": plan["matched_terms"]},
                 "batch": batch, "remaining": len(session["queue"]) - len(batch),
                 "gaps": last["gaps"], "fulltext_available": bool(last["fulltext_reasons"]),
-                "reused_from": last["reused_from"],
+                "reused_from": last["reused_from"], "skipped_owner_ids": session["skip_owner_ids"],
                 "inbox": [], "pending_requests": [], "revision": 1,
                 "next": "对每个对象给出 relevant / uncertain / irrelevant、理由和筛选包 digest（reading_assess）"
                         + ("；quick 策略还要用 accepted_windows 标出可依据的窗口" if strategy == "quick" else "")}

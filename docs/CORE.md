@@ -158,6 +158,7 @@ synthesize：跨对象综合，固定所依据的笔记
 全文补偿：仅当发现召回不可用、不完整或不足 → ask_user(fulltext) → 用户批准 → recall(fulltext)
 联想补查：associative 策略按主 Agent 给定方向，受轮数上限
 finish：交接文本 = 有效综合稿或逐对象笔记；陈旧笔记、超上限笔记不交付并列为缺口
+所属对象：start 的 owner_id 还没有任何记录时，本会话的召回都不收它（只有业务卡，无可读材料；回执 skipped_owner_ids）
 复用：start 的输入与刚做过的归属判定相同、参与检索的对象及其索引都没变时，直接用那一轮召回与筛选包
       （回执 reused_from；缺口现算）；判定时的判断不带进会话，照常 assess
 用户侧：respond / override / direct / configure / abort / archive → 写入收件箱，随下次调用交付

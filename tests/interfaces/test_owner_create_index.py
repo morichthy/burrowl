@@ -65,3 +65,19 @@ def test_reuse_on_continue_path_but_not_after_create(ctx):
     session = call(ctx, "reading.start", {"question": TASK, "owner_id": created["owner_id"]})
     assert session["reused_from"] is None
     assert not owner_gaps(session, created["owner_id"])
+
+
+def test_reading_skips_its_own_owner_until_it_has_records(ctx):
+    # R18 走查：会话所属的新对象只有业务卡，却因标题与问题高度相似排在第一批最前
+    created = call(ctx, "memory.owner_create", {"owner_type": "research", "slug": "sum-eval",
+                                                "title": "浮点求和误差的比较评测"})
+    owner_id = created["owner_id"]
+    session = call(ctx, "reading.start", {"question": TASK, "owner_id": owner_id})
+    assert session["skipped_owner_ids"] == [owner_id]
+    assert owner_id not in {p["owner_id"] for p in session["batch"]}
+    # 不指定所属对象时它照常可被召回（判定要能找到它）
+    assert owner_id in {p["owner_id"] for p in call(ctx, "reading.start", {"question": TASK})["batch"]}
+    # 已有记录的所属对象照常参与
+    sum_owner = "RES-SUM"
+    session = call(ctx, "reading.start", {"question": TASK, "owner_id": sum_owner})
+    assert session["skipped_owner_ids"] == [] and sum_owner in {p["owner_id"] for p in session["batch"]}

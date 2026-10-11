@@ -78,7 +78,7 @@ def test_unready_owner_does_not_block_reuse(ws):
     # 经 memory.owner_create 新建的对象会立即建索引，召回确实不同，不复用（tests/interfaces/test_owner_create_index.py）
     ws.route(task=TASK, limit=10)
     created = ws.storage.owners.create("research", "sum-rand", "随机输入求和误差", {})
-    session = ws.reading.start(TASK, actor=AI, owner_id=created.owner_id)
+    session = ws.reading.start(TASK, actor=AI)  # 不设为所属对象：所属对象尚无记录时会被排除，排除项也是复用键的一部分
     assert session["reused_from"]["origin"] == "owner_route"
     fresh = fresh_start(ws)
     assert session["batch"] == fresh["batch"] and session["gaps"] == fresh["gaps"]

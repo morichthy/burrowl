@@ -16,9 +16,9 @@ from .tokenize import tokens
 MAX_VARIANTS = 3
 
 
-def _require(condition: bool, message: str) -> None:
+def _require(condition: bool, message: str, details: dict | None = None) -> None:
     if not condition:
-        raise BurrowlError("INVALID_ARGUMENT", message)
+        raise BurrowlError("INVALID_ARGUMENT", message, details or {})
 
 
 def _texts(value: Any, name: str, limit: int = 64) -> list[str]:
@@ -78,7 +78,8 @@ def build(question: str, *, keywords: list[str] | None = None, variants: list[di
     _require(isinstance(question, str) and question.strip() and len(question) <= 12000, "问题不能为空且不超过 12000 字")
     numeric = numeric_tokens(question)
     protected = list(dict.fromkeys(_texts(protected_terms or [], "protected_terms") + numeric))
-    _require(all(_preserves(question, t) for t in protected), "保护项必须来自原问题")
+    foreign = [t for t in protected if not _preserves(question, t)]
+    _require(not foreign, f"保护项必须来自原问题：{'、'.join(foreign)}", {"missing": foreign})
     _require(corpus_language in {"zh", "en", "mixed", "unknown"}, "语料语言无效")
     domains = _texts(domains or [], "domains", 20)
     plan_variants = [{"id": "original", "language": _language(question), "question": question,
@@ -89,8 +90,17 @@ def build(question: str, *, keywords: list[str] | None = None, variants: list[di
         _require(item.get("language") in {"zh", "en", "other"} and isinstance(item.get("question"), str)
                  and item["question"].strip(), "查询改写缺少语言或语句")
         terms_list = _texts(item.get("lexical_terms") or tokens(item["question"])[:32], "lexical_terms", 32)
-        _require(all(_preserves(item["question"], t) for t in protected), "查询改写丢失了保护项（型号/数值），请修正")
-        _require(set(numeric_tokens(item["question"])) == set(numeric), "查询改写增加或改变了数值/型号，请修正")
+        # 报错写明是哪条改写、缺了或多了哪几项：有的客户端只显示 message
+        lost = [t for t in protected if not _preserves(item["question"], t)]
+        _require(not lost, f"查询改写丢失了保护项（型号/数值）：{'、'.join(lost)}，请补上",
+                 {"variant": item["question"], "missing": lost})
+        found = set(numeric_tokens(item["question"]))
+        added, dropped = sorted(found - set(numeric)), sorted(set(numeric) - found)
+        _require(not added and not dropped,
+                 "查询改写增加或改变了数值/型号：" + "；".join(
+                     part for part in (f"多出 {'、'.join(added)}" if added else "",
+                                       f"缺少 {'、'.join(dropped)}" if dropped else "") if part) + "，请修正",
+                 {"variant": item["question"], "added": added, "missing": dropped})
         same = next((v for v in plan_variants if " ".join(v["question"].casefold().split())
                      == " ".join(item["question"].casefold().split())), None)
         if same:
