@@ -306,6 +306,10 @@ export declare namespace RelationsDecide {
     };
     reason: string;
     dry_run?: boolean;
+    /**
+     * 可见范围；不给时新关联默认全库可见、修订沿用原值。只有需要保密时才写 owner_only
+     */
+    discovery?: ("workspace_summary" | "owner_only") | null;
   }
 }
 
@@ -1361,7 +1365,7 @@ export declare namespace ReadingStart {
      */
     conditions?: string[] | null;
     /**
-     * standard=筛选后完整阅读（默认）；associative=不足时按联想方向补查；quick=只依据片段、不读全文
+     * standard=筛选后完整阅读（默认）；associative=读完写笔记后可做联想（从笔记出处出发、只走跨对象边的一跳图扩展）；quick=只依据片段、不读全文
      */
     strategy?: ("standard" | "associative" | "quick") | null;
     /**
@@ -1440,7 +1444,7 @@ export declare namespace ReadingPeek {
 
 export declare namespace ReadingRead {
   /**
-   * 完整阅读判为相关的对象：第 1 页附目录，按 unread_pages 读完全部页。quick 策略不可用。
+   * 阅读判为相关的对象：第 1 页附目录，按 unread_pages 读完全部页。quick 策略不可用。
    * 对象在阅读期间有新提交时要求从第 1 页重读（STALE_BASIS）。
    */
   export interface Args {
@@ -1450,12 +1454,16 @@ export declare namespace ReadingRead {
     session_id: string;
     owner_id: string;
     page?: number;
+    /**
+     * 不填即可：第一轮召回的对象整读；图扩展带来的对象默认 targets（定点阅读，只交付被关系指到的节点及必要上下文）。只有定点内容不足以判断、确有必要了解整个对象时才填 full 升级为整读，并在笔记中说明原因；整读计入会话的整读对象上限
+     */
+    scope?: ("targets" | "full") | null;
   }
 }
 
 export declare namespace ReadingNote {
   /**
-   * 保存某对象的研究笔记（standard/associative 须先读完全部页）；出处补全为固定引用。
+   * 保存某对象的研究笔记（standard/associative 须先读完全部页；定点阅读读完定点页即可）；出处补全为固定引用。
    */
   export interface Args {
     /**
@@ -1468,13 +1476,21 @@ export declare namespace ReadingNote {
      */
     note: string;
     /**
-     * 出处 ID：必须是本会话交付过的（如 MEM-…、MEM-…#块ID、SRC-…）；quick 下只能是已采纳的窗口
+     * 出处 ID：必须是本会话交付过的。要细：引用到真正支撑内容的 L1 块（MEM-…#块ID）或结论（CLM-…），不要只写整条记录（MEM-…）；也可以是 SRC-…。quick 下只能是已采纳的窗口。出处也是联想（图扩展）的种子
      */
     sources: string[];
     /**
      * 可选的探索线索（材料提到但未核实的方向、可能相关的对象）；只作导航，不会成为结论
      */
     clues?: string[] | null;
+    /**
+     * 可选的扩展锚点 [{ref, why}]，最多 3 个：ref 是本笔记 sources 中值得顺着关系去追的节点（例如该块引用了另一项目的实测、该结论有待查的反例），why 写原因。没有值得追的就不写；写了锚点时，联想优先从锚点出发
+     */
+    expand_from?:
+      | {
+          [k: string]: unknown;
+        }[]
+      | null;
     /**
      * 可选 UUID；网络重试时沿用同一个，不会重复执行
      */
@@ -1504,14 +1520,16 @@ export declare namespace ReadingSynthesize {
 export declare namespace ReadingAskUser {
   /**
    * 向用户提问。fulltext=申请全文补偿（仅当发现召回不可用、不完整或不足，见 fulltext_available；批准后得到
-   * approval_id）；direction=请用户定联想方向；clarify=澄清问题。用户可在对话或工作台回答。
+   * approval_id）；broaden=申请扩大检索：放宽条件、去掉限定词或型号、改问更宽的问题都算，prompt 写清新问法、
+   * 理由与预计多带来哪类材料（等义改写、补保护词、改错别字不算扩大，不用申请）；direction=请用户给联想方向；
+   * clarify=澄清问题。用户可在对话或工作台回答。
    */
   export interface Args {
     /**
      * 阅读会话 ID（RS-…）
      */
     session_id: string;
-    kind: "fulltext" | "direction" | "clarify";
+    kind: "fulltext" | "broaden" | "direction" | "clarify";
     prompt: string;
     options?: string[] | null;
     /**
@@ -1523,21 +1541,43 @@ export declare namespace ReadingAskUser {
 
 export declare namespace ReadingRecall {
   /**
-   * 补充召回：全文补偿（需用户批准）或联想补查（associative 策略，受轮数上限）。
-   * 想换一种问法重新找，请新开一个 reading_start。
+   * 补充召回。fulltext=全文补偿；broaden=按用户批准的新问法再召回一轮；两者都需要用户批准。
+   * association=联想（仅 associative 策略，受轮数上限）：本轮相关对象读完、笔记写好后，从笔记出处（扩展锚点优先）
+   * 出发只走跨对象的边一跳，把与 focus 相关的新候选加入下一批筛选包；扩展来的对象判为相关后默认定点阅读。
+   * 不要通过新开 reading_start 换更宽的问题来绕过扩大检索的审批。
    */
   export interface Args {
     /**
      * 阅读会话 ID（RS-…）
      */
     session_id: string;
-    mode: "fulltext" | "association";
+    mode: "fulltext" | "broaden" | "association";
     /**
-     * fulltext 模式必填：用户批准后的 approval_id
+     * fulltext、broaden 模式必填：用户批准后的 approval_id（只能用一次）
      */
     approval_id?: string | null;
     /**
-     * association 模式：联想方向（由主 agent 制定）
+     * association 模式：一句话写当前还缺什么（例如“缺少长记录上 late 与 windows 的实测对比”），不要重复原问题；只用于给图邻居排序，不召回新范围，不需要审批。不填时用用户补充的方向或会话问题
+     */
+    focus?: string | null;
+    /**
+     * broaden 模式必填：用户批准的新问法
+     */
+    question?: string | null;
+    /**
+     * broaden 模式可选：新问法的等义改写
+     */
+    variants?:
+      | {
+          [k: string]: unknown;
+        }[]
+      | null;
+    /**
+     * broaden 模式可选：必须原样出现的词
+     */
+    protected_terms?: string[] | null;
+    /**
+     * 已停用：联想改为图扩展；要换更宽的问法先 reading_ask_user(kind=broaden)。传入会返回参数错误
      */
     association_text?: string | null;
     /**

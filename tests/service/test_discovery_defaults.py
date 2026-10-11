@@ -74,3 +74,25 @@ def test_association_defaults_to_workspace(env):
     secret = associations.decide(memory, OWNER, {"from": ends[0], "to": ends[2], "explanation": "保密对照"},
                                  actor=AI, reason="保密", discovery="owner_only")
     assert discovery(memory, secret["record_results"][0]["record_id"]) == "owner_only"
+
+
+def test_non_recommended_relation_warns_but_commits(env):
+    # R19 D-09：两层词表，超出推荐范围只给 warning
+    from burrowl.services.memory import consolidation
+
+    _storage, memory, evidence = env
+    first = put(memory, narrative_draft(OWNER, evidence), "a")
+    background = memory.inspect(OWNER, record_id=first)["record"]
+    ref = {"target_kind": "record", "target_id": first, "revision": background["revision"],
+           "sha256": background["record_hash"], "locator": "record", "relation": "background"}
+    draft = narrative_draft(OWNER, evidence, claim_id="CLM-ORDER-9") | {"sources": [evidence, ref]}
+    dry = memory.commit(request(OWNER, head_of(memory, OWNER), {"op": "put_record", "client_key": "b", "draft": draft},
+                                dry_run=True))
+    assert [w["relation"] for w in dry["warnings"]] == ["background"]
+    receipt = memory.commit(request(OWNER, head_of(memory, OWNER),
+                                    {"op": "put_record", "client_key": "b", "draft": draft}))
+    assert receipt["save_status"] == "committed"
+    assert [w["code"] for w in receipt["warnings"]] == ["RELATION_NOT_RECOMMENDED"]
+    prepared = consolidation.prepare(memory, OWNER)
+    flagged = [c for c in prepared["candidates"] if c["kind"] == "relation_vocabulary"]
+    assert len(flagged) == 1 and flagged[0]["relations"] == ["background"]

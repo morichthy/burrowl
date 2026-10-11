@@ -116,18 +116,18 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 |---|---|---|---|
 | `reading.abort` | 仅用户（不暴露给 agent） | 中止会话（agent 之后的写操作会被拒绝）。 | `session_id`*: string，`reason`: string |
 | `reading.archive` | 仅用户（不暴露给 agent） | 归档或恢复会话（历史保留）。 | `session_id`*: string，`archived`: boolean |
-| `reading.ask_user` | 写入 | 向用户提问。fulltext=申请全文补偿（仅当发现召回不可用、不完整或不足，见 fulltext_available；批准后得到 approval_id）；direction=请用户定联想方向；clarify=澄清问题。用户可在对话或工作台回答。 | `session_id`*: string，`kind`*: string，`prompt`*: string，`options`: array|null，`request_id`: string|null |
+| `reading.ask_user` | 写入 | 向用户提问。fulltext=申请全文补偿（仅当发现召回不可用、不完整或不足，见 fulltext_available；批准后得到 approval_id）；broaden=申请扩大检索：放宽条件、去掉限定词或型号、改问更宽的问题都算，prompt 写清新问法、 理由与预计多带来哪类材料（等义改写、补保护词、改错别字不算扩大，不用申请）；direction=请用户给联想方向； clarify=澄清问题。用户可在对话或工作台回答。 | `session_id`*: string，`kind`*: string，`prompt`*: string，`options`: array|null，`request_id`: string|null |
 | `reading.assess` | 写入 | 三态判断一批对象；返回下一批或“可以开始读”的提示。用户的改判优先，不会被覆盖。 | `session_id`*: string，`judgments`*: array，`request_id`: string|null |
 | `reading.configure` | 仅用户（不暴露给 agent） | 切换阅读策略。 | `session_id`*: string，`strategy`*: string |
 | `reading.delegate` | 只读 | 子 agent 任务包（只描述任务；实际派工由宿主完成）。 | `session_id`*: string，`host_supports_subagents`*: boolean |
 | `reading.direct` | 仅用户（不暴露给 agent） | 补充联想方向（下一轮联想补查使用）。 | `session_id`*: string，`text`*: string |
 | `reading.finish` | 写入 | 结束会话并返回交接文本（综合稿优先；陈旧笔记不交付；超出上限的笔记整篇省略并列出缺口）。 | `session_id`*: string，`outcome`: string，`request_id`: string|null |
 | `reading.list` | 只读 | 阅读会话列表（最新在前）。 | `status`: string|null，`owner_id`: string|null，`limit`: integer |
-| `reading.note` | 写入 | 保存某对象的研究笔记（standard/associative 须先读完全部页）；出处补全为固定引用。 | `session_id`*: string，`owner_id`*: string，`note`*: string，`sources`*: array，`clues`: array|null，`request_id`: string|null |
+| `reading.note` | 写入 | 保存某对象的研究笔记（standard/associative 须先读完全部页；定点阅读读完定点页即可）；出处补全为固定引用。 | `session_id`*: string，`owner_id`*: string，`note`*: string，`sources`*: array，`clues`: array|null，`expand_from`: array|null，`request_id`: string|null |
 | `reading.override` | 仅用户（不暴露给 agent） | 用户改判某个对象（agent 不能再覆盖）。 | `session_id`*: string，`owner_id`*: string，`verdict`*: string，`reason`: string |
 | `reading.peek` | 写入 | 查看某对象更多的命中窗口（用于 uncertain 的对象）。 | `session_id`*: string，`owner_id`*: string |
-| `reading.read` | 写入 | 完整阅读判为相关的对象：第 1 页附目录，按 unread_pages 读完全部页。quick 策略不可用。 对象在阅读期间有新提交时要求从第 1 页重读（STALE_BASIS）。 | `session_id`*: string，`owner_id`*: string，`page`: integer |
-| `reading.recall` | 写入 | 补充召回：全文补偿（需用户批准）或联想补查（associative 策略，受轮数上限）。 想换一种问法重新找，请新开一个 reading_start。 | `session_id`*: string，`mode`*: string，`approval_id`: string|null，`association_text`: string|null，`request_id`: string|null |
+| `reading.read` | 写入 | 阅读判为相关的对象：第 1 页附目录，按 unread_pages 读完全部页。quick 策略不可用。 对象在阅读期间有新提交时要求从第 1 页重读（STALE_BASIS）。 | `session_id`*: string，`owner_id`*: string，`page`: integer，`scope`: string|null |
+| `reading.recall` | 写入 | 补充召回。fulltext=全文补偿；broaden=按用户批准的新问法再召回一轮；两者都需要用户批准。 association=联想（仅 associative 策略，受轮数上限）：本轮相关对象读完、笔记写好后，从笔记出处（扩展锚点优先） 出发只走跨对象的边一跳，把与 focus 相关的新候选加入下一批筛选包；扩展来的对象判为相关后默认定点阅读。 不要通过新开 reading_start 换更宽的问题来绕过扩大检索的审批。 | `session_id`*: string，`mode`*: string，`approval_id`: string|null，`focus`: string|null，`question`: string|null，`variants`: array|null，`protected_terms`: array|null，`association_text`: string|null，`request_id`: string|null |
 | `reading.respond` | 仅用户（不暴露给 agent） | 回答 agent 的请求；批准全文补偿会生成 approval_id。 | `session_id`*: string，`request_id`*: string，`decision`*: string，`answer`: string |
 | `reading.start` | 写入 | 查询主题相关知识、找已有经验的默认入口：创建工作台可见阅读会话并立即召回。 简查选 quick（采纳片段、写笔记）；完整阅读选 standard。返回第一批对象筛选包 （每个对象 2–4 个命中窗口，含 digest），继续 assess → read（quick 跳过）→ note → finish。 | `question`*: string，`conditions`: array|null，`strategy`: string|null，`review_filter`: string|null，`variants`: array|null，`protected_terms`: array|null，`domains`: array|null，`owner_id`: string|null，`scope_owner_ids`: array|null，`field_conditions`: array|null |
 | `reading.status` | 只读 | 会话概况、当前批次、交接预览、预算消耗，以及用户在工作台上的新输入（每条只交付一次）。 | `session_id`*: string |
@@ -140,7 +140,7 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 |---|---|---|---|
 | `relations.associations` | 只读 | 已保存的关联记录。 | `status`: string|null，`record_id`: string|null |
 | `relations.candidates` | 只读 | 待判断的线索：正文提到概念却没链接（concept_mention）、向量近邻（similar）、外部工具回流（external:*）。 已判断过的端点对会被过滤。只读。 | `record_id`: string|null，`owner_id`: string|null，`kinds`: array|null，`limit`: integer |
-| `relations.decide` | 写入 | 保存关联判断（candidate/accepted/rejected/withdrawn）；只能是导航关系。 "A 会影响 B"这类可以验证的判断写成结论（inference），不要写成关联。 | `owner_id`*: string，`payload`*: object，`reason`*: string，`dry_run`: boolean |
+| `relations.decide` | 写入 | 保存关联判断（candidate/accepted/rejected/withdrawn）；只能是导航关系。 "A 会影响 B"这类可以验证的判断写成结论（inference），不要写成关联。 | `owner_id`*: string，`payload`*: object，`reason`*: string，`dry_run`: boolean，`discovery`: string|null |
 | `relations.graph` | 只读 | 材料关系图（子图）：对象、记录、块、结论、概念、来源，以及按类别区分的边（来自图投影）。 categories 只看某几类边；domains / excluded_domains 按领域筛选或屏蔽概念。 | `center`: string|null，`hops`: integer，`query`: string，`kinds`: array|null，`levels`: array|null，`excluded`: array|null，`limit`: integer，`categories`: array|null，`domains`: array|null，`excluded_domains`: array|null，`node_types`: array|null |
 | `relations.note_add` | 仅用户（不暴露给 agent） | （仅用户）新建工作台笔记（草稿）。 | `kind`*: string，`title`*: string，`text`: string，`refs`: array|null |
 | `relations.note_answer` | 仅用户（不暴露给 agent） | （仅用户）回答 AI 在笔记上的提问；笔记回到 queued。 | `note_id`*: string，`text`*: string |

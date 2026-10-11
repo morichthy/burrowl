@@ -83,7 +83,7 @@ def _indexed(ctx: Ctx, owner) -> dict:
         state = {"index_status": "pending", "details": {"reason": type(exc).__name__}}
     result = owner.summary() | {"index": state}
     if state["index_status"] not in {"indexed", "not_configured"}:
-        result["warnings"] = ["对象已建立；检索索引待补偿（index.reconcile）"]
+        result["warnings"] = [{"code": "INDEX_PENDING", "message": "对象已建立；检索索引待补偿（index.reconcile）"}]
     return result
 
 

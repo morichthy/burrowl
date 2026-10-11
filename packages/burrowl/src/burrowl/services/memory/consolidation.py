@@ -11,7 +11,7 @@ from ...core.errors import BurrowlError
 from ...core.hashing import canonical_hash, sha256_file
 from ...core.records import validate_record
 from ...storage.owners import Owner, OwnerIndex
-from . import provenance
+from . import provenance, vocabulary
 from .claims import FIXING_LEVELS, ClaimGraph, citations, iter_refs
 from .reader import fixed_ref
 from .service import MemoryService
@@ -100,6 +100,14 @@ def prepare(memory: MemoryService, owner_id: str, *, since_commit: str | None = 
             if any(r["relation"] == "contradicts" for r in [*a["sources"], *b["sources"]]):
                 candidates.append({"kind": "conflict_candidate", "refs": [fixed_ref(a), fixed_ref(b)],
                                    "reason": "存在显式反证关系，需复核范围；不会自动撤回"})
+    # R19 D-09：使用了非推荐关系名的记录，收口时由 AI 修订或保持（保持时写明理由）
+    for record in snapshot.records.values():
+        if record["sensitivity"] == "restricted":
+            continue
+        if warnings := vocabulary.relation_warnings([{"draft": record}]):
+            candidates.append({"kind": "relation_vocabulary", "refs": [fixed_ref(record)],
+                               "relations": sorted({w["relation"] for w in warnings}),
+                               "reason": "使用了非推荐关系名；按判断问题改用推荐的关系，或在修订原因中写明保留理由"})
     result = {"owner_id": owner_id, "trigger": trigger, "since_commit": base_commit, "basis_heads": basis_heads,
               "changed": changed, "affected": affected,
               "remaining": deepcopy(latest["payload"]["remaining_refs"]) if latest else [],

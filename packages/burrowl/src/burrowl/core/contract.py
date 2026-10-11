@@ -31,14 +31,19 @@ COMMON_NOTES = {
     "sensitivity": "public / internal（默认）/ confidential / restricted；restricted 不进索引、不发布、不被引用",
     "sources": "本条依据的固定引用列表（见 Ref）；正文里的编号或 ID 要与这里对应",
     "provenance_gap": "依据缺口的说明；没有缺口填 null",
-    "discovery": "可省略（取对象策略）。workspace_summary=全库检索可见；owner_only=只在指定该对象时可见",
+    "discovery": ("一般不写：知识记录（L1–L4、关联、概念页）默认 workspace_summary（全库检索可见），目标、检查点、"
+                  "路线、问题等工作状态默认 owner_only（只在指定该对象时可见）；对象策略显式设置时以对象为准；"
+                  "修订时不写则沿用原值。只有需要保密时才写 owner_only"),
     "payload": "各类型自己的结构化字段，见 payload_fields",
 }
 REF_NOTE = ("Ref = {target_kind: record|file|owner|claim, target_id, revision, sha256, locator, relation}。"
             "record：revision 与 sha256 取被引记录的 revision 与 record_hash（memory.inspect 可见）；"
             "file：revision=null，sha256 取 sources.list 中登记的指纹；owner（如 Run）：sha256 为业务卡指纹。"
-            "relation 表示用途：supports/input/contradicts 是证据；references/contains/derived_from 等是展开或组织；"
-            "相似、同类问题等导航关系用 association 记录，不是证据。")
+            "relation 按判断问题选，按写在哪里只用这几个："
+            "结论与 L2 阶段的 evidence_refs → supports（能证明）/ contradicts（是反例）/ input（作为输入的数据）；"
+            "sources 与其他固定引用 → 以上三个或 references（只是参考）。"
+            "\"值得放在一起看\"用 relations.decide 写关联（related_to / same_problem / same_failure_mode / analogous_to），"
+            "不是证据；\"A 会影响 B\"写成结论。其他关系名仍可读取，但提交时会返回 warning。")
 
 
 def _describe(schema: dict, all_defs: dict, depth: int) -> Any:

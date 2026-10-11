@@ -35,7 +35,12 @@
     "result_limit": 10,
     "association": {
       "enabled": true,
-      "max_rounds": 3
+      "max_rounds": 3,
+      "expand_owners": 5,
+      "min_score": 0.2,
+      "concept_max_degree": 20,
+      "target_nodes": 3,
+      "target_pages": 2
     },
     "context": {
       "max_owners": 10,
@@ -57,7 +62,7 @@
       "output_chars": 80000,
       "candidates": 1000,
       "graph_nodes": 50,
-      "graph_edges": 100,
+      "graph_edges": 1000,
       "graph_hops": 2,
       "model_tokens": 65536,
       "model_calls": 20,
@@ -153,6 +158,7 @@
   "$defs": {
     "Association": {
       "additionalProperties": false,
+      "description": "联想 = 按对象的一跳图扩展（R19 D-06、D-11）。默认值是初值，等真实题集建成后再调。",
       "properties": {
         "enabled": {
           "default": true,
@@ -164,6 +170,46 @@
           "maximum": 20,
           "minimum": 1,
           "title": "Max Rounds",
+          "type": "integer"
+        },
+        "expand_owners": {
+          "default": 5,
+          "description": "每轮最多新增的候选对象",
+          "maximum": 20,
+          "minimum": 1,
+          "title": "Expand Owners",
+          "type": "integer"
+        },
+        "min_score": {
+          "default": 0.2,
+          "description": "候选对象的最低分（图分数 × 焦点相关度之和）",
+          "maximum": 10,
+          "minimum": 0,
+          "title": "Min Score",
+          "type": "number"
+        },
+        "concept_max_degree": {
+          "default": 20,
+          "description": "度数不超过它的概念、来源才能中转（热门概念不中转）",
+          "maximum": 1000,
+          "minimum": 0,
+          "title": "Concept Max Degree",
+          "type": "integer"
+        },
+        "target_nodes": {
+          "default": 3,
+          "description": "每个候选对象的关系窗口与定点阅读节点上限",
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Target Nodes",
+          "type": "integer"
+        },
+        "target_pages": {
+          "default": 2,
+          "description": "每个候选对象定点阅读的页数上限",
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Target Pages",
           "type": "integer"
         }
       },

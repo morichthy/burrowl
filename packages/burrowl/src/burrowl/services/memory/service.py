@@ -16,7 +16,7 @@ from ...core.ports import IndexSink, NullIndex
 from ...core.records import content_hash, record_hash, validate_commit_request, validate_record
 from ...storage.memory_store import Snapshot
 from ...storage.owners import SENSITIVITY_RANK, Owner, OwnerIndex
-from . import concepts, policy, rules
+from . import concepts, policy, rules, vocabulary
 from .claims import ClaimGraph, blocked_records
 from .context import RefResolver, Storage
 from .links import LinkResolver
@@ -317,8 +317,11 @@ class MemoryService:
             raise BurrowlError("VERSION_CONFLICT", "预检依据的 HEAD 已变化", {"current_head": snapshot.head})
         _changed, results, resolver = self.prepare(request, snapshot, index, allow_review=allow_review)
         resolver.recheck()
-        return {"valid": True, "dry_run": True, "owner_id": owner.owner_id, "head": snapshot.head,
-                "record_results": results, "writes": 0}
+        result = {"valid": True, "dry_run": True, "owner_id": owner.owner_id, "head": snapshot.head,
+                  "record_results": results, "writes": 0}
+        if warnings := vocabulary.relation_warnings(request["operations"]):  # R19 D-09：只提示，不拒绝
+            result["warnings"] = warnings
+        return result
 
     def basis_checks(self, basis_heads: dict[str, str | None]) -> list[dict]:
         """材料包依据：列出的对象 HEAD 必须与准备材料时一致，否则拒绝（不能用旧材料覆盖新结果）。"""
@@ -349,8 +352,9 @@ class MemoryService:
         owner = self._target(index, request["owner_id"])
         digest = hash_override or request_hash(request)
         snapshot = self.snapshot(owner)
+        warnings = vocabulary.relation_warnings(request["operations"])  # R19 D-09：只提示，不拒绝
         if prior := self.storage.store.find_receipt(owner, snapshot, request["request_id"], digest):
-            return self._with_index(prior, notify=False)
+            return self._with_index(prior, notify=False, warnings=warnings)
         # 先在锁外完整预检：无效输入不会创建任何目录或锁。
         self.validate_draft(request, allow_review=allow_review)
         owner = self.storage.owners.persist(owner, request["actor"])
@@ -367,9 +371,9 @@ class MemoryService:
             owner, expected_head=request["expected_head"], request_id=request["request_id"], request_hash=digest,
             prepare=prepare, prepublish=lambda: holder["resolver"].recheck(),
             source_checks=lambda: deepcopy(holder["resolver"].checks), attribution=request.get("attribution"))
-        return self._with_index(receipt, notify=receipt["save_status"] == "committed")
+        return self._with_index(receipt, notify=receipt["save_status"] == "committed", warnings=warnings)
 
-    def _with_index(self, receipt: dict, *, notify: bool) -> dict:
+    def _with_index(self, receipt: dict, *, notify: bool, warnings: list | None = None) -> dict:
         """HEAD 已发布之后的索引步骤：任何异常都不能把已保存说成失败。"""
         result = deepcopy(receipt)
         try:
@@ -380,6 +384,9 @@ class MemoryService:
         except Exception as exc:  # noqa: BLE001 - 发布后的边界：保留业务成功
             state = {"index_status": "pending", "details": {"reason": type(exc).__name__}}
         result["index"] = state
+        notes = list(warnings or [])
         if state["index_status"] not in {"indexed", "not_configured"}:
-            result["warnings"] = ["记录已保存；检索索引待补偿（index.reconcile），不要重复提交"]
+            notes.append({"code": "INDEX_PENDING", "message": "记录已保存；检索索引待补偿（index.reconcile），不要重复提交"})
+        if notes:
+            result["warnings"] = notes
         return result
