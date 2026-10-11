@@ -246,6 +246,8 @@ assemble(已选候选)：
       或 maintenance.plan(changed_ids, targets?) 列出受影响记录及其完整正文
 处置：用户把计划交给 AI（queued）→ AI 逐项决定 retain / revise（附草案）/ resynthesize / retract / defer
       → maintenance.review 预检 → 待你确认（reviewed）；用户可附意见退回（回到 queued，处置保留）
+可见范围补齐（R19 §8）：maintenance.visibility_candidates 列出旧默认存成 owner_only 的知识记录 → 用户勾选 →
+      maintenance.plan_visibility 生成处置已写好的计划（改为全库可见、正文不变，直接 reviewed）→ 预览后执行
 提交：只由用户在工作台执行 maintenance.apply，按对象逐个提交（依据版本不一致则拒绝），可能部分完成；
       修订署名为写处置的 AI，修订原因带计划编号；撤回结论的复核署名为执行的用户
 回读：再按 consolidate 流程检查概览、文稿和上下文

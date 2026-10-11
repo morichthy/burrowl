@@ -249,6 +249,18 @@ def maintenance_plan_from_candidates(ctx: Ctx, target_ids: list[str], note: str 
     return plan
 
 
+@op("maintenance.visibility_candidates")
+def maintenance_visibility_candidates(ctx: Ctx) -> list:
+    """R19 之前按旧默认存成 owner_only 的知识记录（L1–L4、已采纳的关联、概念页）。对象策略显式要求保密的对象不列出。"""
+    return ctx.app.maintenance.visibility_candidates()
+
+
+@op("maintenance.plan_visibility", effect="user")
+def maintenance_plan_visibility(ctx: Ctx, target_ids: list[str], note: str = "") -> dict:
+    """（仅用户）为勾选的记录生成可见范围补齐计划：处置已写好（修订为全库可见，正文不变），预览后执行。"""
+    return ctx.app.maintenance.plan_visibility(target_ids, actor=ctx.actor, note=note)
+
+
 @op("maintenance.plans")
 def maintenance_plans(ctx: Ctx, status: Annotated[
         list[Literal["planned", "queued", "reviewed", "applied", "partial"]] | None,

@@ -6,6 +6,10 @@ apply   （仅用户，R16 D-03）按对象逐个提交（请求 ID 由计划确
 撤回（retract）= 把该记录中的结论复核为 retracted，不删除任何内容。
 
 状态（R16 D-02）：planned 已生成 → queued 交给 AI → reviewed 待你确认 → applied / partial。
+
+可见范围补齐（R19 §8）：R19 之前按旧工作区默认（owner_only）保存的知识记录不会自动改变。visibility_candidates
+列出它们，plan_visibility 为用户勾选的记录生成已写好处置的计划（修订为全库可见，正文不变），直接进入 reviewed，
+由用户在工作台预览后执行。改的只是可见范围，属机械操作，不需要 AI 起草。
 """
 import uuid
 from typing import Any
@@ -13,7 +17,7 @@ from typing import Any
 from ..core.clock import utc_now
 from ..core.errors import BurrowlError
 from ..core.revdoc import RevisionedDoc
-from .memory import provenance
+from .memory import policy, provenance, rules
 from .memory.claims import ClaimGraph
 from .memory.reader import Reader, fixed_ref
 from .memory.service import MemoryService
@@ -63,6 +67,55 @@ class MaintenanceService:
                 "thread": []}
         self._doc(plan["plan_id"]).create(plan)
         return {**plan, "revision": 1}
+
+    def visibility_candidates(self) -> list[dict]:
+        """按旧默认存成 owner_only 的知识记录（R19 §8）。跳过：对象策略显式设为 owner_only 的对象、受限记录、
+        不可读对象、未采纳的关联。无法区分"当时显式写了 owner_only"与"取了旧默认"，所以由用户逐条勾选。"""
+        out = []
+        for owner in self.memory.owners().readable():
+            if not owner.persisted:
+                continue
+            snapshot = self.memory.snapshot(owner)
+            resolved = self.memory.owner_policy(owner, snapshot)
+            if resolved["sources"].get("discovery") in {"owner", "request"} \
+                    and resolved["values"]["discovery"] == "owner_only":
+                continue  # 对象整体要求保密
+            for record in snapshot.records.values():
+                if record["kind"] not in policy.KNOWLEDGE_KINDS or record["discovery"] != "owner_only" \
+                        or record["sensitivity"] == "restricted":
+                    continue
+                if record["kind"] == "association" and record["payload"].get("status") != "accepted":
+                    continue
+                out.append({"record_id": record["record_id"], "owner_id": owner.owner_id, "kind": record["kind"],
+                            "level": record["level"], "title": record["title"], "updated_at": record["updated_at"]})
+        return sorted(out, key=lambda r: (r["owner_id"], r["record_id"]))
+
+    def plan_visibility(self, target_ids: list[str], *, actor: dict, note: str = "") -> dict:
+        """为勾选的记录生成计划：处置已写好（修订为全库可见），状态 reviewed，由用户预览后执行。"""
+        candidates = {c["record_id"]: c for c in self.visibility_candidates()}
+        missing = sorted(set(target_ids) - candidates.keys())
+        if not target_ids or missing:
+            raise BurrowlError("INVALID_ARGUMENT", "请从可见范围补齐的候选中选择", {"missing": missing[:20]})
+        reader = Reader(self.memory.storage)
+        items, heads = [], {}
+        for record_id in sorted(set(target_ids)):
+            owner_id = candidates[record_id]["owner_id"]
+            owner = self.memory.owners().get(owner_id)
+            current = self.memory.snapshot(owner).records[record_id]
+            heads[owner_id] = self.memory.snapshot(owner).commit_id
+            draft = rules.draft_from(current) | {"discovery": "workspace_summary"}
+            reason = "R19：知识记录默认全库可见；原为 owner_only（取自旧的工作区默认值），正文不变"
+            items.append({"target": fixed_ref(current), "owner_id": owner_id, "kind": current["kind"],
+                          "title": current["title"], "content": record_text(reader.record(fixed_ref(current))),
+                          "formal_dependency": False, "paths": [],
+                          "decision": {"action": "revise", "reason": reason, "draft": draft}})
+        reader.recheck()
+        plan = {"plan_id": f"MP-{uuid.uuid4()}", "changed_ids": [], "note": note or "可见范围补齐（R19）",
+                "created_by": actor, "created_at": utc_now(), "basis_heads": heads, "items": items, "applied": {},
+                "status": "reviewed", "reviewed_by": actor, "purpose": "visibility", "thread": []}
+        _event(plan, actor, "reviewed", "处置由程序生成：修订为全库可见，正文不变；预览后执行")
+        self._doc(plan["plan_id"]).create(plan)
+        return {**plan, "revision": 1, "preview": self._preview(plan)}
 
     def review(self, plan_id: str, decisions: list[dict], *, expected_revision: int | None = None,
                actor: dict | None = None, message: str = "") -> dict:

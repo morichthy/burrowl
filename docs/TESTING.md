@@ -105,6 +105,8 @@
 - 扩大检索须用户批准、批准只能用一次、别的请求的批准不能借用；联想不接受文本（`tests/service/test_graph_expansion.py`，R19）。
 - 图扩展：种子只来自笔记出处、锚点优先；只走跨对象的边，对象内部与已在会话中的对象不出现；失效结论声明的边不扩展；被很多对象引用的来源不中转；焦点改变排序；没有种子时不消耗轮数；扩展来的对象默认定点阅读、升级整读计入上限；关系线索不可作为出处（同上）。
 - 可见范围默认值、修订沿用、对象策略优先；非推荐关系名只给 warning、收口时列出（`tests/service/test_discovery_defaults.py`、`tests/unit/test_relation_vocabulary.py`）。结论、已采纳关联、概念页进入发现投影（`tests/unit/test_relation_projection.py`）。
+- 可见范围补齐：只列知识类、owner_only、对象未显式保密的记录；计划只能由用户生成、只含候选；执行后全库可见且能被检索到（`tests/interfaces/test_visibility_backfill.py`）。
+- 图扩展中结论、块种子带上所在记录：只走入边与对称的关联边，不走记录自己的出边（`test_claim_seed_brings_incoming_references_to_its_record`）。
 
 **MCP 交付**
 

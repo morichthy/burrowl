@@ -47,9 +47,11 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | `maintenance.handoff` | 仅用户（不暴露给 agent） | （仅用户）把计划交给 AI 起草处置，或把待确认 / 部分完成的计划退回 AI（附意见）。 | `plan_id`*: string，`note`: string |
 | `maintenance.plan` | 写入 | 来源变化或新反证后：列出受影响记录及其完整正文，生成维护计划。 | `changed_ids`*: array，`note`: string，`targets`: array|null |
 | `maintenance.plan_from_candidates` | 仅用户（不暴露给 agent） | （仅用户）为所选维护候选生成计划：变化来源取自候选记下的影响路径，计划只含所选记录；候选标为 planned。 | `target_ids`*: array，`note`: string |
+| `maintenance.plan_visibility` | 仅用户（不暴露给 agent） | （仅用户）为勾选的记录生成可见范围补齐计划：处置已写好（修订为全库可见，正文不变），预览后执行。 | `target_ids`*: array，`note`: string |
 | `maintenance.plans` | 只读 | 维护计划概况（最近有变化的在前）。queued 表示用户交给 AI 起草处置。 | `status`: array|null |
 | `maintenance.review` | 写入 | 记录逐项处置与修订草案，并逐对象预检（不写记忆）。之后由用户在工作台预览并执行。 | `plan_id`*: string，`decisions`*: array，`expected_revision`: integer|null，`message`: string |
 | `maintenance.status` | 只读 | 维护计划的当前状态。 | `plan_id`*: string |
+| `maintenance.visibility_candidates` | 只读 | R19 之前按旧默认存成 owner_only 的知识记录（L1–L4、已采纳的关联、概念页）。对象策略显式要求保密的对象不列出。 | 无 |
 
 ## memory
 

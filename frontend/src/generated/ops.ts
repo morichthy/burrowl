@@ -482,6 +482,23 @@ export declare namespace MaintenancePlanFromCandidates {
   }
 }
 
+export declare namespace MaintenanceVisibilityCandidates {
+  /**
+   * R19 之前按旧默认存成 owner_only 的知识记录（L1–L4、已采纳的关联、概念页）。对象策略显式要求保密的对象不列出。
+   */
+  export interface Args {}
+}
+
+export declare namespace MaintenancePlanVisibility {
+  /**
+   * （仅用户）为勾选的记录生成可见范围补齐计划：处置已写好（修订为全库可见，正文不变），预览后执行。
+   */
+  export interface Args {
+    target_ids: string[];
+    note?: string;
+  }
+}
+
 export declare namespace MaintenancePlans {
   /**
    * 维护计划概况（最近有变化的在前）。queued 表示用户交给 AI 起草处置。
@@ -1897,6 +1914,8 @@ export interface OpArgs {
   "relations.note_clear": RelationsNoteClear.Args;
   "maintenance.plan": MaintenancePlan.Args;
   "maintenance.plan_from_candidates": MaintenancePlanFromCandidates.Args;
+  "maintenance.visibility_candidates": MaintenanceVisibilityCandidates.Args;
+  "maintenance.plan_visibility": MaintenancePlanVisibility.Args;
   "maintenance.plans": MaintenancePlans.Args;
   "maintenance.handoff": MaintenanceHandoff.Args;
   "maintenance.review": MaintenanceReview.Args;
@@ -2028,6 +2047,8 @@ export const OP_EFFECTS: Record<OpName, string> = {
   "relations.note_clear": "user",
   "maintenance.plan": "write",
   "maintenance.plan_from_candidates": "user",
+  "maintenance.visibility_candidates": "read",
+  "maintenance.plan_visibility": "user",
   "maintenance.plans": "read",
   "maintenance.handoff": "user",
   "maintenance.review": "write",

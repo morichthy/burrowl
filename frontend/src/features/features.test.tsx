@@ -415,6 +415,34 @@ describe("维护计划交给 AI（R16）", () => {
   });
 });
 
+describe("可见范围补齐（R19）", () => {
+  it("勾选旧默认存成只在本对象可见的记录，生成补齐计划并在下方打开", async () => {
+    const { Maintenance } = await import("./Maintenance");
+    handlers["monitor.observations"] = () => [];
+    handlers["monitor.candidates"] = () => [];
+    handlers["sources.list"] = () => [];
+    handlers["sources.roots"] = () => ({ roots: [], work_dir: null });
+    handlers["runs.search"] = () => [];
+    handlers["runs.trash"] = () => [];
+    handlers["maintenance.visibility_candidates"] = () => [
+      { record_id: "MEM-OLD", owner_id: "RES-A", kind: "experience", level: "L3", title: "旧经验", updated_at: "2026-10-10T00:00:00Z" },
+    ];
+    handlers["maintenance.plan_visibility"] = () => ({ plan_id: "MP-V" });
+    handlers["maintenance.plans"] = () => [{ plan_id: "MP-V", status: "reviewed", changed_ids: [], note: "可见范围补齐（R19）", items: 1, updated_at: "2026-10-12T00:00:00Z" }];
+    handlers["maintenance.status"] = () => ({
+      plan_id: "MP-V", status: "reviewed", revision: 1, changed_ids: [], note: "可见范围补齐（R19）", applied: {}, thread: [],
+      items: [{ target: { target_id: "MEM-OLD", revision: 1 }, owner_id: "RES-A", kind: "experience", title: "旧经验", content: "正文",
+                formal_dependency: false, decision: { action: "revise", reason: "R19：知识记录默认全库可见", draft: { discovery: "workspace_summary" } } }],
+      preview: [{ owner_id: "RES-A", ok: true }],
+    });
+    render(<Maintenance />);
+    fireEvent.click(await screen.findByRole("checkbox", { name: "选择 MEM-OLD" }));
+    fireEvent.click(screen.getByRole("button", { name: "为所选生成补齐计划" }));
+    await waitFor(() => expect(calls.find((c) => c.name === "maintenance.plan_visibility")?.args).toEqual({ target_ids: ["MEM-OLD"] }));
+    expect(await screen.findByRole("button", { name: "可见范围补齐（R19）" })).toBeInTheDocument();
+  });
+});
+
 describe("维护页的 Run（R14）", () => {
   it("列出未写成记录的 Run，丢弃需写理由，回收站可恢复与清空", async () => {
     const { Maintenance } = await import("./Maintenance");

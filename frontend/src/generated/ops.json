@@ -1542,6 +1542,48 @@
   }
  },
  {
+  "name": "maintenance.visibility_candidates",
+  "group": "maintenance",
+  "effect": "read",
+  "summary": "R19 之前按旧默认存成 owner_only 的知识记录（L1–L4、已采纳的关联、概念页）。对象策略显式要求保密的对象不列出。",
+  "input": {
+   "additionalProperties": false,
+   "description": "R19 之前按旧默认存成 owner_only 的知识记录（L1–L4、已采纳的关联、概念页）。对象策略显式要求保密的对象不列出。",
+   "properties": {},
+   "title": "maintenance_visibility_candidates_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "maintenance.plan_visibility",
+  "group": "maintenance",
+  "effect": "user",
+  "summary": "（仅用户）为勾选的记录生成可见范围补齐计划：处置已写好（修订为全库可见，正文不变），预览后执行。",
+  "input": {
+   "additionalProperties": false,
+   "description": "（仅用户）为勾选的记录生成可见范围补齐计划：处置已写好（修订为全库可见，正文不变），预览后执行。",
+   "properties": {
+    "target_ids": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Target Ids",
+     "type": "array"
+    },
+    "note": {
+     "default": "",
+     "title": "Note",
+     "type": "string"
+    }
+   },
+   "required": [
+    "target_ids"
+   ],
+   "title": "maintenance_plan_visibility_input",
+   "type": "object"
+  }
+ },
+ {
   "name": "maintenance.plans",
   "group": "maintenance",
   "effect": "read",

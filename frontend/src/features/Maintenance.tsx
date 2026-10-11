@@ -43,6 +43,7 @@ interface Plan {
   status: string;
   revision: number;
   changed_ids: string[];
+  note?: string;
   items: PlanItem[];
   applied: Record<string, { ok: boolean; error?: { message: string } }>;
   thread?: { at: string; by: string; kind: string; text: string }[];
@@ -53,6 +54,7 @@ interface PlanSummary {
   plan_id: string;
   status: string;
   changed_ids: string[];
+  note?: string;
   items: number;
   updated_at: string;
 }
@@ -63,6 +65,7 @@ export function Maintenance() {
   return (
     <>
       <MonitorPanel onPlan={setPlanId} />
+      <VisibilityPanel onPlan={setPlanId} />
       <PlanPanel planId={planId} setPlanId={setPlanId} />
       <RunsPanel />
       <RootsPanel />
@@ -193,6 +196,81 @@ function MonitorPanel({ onPlan }: { onPlan: (planId: string) => void }) {
   );
 }
 
+interface VisibilityCandidate {
+  record_id: string;
+  owner_id: string;
+  kind: string;
+  level: string | null;
+  title: string;
+  updated_at: string;
+}
+
+// R19 §8：之前按旧默认存成"只在本对象可见"的知识记录。勾选后生成计划（处置已写好：改为全库可见、正文不变），
+// 在下方预览后执行；没勾选的保持原样。
+function VisibilityPanel({ onPlan }: { onPlan: (planId: string) => void }) {
+  const candidates = useOp<VisibilityCandidate[]>("maintenance.visibility_candidates", {});
+  const generate = useAction<Plan>("maintenance.plan_visibility");
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const rows = candidates.data ?? [];
+  if (!rows.length && !candidates.error) return null;
+  const toggle = (id: string) =>
+    setPicked((now) => {
+      const next = new Set(now);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  return (
+    <Panel title={`可见范围补齐（${rows.length}）`}>
+      <p className="hint">
+        这些知识记录保存时取了旧的默认值"只在本对象可见"，在跨项目的检索和联想里找不到。现在知识记录默认全库可见。
+        勾选要公开的记录生成计划，预览后执行；需要保密的不要勾选。对象整体设为保密的不会列在这里。
+      </p>
+      <ErrorBox error={candidates.error ?? generate.error} />
+      <div className="batchbar">
+        <span>已选 {picked.size} 个</span>
+        <button type="button" className="small" onClick={() => setPicked(new Set(rows.map((r) => r.record_id)))}>
+          全选
+        </button>
+        <button
+          type="button"
+          className="small primary"
+          disabled={!picked.size || generate.busy}
+          onClick={async () => {
+            const plan = await generate.run({ target_ids: [...picked] });
+            if (plan) {
+              setPicked(new Set());
+              candidates.reload();
+              onPlan(plan.plan_id);
+            }
+          }}
+        >
+          为所选生成补齐计划
+        </button>
+      </div>
+      <ul className="claims">
+        {rows.map((r) => (
+          <li key={r.record_id}>
+            <input
+              type="checkbox"
+              aria-label={`选择 ${r.record_id}`}
+              checked={picked.has(r.record_id)}
+              onChange={() => toggle(r.record_id)}
+            />
+            <div className="claim-body">
+              <Tag>{label(KINDS, r.kind)}</Tag> <a href={href("memory", r.owner_id, r.record_id)}>{r.title}</a>{" "}
+              <code>{r.owner_id}</code>
+              <div className="hint">
+                更新于 <Time value={r.updated_at} />
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </Panel>
+  );
+}
+
 // R16 D-02：计划状态的中文名
 const PLAN_STATUS: Record<string, { label: string; tone: string }> = {
   planned: { label: "已生成", tone: "muted" },
@@ -243,7 +321,7 @@ function PlanPanel({ planId, setPlanId }: { planId: string; setPlanId: (id: stri
           {plans.data.map((s) => (
             <li key={s.plan_id} className={s.plan_id === planId ? "on" : ""}>
               <button type="button" className="link" onClick={() => setPlanId(s.plan_id)}>
-                {s.changed_ids.join("、")}
+                {s.changed_ids.length ? s.changed_ids.join("、") : s.note || s.plan_id}
               </button>
               <Tag tone={PLAN_STATUS[s.status]?.tone}>{PLAN_STATUS[s.status]?.label ?? s.status}</Tag>
               <span className="hint">
@@ -279,7 +357,8 @@ function PlanPanel({ planId, setPlanId }: { planId: string; setPlanId: (id: stri
       {p ? (
         <section className="plan-detail">
           <h3>
-            <Tag tone={PLAN_STATUS[p.status]?.tone}>{PLAN_STATUS[p.status]?.label ?? p.status}</Tag> 变化：{p.changed_ids.join("、")}{" "}
+            <Tag tone={PLAN_STATUS[p.status]?.tone}>{PLAN_STATUS[p.status]?.label ?? p.status}</Tag>{" "}
+            {p.changed_ids.length ? `变化：${p.changed_ids.join("、")}` : p.note}{" "}
             <code>{p.plan_id}</code>
           </h3>
           {(p.thread ?? []).slice(-3).map((e, i) => (
