@@ -55,4 +55,4 @@
 | T-3 | 已完成 | RULES 第 2 节"判定之后的阅读""关联何时建立"；burrowl-work 第 2 步与"随手连起来"；burrowl-read"选哪种方式"；MCP 服务说明 |
 | T-4 | 已完成 | CORE §4、§12；ARCHITECTURE 模块表（ROUTE、READ）、状态表"筛选结果复用"、已知差距（只有业务卡的对象一直是 not_indexed 缺口）；TESTING；DEVELOPMENT_HISTORY；docs/README；AGENTS |
 | D-05 | 已完成（2026-10-11） | `interfaces/ops/builtin/memory.py` 的 `_indexed`；`tests/interfaces/test_owner_create_index.py`（3 项）。`test_screen_reuse` 的新建用例改为"未就绪对象不妨碍复用" |
-| 待确认 | — | 尚未用真实 AI 对话走一遍"判定 → 新建 → 阅读 → 写记录与关联" |
+| 走查 | 已完成（2026-10-11） | 在测试数据目录副本上，用常驻进程（等同 MCP，真实嵌入与重排模型）由 AI 按 Skill 走完：判定（1.06 s，无缺口）→ resume 后判为主题相关但目标不同 → 新建（立即 indexed）→ 同一问题开阅读（不复用，0.24 s）→ assess、读完 3 页、写笔记、finish（交接无缺口）→ 第一次提交 goal 带 attribution，sources 引用交接给出的两条固定引用（relation=background）→ 图投影中新目标有两条 background 边连到相关对象的 L1、L4。再判定同一任务时新对象带目标排第一，开阅读复用（35 ms）。发现：①会话自己的新对象（只有业务卡）在第一批里排第一（重排分 5.66），AI 只能判无关；②保护项丢失的报错不说明丢了哪一项；③dry_run 预测的记录 ID 随 request_id 变化，与正式提交不同（预期行为）。①②未处理，待用户决定 |
