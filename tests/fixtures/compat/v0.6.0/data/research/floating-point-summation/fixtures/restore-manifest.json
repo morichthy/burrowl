@@ -1,0 +1,767 @@
+{
+  "schema_version": 1,
+  "purpose": "Synthetic developer regression fixture; excluded from release assets",
+  "source_commit": "5d4ff0c",
+  "entries": [
+    {
+      "source": "fixtures/original-documents/EVIDENCE_LEDGER.md.snapshot",
+      "target": "research/floating-point-summation/EVIDENCE_LEDGER.md",
+      "sha256": "ee1b3ca9e69108cca9d0569a8b1dcd412a7f1637aa28874b8f70ff12ee2c94f9"
+    },
+    {
+      "source": "fixtures/original-documents/MEMORY.md.snapshot",
+      "target": "research/floating-point-summation/MEMORY.md",
+      "sha256": "ec332a13974e26a8fd01a73b067fb49b706208838255f10c9c9e44d3215f53ac"
+    },
+    {
+      "source": "PLAN.md",
+      "target": "research/floating-point-summation/PLAN.md",
+      "sha256": "dd6ed1e91dcda6709f1cf4d362c5471d25f7d3338dcf240f79a7337676113fde"
+    },
+    {
+      "source": "fixtures/original-README.md.snapshot",
+      "target": "research/floating-point-summation/README.md",
+      "sha256": "8b713428be8a83e49f1fe07a734c185bec2e5371c6929fe769ce298fdcffd86d"
+    },
+    {
+      "source": "SOURCES.md",
+      "target": "research/floating-point-summation/SOURCES.md",
+      "sha256": "8e7f63e90f57fdc0d59210ff879e15752bd2309dd67be2077ee1d6a1ea6d3dcf"
+    },
+    {
+      "source": "fixtures/original-documents/SYNTHESIS.md.snapshot",
+      "target": "research/floating-point-summation/SYNTHESIS.md",
+      "sha256": "6af09d06b2e04fe4abf60de9b12da69b82b03bc492fabcc23a15dac3e81ca9e6"
+    },
+    {
+      "source": "details/README.md",
+      "target": "research/floating-point-summation/details/README.md",
+      "sha256": "2e601360f7322303db589c7d09e231e5f25d8215d23bde21a8e48be97888ac59"
+    },
+    {
+      "source": "details/report-v2/methods.md",
+      "target": "research/floating-point-summation/details/report-v2/methods.md",
+      "sha256": "bf89c9889ac3795214b21b6a3d19557750da1304fc60fb58d63d119784e7ceed"
+    },
+    {
+      "source": "details/report-v2/round-01.md",
+      "target": "research/floating-point-summation/details/report-v2/round-01.md",
+      "sha256": "77941df3cdaf33546da7a65362918f07f00fd02196163e4992508444fe763d23"
+    },
+    {
+      "source": "details/report-v2/round-02.md",
+      "target": "research/floating-point-summation/details/report-v2/round-02.md",
+      "sha256": "70b04d20e8973083af0f7a99a27c8715d97791bf051fbbd1a5f8d3b3c410df0a"
+    },
+    {
+      "source": "details/report-v2/round-03.md",
+      "target": "research/floating-point-summation/details/report-v2/round-03.md",
+      "sha256": "be64d72d7648d1463ab8e007d18b984b418601794fad391c6dec047af5f5ac6d"
+    },
+    {
+      "source": "fixtures/original-documents/details/round-01.md.snapshot",
+      "target": "research/floating-point-summation/details/round-01.md",
+      "sha256": "4259addfe1da6ca0b2736a05e02d3a662fdad3d6c842243e3818c99e120e34de"
+    },
+    {
+      "source": "fixtures/original-documents/details/round-02.md.snapshot",
+      "target": "research/floating-point-summation/details/round-02.md",
+      "sha256": "6663c5e22a2c3154c13dae18754d7cc20b6d4c225d159ebc8081cbe27a0beb34"
+    },
+    {
+      "source": "fixtures/original-documents/details/round-03.md.snapshot",
+      "target": "research/floating-point-summation/details/round-03.md",
+      "sha256": "16afde15315ac4f45463c1f3124a3e7d886398e8c09c6fb9adfdc19e43bd228d"
+    },
+    {
+      "source": "execution/commit-invocation.json",
+      "target": "research/floating-point-summation/execution/commit-invocation.json",
+      "sha256": "467beaff914a65ab0aa137fc6403012b160afe798cc5094c7778039a2b60025a"
+    },
+    {
+      "source": "execution/commit.json",
+      "target": "research/floating-point-summation/execution/commit.json",
+      "sha256": "c20e8e5865152e587d373380f8c0929e29e763754f3f500a7fc3db5e5a4ef45e"
+    },
+    {
+      "source": "execution/inspect-invocation.json",
+      "target": "research/floating-point-summation/execution/inspect-invocation.json",
+      "sha256": "29cbb7b0c2646728f4797f979575039261513df0a5cdabd69219f487968cf2ad"
+    },
+    {
+      "source": "execution/inspect.json",
+      "target": "research/floating-point-summation/execution/inspect.json",
+      "sha256": "911f4bb4ad02372aaa5f7bcfdd9fc1457cb6897d47ecb71348d3fe6b623ebcfc"
+    },
+    {
+      "source": "execution/memory-request.json",
+      "target": "research/floating-point-summation/execution/memory-request.json",
+      "sha256": "44e4ec2cb490adc22838fe7ee92e84ded235a450c2750405cc0904ca332d01d3"
+    },
+    {
+      "source": "execution/source-registration-added.json",
+      "target": "research/floating-point-summation/execution/source-registration-added.json",
+      "sha256": "b4b858f05488ebde8b9b795e5e35eb34317d199a22f6cdc0f3e1b6d245f04f20"
+    },
+    {
+      "source": "execution/source-registration-before.json",
+      "target": "research/floating-point-summation/execution/source-registration-before.json",
+      "sha256": "e5d3cf64c728558a3de142635b1342121826955fa7aca63a4264dc4e5f70cc91"
+    },
+    {
+      "source": "execution/validate-invocation.json",
+      "target": "research/floating-point-summation/execution/validate-invocation.json",
+      "sha256": "c750ae2918b96187d4e85f776c42ffd8b001211541de0f7b9d99f8dd6b6d1979"
+    },
+    {
+      "source": "execution/validate.json",
+      "target": "research/floating-point-summation/execution/validate.json",
+      "sha256": "ce4bef4a976a47c0cb79c476c18eaf8dfb0efa27449051c4744e71ad9d419a53"
+    },
+    {
+      "source": "experiment.py",
+      "target": "research/floating-point-summation/experiment.py",
+      "sha256": "8dc8cd86e17a2595b0217e9bcef712c5a61db1eec07828fb446ea556657f2284"
+    },
+    {
+      "source": "memory/HEAD.json",
+      "target": "research/floating-point-summation/memory/HEAD.json",
+      "sha256": "204621dc47863d9ad41c402ba3fea8ed2fcf2a8049a8ec76af8ead9751cacac9"
+    },
+    {
+      "source": "memory/commits/COM-0ffe3ad7-65cc-478a-9c19-4745bccc25f2/manifest.json",
+      "target": "research/floating-point-summation/memory/commits/COM-0ffe3ad7-65cc-478a-9c19-4745bccc25f2/manifest.json",
+      "sha256": "70e763bf174e7f08fe2c46d2d640e188e39b8682b8a54c7dac4f89b5b76c501b"
+    },
+    {
+      "source": "memory/commits/COM-0ffe3ad7-65cc-478a-9c19-4745bccc25f2/receipt.json",
+      "target": "research/floating-point-summation/memory/commits/COM-0ffe3ad7-65cc-478a-9c19-4745bccc25f2/receipt.json",
+      "sha256": "fa876de83206d1945055c5f465b56a97244310d9c32fda76811ad6162b07d800"
+    },
+    {
+      "source": "memory/commits/COM-0ffe3ad7-65cc-478a-9c19-4745bccc25f2/records/MEM-96f79923-f023-509e-a002-40f2d5a4fca1.json",
+      "target": "research/floating-point-summation/memory/commits/COM-0ffe3ad7-65cc-478a-9c19-4745bccc25f2/records/MEM-96f79923-f023-509e-a002-40f2d5a4fca1.json",
+      "sha256": "925a3637729088aa8940b3684407591ea3b0153d611afb76a3369ce2c2f3e91e"
+    },
+    {
+      "source": "memory/commits/COM-0ffe3ad7-65cc-478a-9c19-4745bccc25f2/records/MEM-c4a61c00-1bf1-59b3-a65e-0fa4847db2e1.json",
+      "target": "research/floating-point-summation/memory/commits/COM-0ffe3ad7-65cc-478a-9c19-4745bccc25f2/records/MEM-c4a61c00-1bf1-59b3-a65e-0fa4847db2e1.json",
+      "sha256": "364d5e897993fd638acb4afeb99050b261eaa34ee3fcbf68f70b7a8fc17383c3"
+    },
+    {
+      "source": "memory/commits/COM-0ffe3ad7-65cc-478a-9c19-4745bccc25f2/records/MEM-c52df8fb-ca9e-53a7-a49b-342592884a50.json",
+      "target": "research/floating-point-summation/memory/commits/COM-0ffe3ad7-65cc-478a-9c19-4745bccc25f2/records/MEM-c52df8fb-ca9e-53a7-a49b-342592884a50.json",
+      "sha256": "2112edc9a1f7d2d881d40fba247935946a04d4cb0c526e4cb0308923356a29e3"
+    },
+    {
+      "source": "memory/commits/COM-30a083d9-bde0-4701-97d4-4d200c4d67d7/manifest.json",
+      "target": "research/floating-point-summation/memory/commits/COM-30a083d9-bde0-4701-97d4-4d200c4d67d7/manifest.json",
+      "sha256": "c6529a813ecd3374cabfcb8209029e661a5ea5b2be79e23829b7c97423ae63e0"
+    },
+    {
+      "source": "memory/commits/COM-30a083d9-bde0-4701-97d4-4d200c4d67d7/receipt.json",
+      "target": "research/floating-point-summation/memory/commits/COM-30a083d9-bde0-4701-97d4-4d200c4d67d7/receipt.json",
+      "sha256": "37ab0e09c30264abf94482c881ed0293c369a165365743d7d68e56ba6cc2985d"
+    },
+    {
+      "source": "memory/commits/COM-30a083d9-bde0-4701-97d4-4d200c4d67d7/records/MEM-58fd845a-05a5-516c-8bbe-c88d887cbb91.json",
+      "target": "research/floating-point-summation/memory/commits/COM-30a083d9-bde0-4701-97d4-4d200c4d67d7/records/MEM-58fd845a-05a5-516c-8bbe-c88d887cbb91.json",
+      "sha256": "40046310bb212d7318b7bfa7985d79c7a4c5aaa4c4dd50339e81ffed3cac37e2"
+    },
+    {
+      "source": "memory/commits/COM-30a083d9-bde0-4701-97d4-4d200c4d67d7/records/MEM-77b35d77-f6c1-5d05-80a1-7c3b9d5e9d09.json",
+      "target": "research/floating-point-summation/memory/commits/COM-30a083d9-bde0-4701-97d4-4d200c4d67d7/records/MEM-77b35d77-f6c1-5d05-80a1-7c3b9d5e9d09.json",
+      "sha256": "185b92b5343101a1ec6e7c877b7f10c2aa2c2714b4a6a111c7cd418ff542fec1"
+    },
+    {
+      "source": "memory/commits/COM-30a083d9-bde0-4701-97d4-4d200c4d67d7/records/MEM-96f79923-f023-509e-a002-40f2d5a4fca1.json",
+      "target": "research/floating-point-summation/memory/commits/COM-30a083d9-bde0-4701-97d4-4d200c4d67d7/records/MEM-96f79923-f023-509e-a002-40f2d5a4fca1.json",
+      "sha256": "6b8975d822c1b2dd1a16aed03db742b3c2aeca5e3077b06b650823ae54a3ed59"
+    },
+    {
+      "source": "memory/commits/COM-30a083d9-bde0-4701-97d4-4d200c4d67d7/records/MEM-a8226b54-a4cd-545a-8f22-422c2f513bfc.json",
+      "target": "research/floating-point-summation/memory/commits/COM-30a083d9-bde0-4701-97d4-4d200c4d67d7/records/MEM-a8226b54-a4cd-545a-8f22-422c2f513bfc.json",
+      "sha256": "3932fc9294f1208df74562ff4133d4fb925b7f687909260b2102f48e455bf664"
+    },
+    {
+      "source": "memory/commits/COM-30a083d9-bde0-4701-97d4-4d200c4d67d7/records/MEM-c4a61c00-1bf1-59b3-a65e-0fa4847db2e1.json",
+      "target": "research/floating-point-summation/memory/commits/COM-30a083d9-bde0-4701-97d4-4d200c4d67d7/records/MEM-c4a61c00-1bf1-59b3-a65e-0fa4847db2e1.json",
+      "sha256": "a6f3051393401f1a63cdb5c3b32be257d8d656b091bb23307414d616d077c756"
+    },
+    {
+      "source": "memory/commits/COM-30a083d9-bde0-4701-97d4-4d200c4d67d7/records/MEM-c52df8fb-ca9e-53a7-a49b-342592884a50.json",
+      "target": "research/floating-point-summation/memory/commits/COM-30a083d9-bde0-4701-97d4-4d200c4d67d7/records/MEM-c52df8fb-ca9e-53a7-a49b-342592884a50.json",
+      "sha256": "9d80e651a03c2e38b4996603f4ffe67e8ae88d1cfc128da6564cfad28f7d656b"
+    },
+    {
+      "source": "memory/commits/COM-30a083d9-bde0-4701-97d4-4d200c4d67d7/records/MEM-d117fbde-ec6b-5168-9a40-f4a25459aa2a.json",
+      "target": "research/floating-point-summation/memory/commits/COM-30a083d9-bde0-4701-97d4-4d200c4d67d7/records/MEM-d117fbde-ec6b-5168-9a40-f4a25459aa2a.json",
+      "sha256": "78e2db5022fb4981894b92df1ffb80bdbc1555ca9263ba6ea1a03b7be01175d5"
+    },
+    {
+      "source": "memory/commits/COM-30a083d9-bde0-4701-97d4-4d200c4d67d7/records/MEM-eae11b05-09a7-5f4e-a2fd-65fc1ec6000e.json",
+      "target": "research/floating-point-summation/memory/commits/COM-30a083d9-bde0-4701-97d4-4d200c4d67d7/records/MEM-eae11b05-09a7-5f4e-a2fd-65fc1ec6000e.json",
+      "sha256": "ca4a5d7e3be3721b9a430843dcdbee5c8fcae342c63b51d2c42bc2c3c8e6f0ea"
+    },
+    {
+      "source": "memory/commits/COM-30a083d9-bde0-4701-97d4-4d200c4d67d7/records/MEM-f1b731ce-9e87-502b-a9cf-a93c3f47c5f6.json",
+      "target": "research/floating-point-summation/memory/commits/COM-30a083d9-bde0-4701-97d4-4d200c4d67d7/records/MEM-f1b731ce-9e87-502b-a9cf-a93c3f47c5f6.json",
+      "sha256": "22170b8070eec734b2508403ff3282ddeea92e9dadd0748952aba14a54dd588d"
+    },
+    {
+      "source": "memory/commits/COM-30a083d9-bde0-4701-97d4-4d200c4d67d7/records/MEM-ff3cf263-e13e-51b3-8a4f-6c7574040f10.json",
+      "target": "research/floating-point-summation/memory/commits/COM-30a083d9-bde0-4701-97d4-4d200c4d67d7/records/MEM-ff3cf263-e13e-51b3-8a4f-6c7574040f10.json",
+      "sha256": "92001fb48d5d2a09f9852a61f07ffd1c37d7c980c1f098b36b75d542be36dda5"
+    },
+    {
+      "source": "memory/commits/COM-84733466-ca73-43c5-80a0-2ad3c4f8dbf9/manifest.json",
+      "target": "research/floating-point-summation/memory/commits/COM-84733466-ca73-43c5-80a0-2ad3c4f8dbf9/manifest.json",
+      "sha256": "7cd428965b5988bbd6e8e9bc5a922b84e49777b1fed3b828d1ddb384369657b5"
+    },
+    {
+      "source": "memory/commits/COM-84733466-ca73-43c5-80a0-2ad3c4f8dbf9/receipt.json",
+      "target": "research/floating-point-summation/memory/commits/COM-84733466-ca73-43c5-80a0-2ad3c4f8dbf9/receipt.json",
+      "sha256": "04467ec250dc3e1f321228be9d963e9672f398727a7352259e760754a83e5ede"
+    },
+    {
+      "source": "memory/commits/COM-84733466-ca73-43c5-80a0-2ad3c4f8dbf9/records/MEM-3090dc56-e320-5db7-8489-e0bff4d9a153.json",
+      "target": "research/floating-point-summation/memory/commits/COM-84733466-ca73-43c5-80a0-2ad3c4f8dbf9/records/MEM-3090dc56-e320-5db7-8489-e0bff4d9a153.json",
+      "sha256": "be23738f74a11e28463e3276abe97b142a52a0231f7cda0c62a3825eb84e049b"
+    },
+    {
+      "source": "memory/commits/COM-84733466-ca73-43c5-80a0-2ad3c4f8dbf9/records/MEM-5c24b3d1-3802-537e-a963-d25d63f837f8.json",
+      "target": "research/floating-point-summation/memory/commits/COM-84733466-ca73-43c5-80a0-2ad3c4f8dbf9/records/MEM-5c24b3d1-3802-537e-a963-d25d63f837f8.json",
+      "sha256": "f8e33c11c7a6632040be0696011f81a4bbf9c22dd0c6f2ef37197410ccaaa18e"
+    },
+    {
+      "source": "memory/commits/COM-9aac6b89-542c-4e2f-9a8d-01a6a0cfee63/manifest.json",
+      "target": "research/floating-point-summation/memory/commits/COM-9aac6b89-542c-4e2f-9a8d-01a6a0cfee63/manifest.json",
+      "sha256": "59c50e99619b6b7728c641ac90a3366f4c4cf6e8490cd7e77c231aff73d39db5"
+    },
+    {
+      "source": "memory/commits/COM-9aac6b89-542c-4e2f-9a8d-01a6a0cfee63/receipt.json",
+      "target": "research/floating-point-summation/memory/commits/COM-9aac6b89-542c-4e2f-9a8d-01a6a0cfee63/receipt.json",
+      "sha256": "3e18803b078e37004a032e2c083522aa95f6e8ff40799d9300b0f69a882bbc09"
+    },
+    {
+      "source": "memory/commits/COM-9aac6b89-542c-4e2f-9a8d-01a6a0cfee63/records/MEM-4acc73bb-59c7-560d-9415-fd42e9dcaa2d.json",
+      "target": "research/floating-point-summation/memory/commits/COM-9aac6b89-542c-4e2f-9a8d-01a6a0cfee63/records/MEM-4acc73bb-59c7-560d-9415-fd42e9dcaa2d.json",
+      "sha256": "b804d686f65e02800cb0d2fcf39ba05d25a9cd1629d9c3dc18c25cbe7336e428"
+    },
+    {
+      "source": "memory/commits/COM-abddae26-f26e-4c76-8b28-fe0b98a29d05/manifest.json",
+      "target": "research/floating-point-summation/memory/commits/COM-abddae26-f26e-4c76-8b28-fe0b98a29d05/manifest.json",
+      "sha256": "3faaa86dbfce2b3ab77fa1b5ad64b2fef674237a80705fc51b03c8dbf841bae1"
+    },
+    {
+      "source": "memory/commits/COM-abddae26-f26e-4c76-8b28-fe0b98a29d05/receipt.json",
+      "target": "research/floating-point-summation/memory/commits/COM-abddae26-f26e-4c76-8b28-fe0b98a29d05/receipt.json",
+      "sha256": "d49a30fab5a131e743aa043f37613118e87c07b07a0f78550c89ae2a7d2c9ed5"
+    },
+    {
+      "source": "memory/commits/COM-abddae26-f26e-4c76-8b28-fe0b98a29d05/records/MEM-a8226b54-a4cd-545a-8f22-422c2f513bfc.json",
+      "target": "research/floating-point-summation/memory/commits/COM-abddae26-f26e-4c76-8b28-fe0b98a29d05/records/MEM-a8226b54-a4cd-545a-8f22-422c2f513bfc.json",
+      "sha256": "0c1dcf2020e582a75c9236dfe0202c7205273adeae7abe2df95c63d41b86c1a1"
+    },
+    {
+      "source": "memory/commits/COM-b5c67bba-4c3a-48f8-8ab8-248fa357c5cd/manifest.json",
+      "target": "research/floating-point-summation/memory/commits/COM-b5c67bba-4c3a-48f8-8ab8-248fa357c5cd/manifest.json",
+      "sha256": "f06c5f88ad411f9d27b4bb1a130e11c50c296493519e6a25843aebe3f58cae11"
+    },
+    {
+      "source": "memory/commits/COM-b5c67bba-4c3a-48f8-8ab8-248fa357c5cd/receipt.json",
+      "target": "research/floating-point-summation/memory/commits/COM-b5c67bba-4c3a-48f8-8ab8-248fa357c5cd/receipt.json",
+      "sha256": "2fb564074aa1553d02657349bc7ee021c01e6d18e0a6510d8091701eba1879c9"
+    },
+    {
+      "source": "memory/commits/COM-b5c67bba-4c3a-48f8-8ab8-248fa357c5cd/records/MEM-96f79923-f023-509e-a002-40f2d5a4fca1.json",
+      "target": "research/floating-point-summation/memory/commits/COM-b5c67bba-4c3a-48f8-8ab8-248fa357c5cd/records/MEM-96f79923-f023-509e-a002-40f2d5a4fca1.json",
+      "sha256": "e350967bced4e72f74ef4aff94aaaf56279a278c338ea15ea37e3b6a7d74df0c"
+    },
+    {
+      "source": "memory/commits/COM-b5c67bba-4c3a-48f8-8ab8-248fa357c5cd/records/MEM-c4a61c00-1bf1-59b3-a65e-0fa4847db2e1.json",
+      "target": "research/floating-point-summation/memory/commits/COM-b5c67bba-4c3a-48f8-8ab8-248fa357c5cd/records/MEM-c4a61c00-1bf1-59b3-a65e-0fa4847db2e1.json",
+      "sha256": "e6428cea04c1a055eeb7731222ad5ae0f59ad5657ebe8eaed92e2f8e8282b130"
+    },
+    {
+      "source": "memory/commits/COM-b5c67bba-4c3a-48f8-8ab8-248fa357c5cd/records/MEM-c52df8fb-ca9e-53a7-a49b-342592884a50.json",
+      "target": "research/floating-point-summation/memory/commits/COM-b5c67bba-4c3a-48f8-8ab8-248fa357c5cd/records/MEM-c52df8fb-ca9e-53a7-a49b-342592884a50.json",
+      "sha256": "4f905049062e4d25e9d1564c268acf9f739db24c13cad0430b694209d17cd9dd"
+    },
+    {
+      "source": "memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/manifest.json",
+      "target": "research/floating-point-summation/memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/manifest.json",
+      "sha256": "7cfe02e9d30660e647c53abc634e32dc848483140077911438a25e0bd7b5f955"
+    },
+    {
+      "source": "memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/receipt.json",
+      "target": "research/floating-point-summation/memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/receipt.json",
+      "sha256": "de1ac46b3387baed6ce687935ad530358d8d0ee11028cd4e26ff78db5241a5cb"
+    },
+    {
+      "source": "memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/records/MEM-240055fb-b318-5e3e-85a0-dadf88507a18.json",
+      "target": "research/floating-point-summation/memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/records/MEM-240055fb-b318-5e3e-85a0-dadf88507a18.json",
+      "sha256": "6a3deaa4d1c199a5dca65568a77e9611d0d9980b44b883228e7f2998a5a10e01"
+    },
+    {
+      "source": "memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/records/MEM-346cdf38-a912-5e43-b17f-5b562f6ca8ba.json",
+      "target": "research/floating-point-summation/memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/records/MEM-346cdf38-a912-5e43-b17f-5b562f6ca8ba.json",
+      "sha256": "787bfc1ae9d83d37da338dd6909cc53246ec2ea0a39eb28e03e049f60c149372"
+    },
+    {
+      "source": "memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/records/MEM-51cc78a8-53d2-5503-9d00-d6131d178a96.json",
+      "target": "research/floating-point-summation/memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/records/MEM-51cc78a8-53d2-5503-9d00-d6131d178a96.json",
+      "sha256": "032132b2e0f6c01b3563facb2cc8a6e6fe8a1431804a544a07f969822782e77f"
+    },
+    {
+      "source": "memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/records/MEM-57f1ea79-42c2-57e7-b17b-b6968c23efeb.json",
+      "target": "research/floating-point-summation/memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/records/MEM-57f1ea79-42c2-57e7-b17b-b6968c23efeb.json",
+      "sha256": "96faff66cd58055d39a290b4500d665041fde0fb7f4f8ee71d275b0854f6e8fe"
+    },
+    {
+      "source": "memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/records/MEM-5977e884-5a25-515d-b2cb-3e28c8418b06.json",
+      "target": "research/floating-point-summation/memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/records/MEM-5977e884-5a25-515d-b2cb-3e28c8418b06.json",
+      "sha256": "cb4b787fccea01432ec18eecb4100e160cb2e6c3027542fd63a56517ddadef67"
+    },
+    {
+      "source": "memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/records/MEM-64aac7b4-acfe-58dd-bcf0-cce8ce3db1f7.json",
+      "target": "research/floating-point-summation/memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/records/MEM-64aac7b4-acfe-58dd-bcf0-cce8ce3db1f7.json",
+      "sha256": "9c4b63ef348b8f2e5d114cf1e9692997a9596cc97adf0dde9cc084cd915afd84"
+    },
+    {
+      "source": "memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/records/MEM-711bb712-5e0d-5ad3-8d69-9fb6f8fa90b7.json",
+      "target": "research/floating-point-summation/memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/records/MEM-711bb712-5e0d-5ad3-8d69-9fb6f8fa90b7.json",
+      "sha256": "1012e2d79abbacb44f670901bc5fd62748986334357760a86716732b19782902"
+    },
+    {
+      "source": "memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/records/MEM-abc1cfbf-3ed6-5123-a84c-f2b7fb0b5f8b.json",
+      "target": "research/floating-point-summation/memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/records/MEM-abc1cfbf-3ed6-5123-a84c-f2b7fb0b5f8b.json",
+      "sha256": "99a621d75cd31c917feb45902786e451c8e0c5bc4946f73aa02d28d8279dd5f2"
+    },
+    {
+      "source": "memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/records/MEM-ad8e3c7b-83e7-5d33-81bd-90742262ec9f.json",
+      "target": "research/floating-point-summation/memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/records/MEM-ad8e3c7b-83e7-5d33-81bd-90742262ec9f.json",
+      "sha256": "36207e4e0d945376171cb45e8c3650eccf96e1d0105990249a803f9017274dde"
+    },
+    {
+      "source": "memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/records/MEM-b2af4b7e-c542-5d09-950c-47661499e24b.json",
+      "target": "research/floating-point-summation/memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/records/MEM-b2af4b7e-c542-5d09-950c-47661499e24b.json",
+      "sha256": "7a85b19858b4ddf5c1224be3f9e9dbc63ba4f973a7fd42dec3832ec988b873af"
+    },
+    {
+      "source": "memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/records/MEM-bcc64166-73f5-5ba9-a8ea-29e41568cd3f.json",
+      "target": "research/floating-point-summation/memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/records/MEM-bcc64166-73f5-5ba9-a8ea-29e41568cd3f.json",
+      "sha256": "1d39fccf19ee5aade6777195fe8210ba8438afbd0643da6156bd76fbd8e243ff"
+    },
+    {
+      "source": "memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/records/MEM-eae18081-bb16-5920-b634-ac08669ae539.json",
+      "target": "research/floating-point-summation/memory/commits/COM-cc88488b-16a4-4a9b-b629-a6db2c83ac49/records/MEM-eae18081-bb16-5920-b634-ac08669ae539.json",
+      "sha256": "689f3aa3a0779fcf857de97b7b147e5af452579136f046251fe85d4ce6efc3be"
+    },
+    {
+      "source": "memory/commits/COM-d62b636d-cf02-449e-9293-e7918cc1b92e/manifest.json",
+      "target": "research/floating-point-summation/memory/commits/COM-d62b636d-cf02-449e-9293-e7918cc1b92e/manifest.json",
+      "sha256": "d5a32e1ab406bf9e2c519bfd8975fb984a506c000a5cee2dc726c1cadd7863bb"
+    },
+    {
+      "source": "memory/commits/COM-d62b636d-cf02-449e-9293-e7918cc1b92e/receipt.json",
+      "target": "research/floating-point-summation/memory/commits/COM-d62b636d-cf02-449e-9293-e7918cc1b92e/receipt.json",
+      "sha256": "3f994dba9b3874e9c8030bfe44d840905b80bb6b3b89c31e5bd73b5dee26d41a"
+    },
+    {
+      "source": "memory/commits/COM-d62b636d-cf02-449e-9293-e7918cc1b92e/records/MEM-21132a5c-2477-50ea-ad28-2244de823f4f.json",
+      "target": "research/floating-point-summation/memory/commits/COM-d62b636d-cf02-449e-9293-e7918cc1b92e/records/MEM-21132a5c-2477-50ea-ad28-2244de823f4f.json",
+      "sha256": "97493cbdc80ea4fcf4f67cf232e7f3cddb97ecbae518ab9f20f63209797c5186"
+    },
+    {
+      "source": "memory/commits/COM-d62b636d-cf02-449e-9293-e7918cc1b92e/records/MEM-ab9db095-2545-594c-9e94-f72bab43c464.json",
+      "target": "research/floating-point-summation/memory/commits/COM-d62b636d-cf02-449e-9293-e7918cc1b92e/records/MEM-ab9db095-2545-594c-9e94-f72bab43c464.json",
+      "sha256": "51b1310db46bf87dc469cf0cca35109259e2b92e4e436d51a570f2b6e3a178a1"
+    },
+    {
+      "source": "memory/commits/COM-db8b0714-0eba-4b73-a935-b6b482268c08/manifest.json",
+      "target": "research/floating-point-summation/memory/commits/COM-db8b0714-0eba-4b73-a935-b6b482268c08/manifest.json",
+      "sha256": "66f3c3a619327b32f06527cd5134825a0a97fcf3b9615f06934addcbe33d1e34"
+    },
+    {
+      "source": "memory/commits/COM-db8b0714-0eba-4b73-a935-b6b482268c08/receipt.json",
+      "target": "research/floating-point-summation/memory/commits/COM-db8b0714-0eba-4b73-a935-b6b482268c08/receipt.json",
+      "sha256": "76abf5981c41355aec373544848cecc2fd49f996e9aa8cd21475903b43895c4d"
+    },
+    {
+      "source": "memory/commits/COM-db8b0714-0eba-4b73-a935-b6b482268c08/records/MEM-a8226b54-a4cd-545a-8f22-422c2f513bfc.json",
+      "target": "research/floating-point-summation/memory/commits/COM-db8b0714-0eba-4b73-a935-b6b482268c08/records/MEM-a8226b54-a4cd-545a-8f22-422c2f513bfc.json",
+      "sha256": "19bfe590785b2411297607f8733f6ba4ac1e9bea4dbc69eb49d23765c9c76164"
+    },
+    {
+      "source": "memory/commits/COM-e609b189-e938-433d-968a-0ee5e184f548/manifest.json",
+      "target": "research/floating-point-summation/memory/commits/COM-e609b189-e938-433d-968a-0ee5e184f548/manifest.json",
+      "sha256": "c7917e6f314359a6b6550ca20ffb3a9374f0d17beedad88cd70c576421e5fd0e"
+    },
+    {
+      "source": "memory/commits/COM-e609b189-e938-433d-968a-0ee5e184f548/receipt.json",
+      "target": "research/floating-point-summation/memory/commits/COM-e609b189-e938-433d-968a-0ee5e184f548/receipt.json",
+      "sha256": "d9a170699a48dfe8163a801418a25aae0161821ea8f5d79cb3bb8948445bc925"
+    },
+    {
+      "source": "memory/commits/COM-e609b189-e938-433d-968a-0ee5e184f548/records/MEM-58fd845a-05a5-516c-8bbe-c88d887cbb91.json",
+      "target": "research/floating-point-summation/memory/commits/COM-e609b189-e938-433d-968a-0ee5e184f548/records/MEM-58fd845a-05a5-516c-8bbe-c88d887cbb91.json",
+      "sha256": "1a3a8329e9d0e6562dfee47360f767ace69a75da73563f11454eafdf28452c8c"
+    },
+    {
+      "source": "memory/commits/COM-e609b189-e938-433d-968a-0ee5e184f548/records/MEM-a8226b54-a4cd-545a-8f22-422c2f513bfc.json",
+      "target": "research/floating-point-summation/memory/commits/COM-e609b189-e938-433d-968a-0ee5e184f548/records/MEM-a8226b54-a4cd-545a-8f22-422c2f513bfc.json",
+      "sha256": "ff0b6949f45152d209e97679563bf882966885df575989acbdfffb9b39e037e7"
+    },
+    {
+      "source": "memory/commits/COM-ec5e1280-6b13-41de-a4f6-435a2dd3990d/manifest.json",
+      "target": "research/floating-point-summation/memory/commits/COM-ec5e1280-6b13-41de-a4f6-435a2dd3990d/manifest.json",
+      "sha256": "c2fdffc160f75ae1d199925cd5172069f6c457e7b37d37498337b0928fc0ca63"
+    },
+    {
+      "source": "memory/commits/COM-ec5e1280-6b13-41de-a4f6-435a2dd3990d/receipt.json",
+      "target": "research/floating-point-summation/memory/commits/COM-ec5e1280-6b13-41de-a4f6-435a2dd3990d/receipt.json",
+      "sha256": "f66acbadf3e5438a9b41a332e8eb3b1cbfb36b2c6a2d345d5b28cbe3e3dd262f"
+    },
+    {
+      "source": "memory/commits/COM-ec5e1280-6b13-41de-a4f6-435a2dd3990d/records/MEM-58fd845a-05a5-516c-8bbe-c88d887cbb91.json",
+      "target": "research/floating-point-summation/memory/commits/COM-ec5e1280-6b13-41de-a4f6-435a2dd3990d/records/MEM-58fd845a-05a5-516c-8bbe-c88d887cbb91.json",
+      "sha256": "f6235e94c32713a7f193122dd156b500dfa4eab0b478367fb658b502548eda6c"
+    },
+    {
+      "source": "memory/owner.json",
+      "target": "research/floating-point-summation/memory/owner.json",
+      "sha256": "0ff3223d1b8a73c6384a7daa733b20a502460a4b98c71e4460c0139dc5a8c113"
+    },
+    {
+      "source": "research.json",
+      "target": "research/floating-point-summation/research.json",
+      "sha256": "239ab0fcd73db65fe6b72b3cd756cc876a83e0fd264ad5f00f4fced71664aea7"
+    },
+    {
+      "source": "rounds/01.json",
+      "target": "research/floating-point-summation/rounds/01.json",
+      "sha256": "e86372aed71838770b55c2678a22033773da4d24aff67f8b8cade653d5bf2b0d"
+    },
+    {
+      "source": "fixtures/original-documents/rounds/01.md.snapshot",
+      "target": "research/floating-point-summation/rounds/01.md",
+      "sha256": "6d4418c6c1f83abd931266e674ff4e1a0a46c7f3e8106461fb4ef1d4902210c3"
+    },
+    {
+      "source": "rounds/02.json",
+      "target": "research/floating-point-summation/rounds/02.json",
+      "sha256": "400b407c8f27d59b5ab90658b95d7a8e5fe789818dda897941ddd031940dce1a"
+    },
+    {
+      "source": "fixtures/original-documents/rounds/02.md.snapshot",
+      "target": "research/floating-point-summation/rounds/02.md",
+      "sha256": "544b892d846cecc161f9cf377a402f1087ad4490e4a87659211ec2330308762e"
+    },
+    {
+      "source": "rounds/03.json",
+      "target": "research/floating-point-summation/rounds/03.json",
+      "sha256": "fb1494db6f27a64f4b9a5915c50afb5a5b68950e642be632f014685127ec46df"
+    },
+    {
+      "source": "fixtures/original-documents/rounds/03.md.snapshot",
+      "target": "research/floating-point-summation/rounds/03.md",
+      "sha256": "54fad1651f72fd91114dea3d761262ab898b07ad13354d14d99606b0a95a855d"
+    },
+    {
+      "source": "runs/.gitkeep",
+      "target": "research/floating-point-summation/runs/.gitkeep",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "source": "runs/run-20260908t214955z-2273015d2cef/README.md",
+      "target": "research/floating-point-summation/runs/run-20260908t214955z-2273015d2cef/README.md",
+      "sha256": "262b60605eb361723385cd6379aec645ae1900a6e2ae78604b23999bb6f6bc75"
+    },
+    {
+      "source": "runs/run-20260908t214955z-2273015d2cef/execution.json",
+      "target": "research/floating-point-summation/runs/run-20260908t214955z-2273015d2cef/execution.json",
+      "sha256": "bd4855e5b255bd5d664e078e3472094364ecb5a91d2ed103da2908d68906b950"
+    },
+    {
+      "source": "runs/run-20260908t214955z-2273015d2cef/lineage.jsonl",
+      "target": "research/floating-point-summation/runs/run-20260908t214955z-2273015d2cef/lineage.jsonl",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "runs/run-20260908t214955z-2273015d2cef/outputs/operation-traces.json",
+      "target": "research/floating-point-summation/runs/run-20260908t214955z-2273015d2cef/outputs/operation-traces.json",
+      "sha256": "d7348aca67bf17dc4369a7b8d756b2193571b8c6f7010cc0efb6557ef409da8c"
+    },
+    {
+      "source": "runs/run-20260908t214955z-2273015d2cef/outputs/trace-results.json",
+      "target": "research/floating-point-summation/runs/run-20260908t214955z-2273015d2cef/outputs/trace-results.json",
+      "sha256": "a09888d9b5c4a669dee0296acd9aa3788d2d73fefe413037ade9e7b29043cf6d"
+    },
+    {
+      "source": "runs/run-20260908t214955z-2273015d2cef/reproduce.py",
+      "target": "research/floating-point-summation/runs/run-20260908t214955z-2273015d2cef/reproduce.py",
+      "sha256": "92628e66d7deef458cc2f966d15416e8fa00d176dd718c2ecda2ee9d8ef2cefa"
+    },
+    {
+      "source": "runs/run-20260908t214955z-2273015d2cef/run.json",
+      "target": "research/floating-point-summation/runs/run-20260908t214955z-2273015d2cef/run.json",
+      "sha256": "ef1ff995612c1af17c3523f3baea1b8459a802b14649de230eb087c941c84bc3"
+    },
+    {
+      "source": "runs/run-20260908t214955z-2273015d2cef/source-manifest.json",
+      "target": "research/floating-point-summation/runs/run-20260908t214955z-2273015d2cef/source-manifest.json",
+      "sha256": "d7958e2c0b086f312113c95b5b5cd242ad3a83e52d3c22ab67f46e1fa18429f2"
+    },
+    {
+      "source": "runs/run-20260908t214955z-2273015d2cef/stderr.txt",
+      "target": "research/floating-point-summation/runs/run-20260908t214955z-2273015d2cef/stderr.txt",
+      "sha256": "fce41d9526563ba30e96ed6a29714858e651d3474024228271389c35b526a9db"
+    },
+    {
+      "source": "runs/run-20260908t214955z-2273015d2cef/stdout.txt",
+      "target": "research/floating-point-summation/runs/run-20260908t214955z-2273015d2cef/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "runs/run-20260908t215458z-04c7d84d40d8/README.md",
+      "target": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/README.md",
+      "sha256": "5d7d2bd0208cb62b5aeac7d237232eb838b6cd501104fce9e21b1cd8c7091a88"
+    },
+    {
+      "source": "runs/run-20260908t215458z-04c7d84d40d8/execution.json",
+      "target": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/execution.json",
+      "sha256": "b8d5a8f0f7a75a7aed951494d2e07dbc86022fa07acb5738720a9fe7e43d8b23"
+    },
+    {
+      "source": "runs/run-20260908t215458z-04c7d84d40d8/lineage.jsonl",
+      "target": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/lineage.jsonl",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "runs/run-20260908t215458z-04c7d84d40d8/outputs/operation-traces.json",
+      "target": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/operation-traces.json",
+      "sha256": "d7348aca67bf17dc4369a7b8d756b2193571b8c6f7010cc0efb6557ef409da8c"
+    },
+    {
+      "source": "runs/run-20260908t215458z-04c7d84d40d8/outputs/round-1-summary.png",
+      "target": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/round-1-summary.png",
+      "sha256": "043d9bc1c51b300a97a2b915b5c53af73553f1d726b9936c9315a074220fbea8"
+    },
+    {
+      "source": "runs/run-20260908t215458z-04c7d84d40d8/outputs/round-2-summary.png",
+      "target": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/round-2-summary.png",
+      "sha256": "1a7a01affa7bd299c9c0d1652018a5f2e15fa29df034fced669254733da694ad"
+    },
+    {
+      "source": "runs/run-20260908t215458z-04c7d84d40d8/outputs/round-3-permutations.png",
+      "target": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/round-3-permutations.png",
+      "sha256": "0fdc0ea6ef408adaf2c7c5c2e56fd0f72e95db032a30d5fc344e3cf9e21bd456"
+    },
+    {
+      "source": "runs/run-20260908t215458z-04c7d84d40d8/outputs/round-3-summary.png",
+      "target": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/round-3-summary.png",
+      "sha256": "7759b89aa016be03e7f18169240dd308c28b21bfafac980c92cbce36bfeeaeee"
+    },
+    {
+      "source": "runs/run-20260908t215458z-04c7d84d40d8/outputs/sampling-verification.json",
+      "target": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/sampling-verification.json",
+      "sha256": "8fc77120e5495b853becd8d160ae84f8c135318eec5dda1f8108b68dd5dfc52d"
+    },
+    {
+      "source": "runs/run-20260908t215458z-04c7d84d40d8/outputs/trace-results.json",
+      "target": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/trace-results.json",
+      "sha256": "a09888d9b5c4a669dee0296acd9aa3788d2d73fefe413037ade9e7b29043cf6d"
+    },
+    {
+      "source": "runs/run-20260908t215458z-04c7d84d40d8/outputs/verification.json",
+      "target": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/verification.json",
+      "sha256": "739d2ce2c6922dc7ce74dfea9ac22d987dd6b8d353484e70c615fc96d2f22074"
+    },
+    {
+      "source": "runs/run-20260908t215458z-04c7d84d40d8/plot-requirements.lock.txt",
+      "target": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/plot-requirements.lock.txt",
+      "sha256": "17f0fde1ad8e3a8331127984b2d1b529ac4bee8fb0bbd402e6e175c8fb210068"
+    },
+    {
+      "source": "runs/run-20260908t215458z-04c7d84d40d8/reproduce.py",
+      "target": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/reproduce.py",
+      "sha256": "9a640a9950a31e9e82fa68d428eaee0cbf37ef6c5cff058295fe225e1887315d"
+    },
+    {
+      "source": "runs/run-20260908t215458z-04c7d84d40d8/run.json",
+      "target": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/run.json",
+      "sha256": "4a29b30d5ac1a90d110f585fcdc982845a780a7163381981463b76ebbc4f6ef7"
+    },
+    {
+      "source": "runs/run-20260908t215458z-04c7d84d40d8/sampling_recipe.py",
+      "target": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/sampling_recipe.py",
+      "sha256": "66604f57648600c24a02cfcf03fb89e25a0e9a1667890b2d202270ac989d2973"
+    },
+    {
+      "source": "runs/run-20260908t215458z-04c7d84d40d8/source-manifest.json",
+      "target": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/source-manifest.json",
+      "sha256": "d7958e2c0b086f312113c95b5b5cd242ad3a83e52d3c22ab67f46e1fa18429f2"
+    },
+    {
+      "source": "runs/run-20260908t215458z-04c7d84d40d8/stderr.txt",
+      "target": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "runs/run-20260908t215458z-04c7d84d40d8/stdout.txt",
+      "target": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/stdout.txt",
+      "sha256": "b6c1f889ffca58eafd5b16464335f096ed37f94f88814ed943cd936f5632c1af"
+    },
+    {
+      "source": "runs/run-20260908t215458z-04c7d84d40d8/steps.jsonl",
+      "target": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/steps.jsonl",
+      "sha256": "3d62a72f385c94645b21d08bbf94ba03f5baf3981d1ba27a0dccb2e2bafa202e"
+    },
+    {
+      "source": "sampling_recipe.py",
+      "target": "research/floating-point-summation/sampling_recipe.py",
+      "sha256": "66604f57648600c24a02cfcf03fb89e25a0e9a1667890b2d202270ac989d2973"
+    },
+    {
+      "source": "trace_analysis.py",
+      "target": "research/floating-point-summation/trace_analysis.py",
+      "sha256": "9a640a9950a31e9e82fa68d428eaee0cbf37ef6c5cff058295fe225e1887315d"
+    },
+    {
+      "source": "runs/run-20260908t201214z-d0ab308f66ad/README.md",
+      "target": "runs/run-20260908t201214z-d0ab308f66ad/README.md",
+      "sha256": "693548f1ed4e4448d25da861d18f9e680f241364c5008f5fea4bcf3a1ffb6741"
+    },
+    {
+      "source": "runs/run-20260908t201214z-d0ab308f66ad/execution.json",
+      "target": "runs/run-20260908t201214z-d0ab308f66ad/execution.json",
+      "sha256": "9de7f8b212f5ee202706f243c03ea1a1b24f6ff6ed96dd3fe631ba15be87b440"
+    },
+    {
+      "source": "runs/run-20260908t201214z-d0ab308f66ad/inputs.json",
+      "target": "runs/run-20260908t201214z-d0ab308f66ad/inputs.json",
+      "sha256": "83d97bbfcf42bdbbe3780df71d202033bc8cede38f197913da5d0b77f5f7cf45"
+    },
+    {
+      "source": "runs/run-20260908t201214z-d0ab308f66ad/lineage.jsonl",
+      "target": "runs/run-20260908t201214z-d0ab308f66ad/lineage.jsonl",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "runs/run-20260908t201214z-d0ab308f66ad/reproduce.py",
+      "target": "runs/run-20260908t201214z-d0ab308f66ad/reproduce.py",
+      "sha256": "8dc8cd86e17a2595b0217e9bcef712c5a61db1eec07828fb446ea556657f2284"
+    },
+    {
+      "source": "runs/run-20260908t201214z-d0ab308f66ad/results.json",
+      "target": "runs/run-20260908t201214z-d0ab308f66ad/results.json",
+      "sha256": "cdb1f9e4f0580d5baaea4a09416f75801e6c5d01eab96c601ded00a28e31134d"
+    },
+    {
+      "source": "runs/run-20260908t201214z-d0ab308f66ad/run.json",
+      "target": "runs/run-20260908t201214z-d0ab308f66ad/run.json",
+      "sha256": "4ff223d25cd5ea92ee3b6d90546944ce94b4af7578cd1811f8325da1303ae858"
+    },
+    {
+      "source": "runs/run-20260908t201214z-d0ab308f66ad/stderr.txt",
+      "target": "runs/run-20260908t201214z-d0ab308f66ad/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "runs/run-20260908t201214z-d0ab308f66ad/stdout.txt",
+      "target": "runs/run-20260908t201214z-d0ab308f66ad/stdout.txt",
+      "sha256": "20af7ea0ab47558a73435f9662827cb0e30365b8f6714f2d5aa07070a1dbc6c2"
+    },
+    {
+      "source": "runs/run-20260908t201228z-a0980824dc18/README.md",
+      "target": "runs/run-20260908t201228z-a0980824dc18/README.md",
+      "sha256": "08daa0b3fe39eae416aa485d014e6f4ade61ee1237c06071a7e7da7718210344"
+    },
+    {
+      "source": "runs/run-20260908t201228z-a0980824dc18/execution.json",
+      "target": "runs/run-20260908t201228z-a0980824dc18/execution.json",
+      "sha256": "1d693558847dc790efd19293b0176afa27176d0f1ee9ccfcb1f83e65c4edc496"
+    },
+    {
+      "source": "runs/run-20260908t201228z-a0980824dc18/inputs.json",
+      "target": "runs/run-20260908t201228z-a0980824dc18/inputs.json",
+      "sha256": "a48c045211280be1e1bb58524a8067598eea6d9d8e964a8b513b4b544e195cd6"
+    },
+    {
+      "source": "runs/run-20260908t201228z-a0980824dc18/lineage.jsonl",
+      "target": "runs/run-20260908t201228z-a0980824dc18/lineage.jsonl",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "runs/run-20260908t201228z-a0980824dc18/reproduce.py",
+      "target": "runs/run-20260908t201228z-a0980824dc18/reproduce.py",
+      "sha256": "8dc8cd86e17a2595b0217e9bcef712c5a61db1eec07828fb446ea556657f2284"
+    },
+    {
+      "source": "runs/run-20260908t201228z-a0980824dc18/results.json",
+      "target": "runs/run-20260908t201228z-a0980824dc18/results.json",
+      "sha256": "f5ef99109b146631abf1fc7256fc62287cbf125c6535ba097da4440570fc8247"
+    },
+    {
+      "source": "runs/run-20260908t201228z-a0980824dc18/run.json",
+      "target": "runs/run-20260908t201228z-a0980824dc18/run.json",
+      "sha256": "ae3855924c5cb40057fec3ce21717c675477a3bc6738a997ffde7233c199de09"
+    },
+    {
+      "source": "runs/run-20260908t201228z-a0980824dc18/stderr.txt",
+      "target": "runs/run-20260908t201228z-a0980824dc18/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "runs/run-20260908t201228z-a0980824dc18/stdout.txt",
+      "target": "runs/run-20260908t201228z-a0980824dc18/stdout.txt",
+      "sha256": "e4dd92ed3dcbe33b4beff6efffa0b96abb2fea5e15a1009b3884b48ee50d3b43"
+    },
+    {
+      "source": "runs/run-20260908t201240z-90107a617cf8/README.md",
+      "target": "runs/run-20260908t201240z-90107a617cf8/README.md",
+      "sha256": "082783ec986a0a5b9f4a6bb1c26248033e6300522dec5764d08799abba3f01dc"
+    },
+    {
+      "source": "runs/run-20260908t201240z-90107a617cf8/execution.json",
+      "target": "runs/run-20260908t201240z-90107a617cf8/execution.json",
+      "sha256": "6ec8ecba6aebbac0609d5a89ca0e67028639d22c0356e9b34ffae71ad125d1ae"
+    },
+    {
+      "source": "runs/run-20260908t201240z-90107a617cf8/inputs.json",
+      "target": "runs/run-20260908t201240z-90107a617cf8/inputs.json",
+      "sha256": "9da1f46663a569680b3e61e842f164880d24c047e0ab13ac0471df6683d32561"
+    },
+    {
+      "source": "runs/run-20260908t201240z-90107a617cf8/lineage.jsonl",
+      "target": "runs/run-20260908t201240z-90107a617cf8/lineage.jsonl",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "runs/run-20260908t201240z-90107a617cf8/reproduce.py",
+      "target": "runs/run-20260908t201240z-90107a617cf8/reproduce.py",
+      "sha256": "8dc8cd86e17a2595b0217e9bcef712c5a61db1eec07828fb446ea556657f2284"
+    },
+    {
+      "source": "runs/run-20260908t201240z-90107a617cf8/results.json",
+      "target": "runs/run-20260908t201240z-90107a617cf8/results.json",
+      "sha256": "693058d77bb3ed61e94535369bbfa4d74b6a2ed7f406a8af0b5782a0dc4fa7ef"
+    },
+    {
+      "source": "runs/run-20260908t201240z-90107a617cf8/run.json",
+      "target": "runs/run-20260908t201240z-90107a617cf8/run.json",
+      "sha256": "64f82aaba34def6261c05a0c3e84e5b47ff3d99b2a6c6000897f622249429a47"
+    },
+    {
+      "source": "runs/run-20260908t201240z-90107a617cf8/stderr.txt",
+      "target": "runs/run-20260908t201240z-90107a617cf8/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "source": "runs/run-20260908t201240z-90107a617cf8/stdout.txt",
+      "target": "runs/run-20260908t201240z-90107a617cf8/stdout.txt",
+      "sha256": "09526f84ed0a7d7e5d33f3ac3225235476ff7c835ab8584a60f93afc2ca73e0d"
+    }
+  ]
+}

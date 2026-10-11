@@ -1,0 +1,16 @@
+{
+  "command": [
+    "C:\\Users\\livky\\.codex\\worktrees\\cf08\\A_work_auto_flow\\services\\qdrant\\runtime\\python.exe",
+    "-X",
+    "utf8",
+    "C:\\Users\\livky\\.codex\\worktrees\\cf08\\A_work_auto_flow\\automation\\scripts\\workspace_cli.py",
+    "--root",
+    "C:\\Users\\livky\\.codex\\worktrees\\cf08\\A_work_auto_flow",
+    "memory",
+    "commit",
+    "--request",
+    "C:\\Users\\livky\\.codex\\worktrees\\cf08\\A_work_auto_flow\\research\\floating-point-summation\\execution\\memory-request.json"
+  ],
+  "exit_code": 0,
+  "stderr": "C:\\Users\\livky\\.codex\\worktrees\\cf08\\A_work_auto_flow\\automation\\scripts\\qdrant_backend.py:48: UserWarning: The model sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2 now uses mean pooling instead of CLS embedding. In order to preserve the previous behaviour, consider either pinning fastembed version to 0.5.1 or using `add_custom_model` functionality.\n  model = TextEmbedding(model_name=model_name, specific_model_path=str(path),\n"
+}

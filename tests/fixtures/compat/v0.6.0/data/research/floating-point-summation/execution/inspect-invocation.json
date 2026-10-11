@@ -1,0 +1,15 @@
+{
+  "command": [
+    "C:\\Users\\livky\\.codex\\worktrees\\cf08\\A_work_auto_flow\\services\\qdrant\\runtime\\python.exe",
+    "-X",
+    "utf8",
+    "C:\\Users\\livky\\.codex\\worktrees\\cf08\\A_work_auto_flow\\automation\\scripts\\workspace_cli.py",
+    "--root",
+    "C:\\Users\\livky\\.codex\\worktrees\\cf08\\A_work_auto_flow",
+    "memory",
+    "inspect",
+    "RES-FLOATING-POINT-SUMMATION"
+  ],
+  "exit_code": 0,
+  "stderr": ""
+}

@@ -1,0 +1,195 @@
+{
+  "schema_version": 1,
+  "sources": [
+    {
+      "source_id": "SRC-SUMMATION-R01",
+      "memory_level": "L0",
+      "discovery": "trace_only",
+      "path": "runs/run-20260908t201214z-d0ab308f66ad/results.json",
+      "enabled": true,
+      "sensitivity": "internal",
+      "sha256": "cdb1f9e4f0580d5baaea4a09416f75801e6c5d01eab96c601ded00a28e31134d",
+      "note": "用户授权新研究的实际计算结果"
+    },
+    {
+      "source_id": "SRC-SUMMATION-R02",
+      "memory_level": "L0",
+      "discovery": "trace_only",
+      "path": "runs/run-20260908t201228z-a0980824dc18/results.json",
+      "enabled": true,
+      "sensitivity": "internal",
+      "sha256": "f5ef99109b146631abf1fc7256fc62287cbf125c6535ba097da4440570fc8247",
+      "note": "用户授权新研究的实际计算结果"
+    },
+    {
+      "source_id": "SRC-SUMMATION-R03",
+      "memory_level": "L0",
+      "discovery": "trace_only",
+      "path": "runs/run-20260908t201240z-90107a617cf8/results.json",
+      "enabled": true,
+      "sensitivity": "internal",
+      "sha256": "693058d77bb3ed61e94535369bbfa4d74b6a2ed7f406a8af0b5782a0dc4fa7ef",
+      "note": "用户授权新研究的实际计算结果"
+    },
+    {
+      "source_id": "SRC-SUMMATION-TRACE-VERIFY",
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/verification.json",
+      "enabled": true,
+      "sensitivity": "internal",
+      "memory_level": "L0",
+      "discovery": "trace_only"
+    },
+    {
+      "source_id": "SRC-SUMMATION-OP-TRACES",
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/operation-traces.json",
+      "enabled": true,
+      "sensitivity": "internal",
+      "memory_level": "L0",
+      "discovery": "trace_only"
+    },
+    {
+      "source_id": "SRC-SUMMATION-SAMPLING-VERIFY",
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/sampling-verification.json",
+      "enabled": true,
+      "sensitivity": "internal",
+      "memory_level": "L0",
+      "discovery": "trace_only"
+    },
+    {
+      "source_id": "SRC-SUMMATION-FAILED-EXECUTION",
+      "path": "research/floating-point-summation/runs/run-20260908t214955z-2273015d2cef/execution.json",
+      "enabled": true,
+      "sensitivity": "internal",
+      "memory_level": "L0",
+      "discovery": "trace_only"
+    },
+    {
+      "source_id": "SRC-SUMMATION-FAILED-STDERR",
+      "path": "research/floating-point-summation/runs/run-20260908t214955z-2273015d2cef/stderr.txt",
+      "enabled": true,
+      "sensitivity": "internal",
+      "memory_level": "L0",
+      "discovery": "trace_only"
+    },
+    {
+      "source_id": "SRC-SUMMATION-DETAIL-R01",
+      "path": "research/floating-point-summation/details/round-01.md",
+      "enabled": true,
+      "sensitivity": "internal",
+      "memory_level": "L1",
+      "discovery": "workspace_summary"
+    },
+    {
+      "source_id": "SRC-SUMMATION-INPUT-R01",
+      "path": "runs/run-20260908t201214z-d0ab308f66ad/inputs.json",
+      "enabled": true,
+      "sensitivity": "internal",
+      "memory_level": "L0",
+      "discovery": "trace_only"
+    },
+    {
+      "source_id": "SRC-SUMMATION-FIGURE-R01",
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/round-1-summary.png",
+      "enabled": true,
+      "sensitivity": "internal",
+      "memory_level": "L0",
+      "discovery": "trace_only"
+    },
+    {
+      "source_id": "SRC-SUMMATION-DETAIL-R02",
+      "path": "research/floating-point-summation/details/round-02.md",
+      "enabled": true,
+      "sensitivity": "internal",
+      "memory_level": "L1",
+      "discovery": "workspace_summary"
+    },
+    {
+      "source_id": "SRC-SUMMATION-INPUT-R02",
+      "path": "runs/run-20260908t201228z-a0980824dc18/inputs.json",
+      "enabled": true,
+      "sensitivity": "internal",
+      "memory_level": "L0",
+      "discovery": "trace_only"
+    },
+    {
+      "source_id": "SRC-SUMMATION-FIGURE-R02",
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/round-2-summary.png",
+      "enabled": true,
+      "sensitivity": "internal",
+      "memory_level": "L0",
+      "discovery": "trace_only"
+    },
+    {
+      "source_id": "SRC-SUMMATION-DETAIL-R03",
+      "path": "research/floating-point-summation/details/round-03.md",
+      "enabled": true,
+      "sensitivity": "internal",
+      "memory_level": "L1",
+      "discovery": "workspace_summary"
+    },
+    {
+      "source_id": "SRC-SUMMATION-INPUT-R03",
+      "path": "runs/run-20260908t201240z-90107a617cf8/inputs.json",
+      "enabled": true,
+      "sensitivity": "internal",
+      "memory_level": "L0",
+      "discovery": "trace_only"
+    },
+    {
+      "source_id": "SRC-SUMMATION-FIGURE-R03",
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/round-3-summary.png",
+      "enabled": true,
+      "sensitivity": "internal",
+      "memory_level": "L0",
+      "discovery": "trace_only"
+    },
+    {
+      "source_id": "SRC-SUMMATION-FIGURE-PERMUTATIONS",
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/round-3-permutations.png",
+      "enabled": true,
+      "sensitivity": "internal",
+      "memory_level": "L0",
+      "discovery": "trace_only"
+    },
+    {
+      "source_id": "SRC-SUMMATION-REPORT-V2-METHODS",
+      "path": "research/floating-point-summation/details/report-v2/methods.md",
+      "enabled": true,
+      "sensitivity": "internal",
+      "memory_level": "L1",
+      "discovery": "workspace_summary"
+    },
+    {
+      "source_id": "SRC-SUMMATION-REPORT-V2-ROUND-01",
+      "path": "research/floating-point-summation/details/report-v2/round-01.md",
+      "enabled": true,
+      "sensitivity": "internal",
+      "memory_level": "L1",
+      "discovery": "workspace_summary"
+    },
+    {
+      "source_id": "SRC-SUMMATION-REPORT-V2-ROUND-02",
+      "path": "research/floating-point-summation/details/report-v2/round-02.md",
+      "enabled": true,
+      "sensitivity": "internal",
+      "memory_level": "L1",
+      "discovery": "workspace_summary"
+    },
+    {
+      "source_id": "SRC-SUMMATION-REPORT-V2-ROUND-03",
+      "path": "research/floating-point-summation/details/report-v2/round-03.md",
+      "enabled": true,
+      "sensitivity": "internal",
+      "memory_level": "L1",
+      "discovery": "workspace_summary"
+    },
+    {
+      "source_id": "SRC-SUMMATION-ORIGINAL-PLAN",
+      "path": "research/floating-point-summation/PLAN.md",
+      "enabled": true,
+      "sensitivity": "internal",
+      "memory_level": "L1",
+      "discovery": "workspace_summary"
+    }
+  ]
+}

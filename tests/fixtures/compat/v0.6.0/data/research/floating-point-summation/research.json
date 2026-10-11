@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "research_id": "RES-FLOATING-POINT-SUMMATION",
+  "slug": "floating-point-summation",
+  "title": "浮点求和的数值稳定性：顺序、补偿与抵消",
+  "status": "active",
+  "created_at": "2026-09-08",
+  "updated_at": "2026-09-08",
+  "owners": [],
+  "sensitivity": "internal",
+  "related_project_ids": [],
+  "related_module_ids": [],
+  "decision_to_support": "比较有限整数浮点输入上的求和误差，保留反例和复查过程",
+  "target_date": null,
+  "open_evidence_gaps": [
+    "非整数输入、其他平台、极端指数及性能尚未验证"
+  ],
+  "claims": [],
+  "dependencies": [],
+  "exploration_run_ids": [
+    "RUN-20260908T201214Z-D0AB308F66AD",
+    "RUN-20260908T201228Z-A0980824DC18",
+    "RUN-20260908T201240Z-90107A617CF8"
+  ]
+}

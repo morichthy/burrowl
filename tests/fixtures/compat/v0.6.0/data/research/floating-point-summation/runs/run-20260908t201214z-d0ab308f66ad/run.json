@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-20260908T201214Z-D0AB308F66AD",
+  "project_id": null,
+  "title": "求和探索01：大数与小增量的顺序影响",
+  "keywords": [
+    "浮点求和"
+  ],
+  "review_history": [],
+  "claims": [],
+  "dependencies": [],
+  "run_type": "analysis",
+  "status": "succeeded",
+  "created_at": "2026-09-08T20:12:14Z",
+  "started_at": "2026-09-08T20:12:14.428777+00:00",
+  "ended_at": "2026-09-08T20:12:14.631582+00:00",
+  "owner": "AI research assistant",
+  "question": "同一组数改变排列后，逐项求和与fsum的误差是否变化？",
+  "hypotheses": [],
+  "inputs": [
+    {
+      "path": "runs/run-20260908t201214z-d0ab308f66ad/inputs.json",
+      "sha256": "83d97bbfcf42bdbbe3780df71d202033bc8cede38f197913da5d0b77f5f7cf45"
+    }
+  ],
+  "parameters": {
+    "round": 1,
+    "samples": 3,
+    "methods": [
+      "sequential",
+      "math.fsum"
+    ]
+  },
+  "code": {
+    "commit": null,
+    "dirty": null,
+    "source_snapshot_sha256": "8dc8cd86e17a2595b0217e9bcef712c5a61db1eec07828fb446ea556657f2284",
+    "source_path": "runs/run-20260908t201214z-d0ab308f66ad/reproduce.py"
+  },
+  "environment": {
+    "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "lock_or_image_digest": null,
+    "dependencies": "Python standard library only"
+  },
+  "random_seeds": [],
+  "quality_results": [
+    {
+      "check": "Actual finite-output computation and rational/integer reference cross-check",
+      "required": true,
+      "status": "passed"
+    }
+  ],
+  "metrics": {
+    "sequential": {
+      "cases": 3,
+      "exact_matches": 1,
+      "max_absolute_error": 1000.0
+    },
+    "math.fsum": {
+      "cases": 3,
+      "exact_matches": 3,
+      "max_absolute_error": 0.0
+    }
+  },
+  "artifacts": [
+    {
+      "path": "runs/run-20260908t201214z-d0ab308f66ad/results.json",
+      "sha256": "cdb1f9e4f0580d5baaea4a09416f75801e6c5d01eab96c601ded00a28e31134d"
+    },
+    {
+      "path": "runs/run-20260908t201214z-d0ab308f66ad/reproduce.py",
+      "sha256": "8dc8cd86e17a2595b0217e9bcef712c5a61db1eec07828fb446ea556657f2284"
+    },
+    {
+      "path": "runs/run-20260908t201214z-d0ab308f66ad/execution.json",
+      "sha256": "9de7f8b212f5ee202706f243c03ea1a1b24f6ff6ed96dd3fe631ba15be87b440"
+    },
+    {
+      "path": "runs/run-20260908t201214z-d0ab308f66ad/README.md",
+      "sha256": "693548f1ed4e4448d25da861d18f9e680f241364c5008f5fea4bcf3a1ffb6741"
+    }
+  ],
+  "lineage_events": "lineage.jsonl",
+  "conclusion": "逐项累加对本组输入的排列敏感；观察结果促使下一轮比较补偿算法，不能只依赖改顺序。",
+  "limitations": [
+    "Constructed dimensionless finite inputs only.",
+    "No overflow, NaN, infinity, timing or proof of universal correctness."
+  ],
+  "parent_run_ids": [],
+  "related_module_ids": [],
+  "related_research_ids": [
+    "RES-FLOATING-POINT-SUMMATION"
+  ],
+  "related_dataset_ids": [],
+  "review": {
+    "status": "not-reviewed",
+    "reviewer": null,
+    "date": null
+  },
+  "sensitivity": "internal"
+}
