@@ -266,6 +266,54 @@ describe("阅读会话实时页", () => {
   });
 });
 
+describe("阅读会话的图扩展（R19）", () => {
+  it("显示扩展来的对象与关系线索，扩大检索有批准按钮", async () => {
+    const expanded = {
+      ...session,
+      strategy: "associative",
+      queue: ["RES-A", "RES-C"],
+      owners: {
+        ...session.owners,
+        "RES-C": {
+          title: "降序求和",
+          rank: 1,
+          round: "R2",
+          verdict: null,
+          reason: "",
+          judged_by: null,
+          pages_read: [1],
+          total_pages: 1,
+          note: null,
+          origin: "expansion",
+          read_scope: "targets",
+          packet: {
+            windows: [
+              { record_id: null, title: "升序求和误差更小 与 C1 矛盾", level: null, kind: "relation", review: null, text: "关系说明",
+                edge: { type: "contradicts", category: "evidence", via: null } },
+              { record_id: "CLM-C-1", title: "降序更好", level: "L2", kind: "claim", review: "not-reviewed", text: "结论正文" },
+            ],
+            extra_windows: [],
+            score: 0.5,
+          },
+        },
+      },
+      requests: [
+        { request_id: "UR-2", kind: "broaden", prompt: "放宽到所有求和方法？", options: [], status: "pending", answer: null, approval_id: null, created_at: "2026-10-08T00:00:00Z" },
+      ],
+    };
+    handlers["reading.view"] = () => expanded;
+    handlers["reading.respond"] = () => ({ session_id: "RS-1", status: "active", revision: 4, approval_id: "AP-2" });
+    render(<ReadingDetail sessionId="RS-1" />);
+    expect(await screen.findByText("放宽到所有求和方法？")).toBeInTheDocument();
+    expect(screen.getByText("图扩展")).toBeInTheDocument();
+    expect(screen.getByText(/定点阅读/)).toBeInTheDocument();
+    expect(screen.getByText("关系线索")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "批准扩大检索" }));
+    await waitFor(() => expect(calls.some((c) => c.name === "reading.respond")).toBe(true));
+    expect(calls.find((c) => c.name === "reading.respond")!.args).toMatchObject({ request_id: "UR-2", decision: "approve" });
+  });
+});
+
 describe("检索", () => {
   it("复核过滤单选按钮传给后端并显示徽标", async () => {
     handlers["query.search"] = () => ({

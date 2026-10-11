@@ -62,6 +62,7 @@ export const KINDS: Record<string, string> = {
   wiki_page: "Wiki 页面",
   claim: "结论",
   run: "运行",
+  relation: "关系线索",
 };
 
 export const OWNER_TYPES: Record<string, string> = {
@@ -91,13 +92,14 @@ export const VERDICTS: Record<string, string> = {
 
 export const REQUEST_KINDS: Record<string, string> = {
   fulltext: "申请全文补偿",
+  broaden: "申请扩大检索",
   direction: "请用户定方向",
   clarify: "需要澄清",
 };
 
 export const STRATEGIES: Record<string, string> = {
   standard: "标准（筛选后完整阅读）",
-  associative: "联想（不足时按方向补查）",
+  associative: "联想（读完后沿关系图扩展一跳）",
   quick: "快速（只判断片段）",
 };
 

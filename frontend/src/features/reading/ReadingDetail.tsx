@@ -2,17 +2,22 @@
 // 用户的每个操作都进入会话 inbox，agent 下一次调用 reading.* 时会收到。
 import { useState } from "react";
 import { useAction, useOp, useReadingEvents } from "../../api";
-import { label, LEVELS, REQUEST_KINDS, SESSION_STATUS, STRATEGIES, VERDICTS } from "../../labels";
+import { KINDS, label, LEVELS, REQUEST_KINDS, SESSION_STATUS, STRATEGIES, VERDICTS } from "../../labels";
 import { ErrorBox, href, Loading, Markdown, Panel, ReviewBadge, Tag, Time } from "../../ui";
 
 interface Window {
-  record_id: string;
+  record_id: string | null;
   title: string;
   level: string | null;
   kind: string;
-  review: string;
+  review: string | null;
   text: string;
+  // 图扩展的关系窗口（R19 §4.5）：只是线索，不能作为笔记出处
+  edge?: { type: string; category: string; via: string | null };
 }
+
+// 需要用户批准才能执行的请求：全文补偿、扩大检索（R19 D-07）
+const APPROVALS: Record<string, string> = { fulltext: "批准全文补偿", broaden: "批准扩大检索" };
 
 interface OwnerState {
   title: string;
@@ -23,8 +28,16 @@ interface OwnerState {
   judged_by: string | null;
   pages_read: number[];
   total_pages: number | null;
-  note: { text: string; sources: string[]; tokens: number; updated_at: string } | null;
+  note: {
+    text: string;
+    sources: string[];
+    tokens: number;
+    updated_at: string;
+    expand_from?: { ref: string; why: string }[];
+  } | null;
   packet: { windows: Window[]; extra_windows: Window[]; score: number };
+  origin?: string;
+  read_scope?: string | null;
 }
 
 interface UserRequest {
@@ -53,7 +66,7 @@ export interface SessionView {
   timeline: { at: string; action: string; summary: string; round?: string }[];
   rounds: { id: string; kind: string; owners: string[]; at: string }[];
   synthesis: { note: string; owner_ids: string[]; updated_at: string } | null;
-  association: { enabled: boolean; text: string; rounds_used: number; max_rounds: number };
+  association: { enabled: boolean; text?: string; focus?: string; rounds_used: number; max_rounds: number };
   plan: { variants: { language: string; question: string }[] };
 }
 
@@ -151,15 +164,15 @@ function PendingRequests({ session, onDone }: { session: SessionView; onDone: ()
             </div>
           ) : null}
           <textarea
-            placeholder={r.kind === "fulltext" ? "可选：批准或拒绝的说明" : "回答或补充说明"}
+            placeholder={APPROVALS[r.kind] ? "可选：批准或拒绝的说明" : "回答或补充说明"}
             value={answers[r.request_id] ?? ""}
             onChange={(e) => setAnswers({ ...answers, [r.request_id]: e.target.value })}
           />
           <div className="actions">
-            {r.kind === "fulltext" ? (
+            {APPROVALS[r.kind] ? (
               <>
                 <button type="button" className="primary" disabled={respond.busy} onClick={() => send(r, "approve")}>
-                  批准全文补偿
+                  {APPROVALS[r.kind]}
                 </button>
                 <button type="button" disabled={respond.busy} onClick={() => send(r, "deny")}>
                   拒绝
@@ -200,7 +213,11 @@ function Controls({ session, onDone }: { session: SessionView; onDone: () => voi
       <ErrorBox error={direct.error ?? configure.error ?? abort.error ?? archive.error} />
       <div className="row">
         <input
-          placeholder={session.association.text ? `当前联想方向：${session.association.text}` : "补充联想方向（下一轮补查使用）"}
+          placeholder={
+            session.association.focus || session.association.text
+              ? `当前联想方向：${session.association.focus || session.association.text}`
+              : "补充联想方向（作为下一轮图扩展的焦点，只用于排序）"
+          }
           value={direction}
           onChange={(e) => setDirection(e.target.value)}
           disabled={closed}
@@ -292,9 +309,10 @@ function Owners({ session, onDone }: { session: SessionView; onDone: () => void 
               ) : (
                 <Tag>未判断</Tag>
               )}
+              {o.origin === "expansion" ? <Tag tone="warn">图扩展</Tag> : null}
               {o.pages_read.length ? (
                 <Tag>
-                  已读 {o.pages_read.length}/{o.total_pages ?? "?"} 页
+                  {o.read_scope === "targets" ? "定点阅读" : "已读"} {o.pages_read.length}/{o.total_pages ?? "?"} 页
                 </Tag>
               ) : null}
               {!closed
@@ -323,9 +341,15 @@ function Owners({ session, onDone }: { session: SessionView; onDone: () => void 
           <details>
             <summary>命中窗口（{o.packet.windows.length + o.packet.extra_windows.length}）</summary>
             {[...o.packet.windows, ...o.packet.extra_windows].map((w, i) => (
-              <div key={i} className="window">
+              <div key={i} className={w.kind === "relation" ? "window relation" : "window"}>
                 <div>
-                  <strong>{w.title}</strong> <Tag>{label(LEVELS, w.level) || w.kind}</Tag> <ReviewBadge value={w.review} />
+                  <strong>{w.title}</strong>{" "}
+                  <Tag tone={w.kind === "relation" ? "warn" : undefined}>
+                    {w.kind === "relation" || w.kind === "claim" || w.kind === "association" || w.kind === "wiki_page"
+                      ? label(KINDS, w.kind)
+                      : label(LEVELS, w.level) || label(KINDS, w.kind)}
+                  </Tag>{" "}
+                  {w.review ? <ReviewBadge value={w.review} /> : null}
                 </div>
                 <Markdown text={w.text} />
               </div>
@@ -337,6 +361,11 @@ function Owners({ session, onDone }: { session: SessionView; onDone: () => void 
                 研究笔记 <span className="hint">约 {o.note.tokens} token · <Time value={o.note.updated_at} /></span>
               </h4>
               <Markdown text={o.note.text} />
+              {o.note.expand_from?.length ? (
+                <p className="hint">
+                  扩展锚点：{o.note.expand_from.map((a) => `${a.ref}（${a.why}）`).join("；")}
+                </p>
+              ) : null}
             </div>
           ) : null}
         </article>
