@@ -61,14 +61,30 @@ def owner_create(ctx: Ctx, owner_type: Literal["research", "project", "core-algo
     if short_name:
         fields["short_name"] = short_name
     owner = ctx.app.storage.owners.create(owner_type, slug, title, fields)
-    return activity.with_activity(owner.summary(), [activity.owner_line(owner)])
+    return activity.with_activity(_indexed(ctx, owner), [activity.owner_line(owner)])
 
 
 @op("memory.owner_adopt", effect="write")
 def owner_adopt(ctx: Ctx, path: str, expected_sha256: str) -> dict:
     """把内容树中已有的文档登记为对象（原件不修改；须给出你看到的字节指纹）。"""
     owner = ctx.app.storage.owners.adopt(path, expected_sha256, ctx.actor)
-    return activity.with_activity(owner.summary(), [activity.owner_line(owner, adopted=True)])
+    return activity.with_activity(_indexed(ctx, owner), [activity.owner_line(owner, adopted=True)])
+
+
+def _indexed(ctx: Ctx, owner) -> dict:
+    """新对象立即建检索投影（只有业务卡时投影只含对象元数据）。
+
+    否则它在 index.reconcile 或第一次提交之前一直是 not_indexed 缺口：每次召回都报缺口、阅读会话总是允许全文补偿，
+    "判定 → 新建 → 开阅读"时也无从判断新对象是否就绪（R18 实施时发现）。索引失败不影响对象已建立，如实报告。"""
+    try:
+        ctx.app.index.on_commit(owner.owner_id, None)
+        state = ctx.app.index.status(owner.owner_id)
+    except Exception as exc:  # noqa: BLE001 - 业务卡已写入：保留业务成功，索引待补偿
+        state = {"index_status": "pending", "details": {"reason": type(exc).__name__}}
+    result = owner.summary() | {"index": state}
+    if state["index_status"] not in {"indexed", "not_configured"}:
+        result["warnings"] = ["对象已建立；检索索引待补偿（index.reconcile）"]
+    return result
 
 
 @op("memory.records")

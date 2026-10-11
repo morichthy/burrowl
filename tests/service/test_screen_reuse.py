@@ -73,8 +73,9 @@ def test_expired_entry_is_not_reused(ws):
     assert ws.reading.start(TASK, actor=AI)["reused_from"] is None
 
 
-def test_owner_created_between_route_and_start_still_reuses(ws):
-    # R18 D-03 的新建路径：判定 → 新建对象 → 开阅读。新对象没有记录、未就绪，不影响召回，只多一条缺口
+def test_unready_owner_does_not_block_reuse(ws):
+    # 未就绪的对象（这里直接写业务卡、不建索引，相当于索引同步失败）不进入召回，只多一条缺口，不妨碍复用。
+    # 经 memory.owner_create 新建的对象会立即建索引，召回确实不同，不复用（tests/interfaces/test_owner_create_index.py）
     ws.route(task=TASK, limit=10)
     created = ws.storage.owners.create("research", "sum-rand", "随机输入求和误差", {})
     session = ws.reading.start(TASK, actor=AI, owner_id=created.owner_id)

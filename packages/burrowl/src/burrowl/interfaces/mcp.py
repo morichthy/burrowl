@@ -48,7 +48,7 @@ AUTO = """burrowl 已为本对话启用（{why}）：AI 研发工作区的版本
   档 1 一次性小任务：开工不召回、不判定归属；结束时做沉淀检查，有可复用的内容才 memory_owner_route 后保存，否则不写；
   档 2 持续工作（继续/续接、多步研究或实验、导入资料、用户要求留痕）：先 memory_owner_route 选出暂定对象，memory_resume 完整阅读，
   确认是同一目标才第一次保存（带 attribution），不相关就换候选或新建；有用的中间成果主动保存。用户说"不用记"时按档 0/1 处理。
-  需要读已有材料时，先确认或新建对象，再 reading_start(owner_id=…)，question 沿用判定时的 task（复用那一轮召回）；
+  需要读已有材料时，先确认或新建对象，再 reading_start(owner_id=…)，question 沿用判定时的 task（沿用已有对象时复用那一轮召回）；
   判定阶段觉得可能相关的对象不直接写成关联，实际读完、验证后再写记录和关联。
 修改 burrowl 框架本身的代码不进入工作流（那是 burrowl-dev-check）。
 """ + COMMON

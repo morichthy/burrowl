@@ -17,7 +17,7 @@ requires_tools: [reading_start, reading_assess, reading_peek, reading_read, read
 - **用户明确只要几个片段或候选列表**：可以直接 `query_search` → 选候选 → `query_assemble`（会补齐必要依据）。展开到经过或技术细节用 `query_expand`，读整篇文稿用 `query_documents`。
 - **查已发布到知识中枢的内容**：`hub_search`。
 - **续接已有会话**：`reading_list(owner_id=…)` 找到会话，再 `reading_status`。
-- **刚做过归属判定**：先确认或新建对象，再 `reading_start(owner_id=…)`；`question` 沿用判定时的 `task`，程序复用那一轮召回（回执 `reused_from`）。判定时的判断不带进会话，照常 `reading_assess`（RULES 第 2 节）。
+- **刚做过归属判定**：先确认或新建对象，再 `reading_start(owner_id=…)`；`question` 沿用判定时的 `task`；沿用已有对象时程序复用那一轮召回（回执 `reused_from`），新建对象后重新召回。判定时的判断不带进会话，照常 `reading_assess`（RULES 第 2 节）。
 
 `query_*`、`memory_owners`、`memory_resume` 是独立查询或对象续接工具，不会建立阅读会话，也不会出现在首页“当前阅读”或“阅读会话”中。不能用这些调用代替上述默认入口，也不能把检索命中写成“已完整阅读”。直接查看已知源码、配置或开发状态仍按公共规则直接读取。
 

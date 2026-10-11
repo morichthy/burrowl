@@ -321,7 +321,8 @@ memory.owner_route(task, variants?, protected_terms?, paths?, owner_hint?)：只
 AI：选暂定对象 → memory.resume 完整阅读 → 同一目标：第一次 memory.commit 带 attribution（确认点）
                                          → 不相关：换候选或新建（确认前不写入暂定对象）
 确认后放错：在正确对象重新保存并引用原记录，原结论 superseded 或建关联（consolidate Skill）
-判定之后的阅读（R18）：确认或新建对象 → reading.start(owner_id, question = 判定时的 task) → 复用判定的召回
+判定之后的阅读（R18）：确认或新建对象 → reading.start(owner_id, question = 判定时的 task)
+    沿用已有对象：复用判定的召回；新建对象：它已进入索引（owner_create/adopt 立即建投影），重新召回
     判定与续接时觉得"可能相关"的对象不直接写成关联；实际读完、验证后由 AI 写记录时引用或 relations.decide
 关键操作记录 memory.activity：业务卡创建 | 回执 attribution | 提交（按层级计数一行）| 复核记录 |
     Run 结束（ended_at）| 中枢执行记录 → 时间倒序归并、分页；写操作返回值附同样的一行摘要

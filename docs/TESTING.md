@@ -60,7 +60,8 @@
 **归属判定与关键操作记录（R13）**
 
 - 归属候选与阅读会话第一轮的对象次序、筛选包一致；判定不读任何对象的全部记录（`tests/service/test_routing.py`）。
-- 判定之后同一问题的 `reading.start` 复用判定的召回（第一批与重新计算完全相同，含 digest 与缺口）；问题、范围、过滤、配置、任一对象的提交或索引水位变化、超时都重新召回；判定与开阅读之间新建的空对象不妨碍复用，只多一条缺口（`tests/service/test_screen_reuse.py`，R18）。
+- 判定之后同一问题的 `reading.start` 复用判定的召回（第一批与重新计算完全相同，含 digest 与缺口）；问题、范围、过滤、配置、任一对象的提交或索引水位变化、超时都重新召回；未就绪的对象不妨碍复用，只多一条缺口（`tests/service/test_screen_reuse.py`，R18）。
+- 新建或采用的对象立即建检索投影、判定能找到；新建后开阅读重新召回，沿用路径复用（`tests/interfaces/test_owner_create_index.py`）。
 - `attribution` 存进回执、参与幂等、结构校验；关键操作记录只列改变资产的操作、分页不重不漏、受限记录不外泄、读取操作不产生条目（`tests/service/test_activity.py`）。
 
 **记录契约与链接**
