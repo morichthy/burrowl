@@ -1,0 +1,44 @@
+{
+  "burrowl_version": "0.7.0",
+  "git_commit": "fc798304718ec7a6553a7a6045876a13694b1789",
+  "git_dirty": true,
+  "created_at": "2026-10-11T18:57:02.209917Z",
+  "format_fingerprint": "aaff9b5e07b640c2328208998f590dc672edd2b87296728ad69ac02a65419a2c",
+  "kinds": [
+    "association",
+    "checkpoint",
+    "detail",
+    "document",
+    "document_section",
+    "experience",
+    "goal",
+    "narrative",
+    "overview",
+    "question",
+    "route",
+    "source",
+    "wiki_page"
+  ],
+  "owners": [
+    "KNW-COMPAT-NOTES",
+    "PRJ-COMPAT-PROJECT",
+    "OBJ-87d81ba5-4b3f-490e-b432-ff208b4ccd98"
+  ],
+  "runs": [
+    "RUN-20261011T185655Z-9F8A46047737",
+    "RUN-20261011T185655Z-591C26A5B8EF",
+    "RUN-20261011T185655Z-F6E22631DD43"
+  ],
+  "sources": [
+    "SRC-COMPAT-SAMPLES",
+    "SRC-COMPAT-README",
+    "SRC-COMPAT-INSIDE"
+  ],
+  "work_root_id": "ROOT-WORK",
+  "original_work_path": "C:\\Users\\livky\\AppData\\Local\\Temp\\burrowl-compat-au0_nv07\\work",
+  "known_problems": [
+    "sources:STALE_BASIS:SRC-SUMMATION-RELOCATED-87fe209f32e34e60",
+    "sources:STALE_BASIS:SRC-SUMMATION-RELOCATED-d526bf0d36560844",
+    "sources:STALE_BASIS:SRC-SUMMATION-RELOCATED-df27dd52e290d0ba"
+  ]
+}

@@ -1,6 +1,6 @@
 [project]
 name = "burrowl-connector-weknora"
-version = "0.6.0"
+version = "0.7.0"
 description = "burrowl 知识中枢连接器：WeKnora（REST /api/v1，已测试 v0.8.x）"
 requires-python = ">=3.12"
 dependencies = ["burrowl", "httpx>=0.27"]

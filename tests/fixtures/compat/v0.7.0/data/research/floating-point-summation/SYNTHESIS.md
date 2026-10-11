@@ -1,0 +1,24 @@
+# 三轮探索综合
+
+所有数字来自下列固定Run；误差相对于实际浮点输入的精确有理数和，单位为无量纲。
+
+| 轮次 | 方法 | 精确命中/样本数 | 最大绝对误差 |
+|---|---|---:|---:|
+| [第1轮](runs/run-20260908t201214z-d0ab308f66ad/README.md) | sequential | 1/3 | 1000 |
+| [第1轮](runs/run-20260908t201214z-d0ab308f66ad/README.md) | math.fsum | 3/3 | 0 |
+| [第2轮](runs/run-20260908t201228z-a0980824dc18/README.md) | sequential | 2/6 | 1 |
+| [第2轮](runs/run-20260908t201228z-a0980824dc18/README.md) | kahan | 2/6 | 1 |
+| [第2轮](runs/run-20260908t201228z-a0980824dc18/README.md) | neumaier | 6/6 | 0 |
+| [第2轮](runs/run-20260908t201228z-a0980824dc18/README.md) | math.fsum | 6/6 | 0 |
+| [第3轮](runs/run-20260908t201240z-90107a617cf8/README.md) | sequential | 0/30 | 10 |
+| [第3轮](runs/run-20260908t201240z-90107a617cf8/README.md) | kahan | 5/30 | 10 |
+| [第3轮](runs/run-20260908t201240z-90107a617cf8/README.md) | neumaier | 30/30 | 0 |
+| [第3轮](runs/run-20260908t201240z-90107a617cf8/README.md) | math.fsum | 30/30 | 0 |
+
+## 观察、解释与后续
+
+计算观察：三轮实际计算表明：本研究的显式逐项累加对顺序敏感；Kahan实现未消除所选抵消结构的全部误差；Neumaier与math.fsum在第二轮6种排列和第三轮30种排列中均与精确基准一致。该观察只适用于已保存输入与脚本，不能推出任意浮点输入都准确，也未比较运行时间。
+
+下一步建议：如需选择工程默认方法，先补非整数、极端指数和计时数据；本轮只能提供局部反例与候选方法。不要据本轮将任何算法标成普遍正确。
+
+方法背景：[Python 3.12官方文档](https://docs.python.org/3.12/library/math.html#math.fsum)说明fsum维护多个部分和以减少精度损失，并保留平台算术限制；本研究实测环境和输入另见各Run。
