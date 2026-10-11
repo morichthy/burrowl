@@ -1,11 +1,19 @@
-"""文本嵌入。默认 fastembed 加载本地多语言 MiniLM（384 维，离线，不联网下载）。
+"""文本嵌入。fastembed 离线加载本地模型（新数据目录默认 jina-v2-base-zh；已有数据目录可能仍用 MiniLM）。
 
-指纹（fingerprint）由模型文件清单、库版本与切窗规则决定：换模型或换规则后，
+两种切分方式（R17，见 docs/design/R17_LATE_CHUNKING.md）：
+- windows：每段单独编码，段长按模型真实上限切窗（R12 T-P0.1）；
+- late（后切分）：整条文本连同前缀一次编码（不超过 late_context_tokens），取逐 token 输出，
+  再按块/段落区间分别求平均。每个向量只覆盖一段（不超过 span_tokens），但编码时看过全文上下文。
+  只适用于平均池化的模型；按段落边界分批时，每批都重复带上前缀。
+
+指纹（fingerprint）由模型文件清单、库版本与切分规则决定：换模型或换规则后，
 新旧向量按指纹隔离，不会混用；需要重建向量投影。
 """
+import bisect
 import hashlib
 import json
 import os
+import re
 import struct
 from dataclasses import dataclass
 from pathlib import Path
@@ -40,9 +48,85 @@ class Embedder(Protocol):
     max_tokens: int  # 模型一次能看到的 token 上限（含特殊符号）；超出部分会被模型截断
 
     def windows(self, prefix: str, text: str) -> list[Window]: ...
+    # 后切分是可选能力：带 late=True 属性的嵌入器另需提供
+    #   segments(text) -> [(起, 止)] 与 late_embed(prefix, text, spans) -> 每段一个向量
     def embed_passages(self, texts: list[str]) -> list[list[float]]: ...
     def embed_query(self, text: str) -> list[float]: ...
     def count_tokens(self, text: str) -> int: ...
+
+
+_PARAGRAPH_BREAK = re.compile(r"\n[ \t]*\n")
+
+
+def segments(tokenizer: Any, text: str, span_tokens: int) -> list[tuple[int, int]]:
+    """把正文切成不超过 span_tokens 的连续区间 [(起, 止)]，覆盖全文：
+    相邻段落（空行分隔）合并到不超过上限；单个段落超长时按 token 数切开。区间首尾相接，空白归入前一段。"""
+    if not text.strip():
+        return []
+    offsets = tokenizer.encode(text, add_special_tokens=False).offsets
+    starts = [o[0] for o in offsets]
+    bounds = [0, *(m.end() for m in _PARAGRAPH_BREAK.finditer(text)), len(text)]
+    paragraphs = [(a, b) for a, b in zip(bounds, bounds[1:], strict=False) if b > a]
+
+    def count(a: int, b: int) -> int:
+        return bisect.bisect_left(starts, b) - bisect.bisect_left(starts, a)
+
+    cuts: list[int] = []
+    used = None  # 当前段已用的 token 数；None 表示还没有段
+    for a, b in paragraphs:
+        size = count(a, b)
+        if used is not None and used + size <= span_tokens:
+            used += size
+            continue
+        if size <= span_tokens:
+            cuts.append(a)
+            used = size
+            continue
+        first, last = bisect.bisect_left(starts, a), bisect.bisect_left(starts, b)  # 超长段落按 token 数切
+        cuts.extend([a, *(starts[i] for i in range(first + span_tokens, last, span_tokens))])
+        used = count(cuts[-1], b)
+    cuts = sorted(set(cuts) | {0})
+    return [(x, y) for x, y in zip(cuts, [*cuts[1:], len(text)], strict=True) if text[x:y].strip()]
+
+
+def late_vectors(tokenizer: Any, run: Any, head: str, text: str, spans: list[tuple[int, int]],
+                 context_tokens: int) -> list[list[float]]:
+    """后切分的核心：[首特殊符号] + 前缀 + 正文 token + [尾特殊符号] 一次编码，逐段取平均并归一化。
+
+    run(ids) 返回该序列每个位置的输出向量（形状 [长度, 维度]）。前缀加正文超过 context_tokens 时，
+    按区间顺序分批（每批不超过上限、都带前缀），区间不跨批。前缀最多占上限的 1/PREFIX_SHARE。"""
+    import numpy as np  # noqa: PLC0415 - 随 onnxruntime 安装
+
+    wrapped = tokenizer.encode("", add_special_tokens=True).ids
+    front, back = wrapped[:1], wrapped[1:]
+    head_ids = tokenizer.encode(head, add_special_tokens=False).ids[:context_tokens // PREFIX_SHARE] if head else []
+    encoded = tokenizer.encode(text, add_special_tokens=False)
+    ids, starts = encoded.ids, [o[0] for o in encoded.offsets]
+    ranges = [(bisect.bisect_left(starts, a), bisect.bisect_left(starts, b)) for a, b in spans]
+    budget = max(1, context_tokens - len(front) - len(back) - len(head_ids))
+    batches: list[list[int]] = []
+    for index, (_a, b) in enumerate(ranges):
+        if batches and b - ranges[batches[-1][0]][0] <= budget:
+            batches[-1].append(index)
+        else:
+            batches.append([index])
+    vectors: list[list[float]] = [[] for _ in spans]
+    for batch in batches:
+        lo = ranges[batch[0]][0]
+        hi = min(ranges[batch[-1]][1], lo + budget)  # 单段超过预算（配置保证不会）时截到预算内
+        # 编码窗口在预算内向两侧扩展，把区间外的前后文也送进模型（后切分的意义就在这些上下文）
+        spare = budget - (hi - lo)
+        w0 = max(0, lo - spare // 2)
+        w1 = min(len(ids), hi + spare - (lo - w0))
+        w0 = max(0, min(w0, w1 - budget))
+        hidden = np.asarray(run(front + head_ids + ids[w0:w1] + back), dtype=np.float64)
+        base = len(front) + len(head_ids) - w0
+        for index in batch:
+            a, b = max(ranges[index][0], lo), min(ranges[index][1], hi)
+            rows = hidden[base + a:base + b] if b > a else hidden  # 没有 token 的区间（纯空白）用整批平均
+            vector = rows.mean(axis=0)
+            vectors[index] = (vector / (np.linalg.norm(vector) or 1.0)).tolist()
+    return vectors
 
 
 def pack(vector: list[float]) -> bytes:
@@ -125,7 +209,8 @@ class FastEmbedEmbedder:
     """本地 ONNX 嵌入。按模型真实输入上限分窗（R12 T-P0.1），超出的部分不会被静默丢弃。"""
 
     def __init__(self, model_dir: str | Path, model_name: str, dim: int = 384, max_tokens: int | None = None,
-                 query_prefix: str | None = None, passage_prefix: str | None = None):
+                 query_prefix: str | None = None, passage_prefix: str | None = None, chunking: str = "windows",
+                 late_context_tokens: int = 2048, span_tokens: int = 512):
         directory = Path(model_dir)
         if not any(directory.rglob("*.onnx")):
             raise BurrowlError("CAPABILITY_UNAVAILABLE", "本地嵌入模型缺失；请先安装模型文件",
@@ -137,6 +222,7 @@ class FastEmbedEmbedder:
             from tokenizers import Tokenizer  # noqa: PLC0415
         except ImportError as exc:
             raise BurrowlError("CAPABILITY_UNAVAILABLE", "未安装 fastembed（burrowl[models]）") from exc
+        _register_custom(TextEmbedding, model_name, dim)
         self.tokenizer = Tokenizer.from_file(str(directory / "tokenizer.json"))
         self.tokenizer.no_truncation()
         self.model = TextEmbedding(model_name=model_name, specific_model_path=str(directory),
@@ -150,16 +236,43 @@ class FastEmbedEmbedder:
             else DEFAULT_MAX_TOKENS
         files = sorted((p.relative_to(directory).as_posix(), _file_digest(p)) for p in directory.rglob("*")
                        if p.is_file() and p.suffix in {".onnx", ".json"})
+        # 后切分：模型须是平均池化（逐 token 输出的平均就是它的原生向量），且位置上限足够长
+        from fastembed.text.pooled_embedding import PooledEmbedding  # noqa: PLC0415
+        positions = _max_positions(directory)
+        supported = isinstance(self.model.model, PooledEmbedding) and (positions or 0) >= 1024
+        self.late = supported and chunking in {"auto", "late"}
+        self.late_context_tokens = min(late_context_tokens, positions or late_context_tokens)
+        self.span_tokens = min(span_tokens, self.late_context_tokens // 2)
+        rule = ({"rule": "late-v1", "context": self.late_context_tokens, "span": self.span_tokens} if self.late
+                else {"rule": "token-v2", "max_tokens": self.max_tokens, "prefix_share": PREFIX_SHARE})
         # 窗口参数写进指纹：上限或切窗规则变化后，旧向量自动作废并重建
         self.fingerprint = "fe-" + hashlib.sha256(json.dumps(
             {"model": model_name, "files": files, "fastembed": fastembed.__version__,
-             "windows": {"rule": "token-v2", "max_tokens": self.max_tokens, "prefix_share": PREFIX_SHARE},
+             "windows": rule,
              "prefixes": [self.query_prefix, self.passage_prefix]}
         ).encode()).hexdigest()[:16]
 
     def windows(self, prefix: str, text: str) -> list[Window]:
         # 文档指令前缀与上下文信封一起计入前缀预算，保证"指令 + 信封 + 正文"不超过模型上限
         return token_windows(self.tokenizer, self.max_tokens, self.passage_prefix + prefix, text)
+
+    def segments(self, text: str) -> list[tuple[int, int]]:
+        return segments(self.tokenizer, text, self.span_tokens)
+
+    def late_embed(self, prefix: str, text: str, spans: list[tuple[int, int]]) -> list[list[float]]:
+        """后切分：复用 fastembed 已加载的推理会话取逐 token 输出（last_hidden_state），不另占一份模型内存。"""
+        import numpy as np  # noqa: PLC0415
+        session = self.model.model.model
+        names = {i.name for i in session.get_inputs()}
+
+        def run(ids: list[int]):
+            feed = {"input_ids": np.asarray([ids], dtype=np.int64)}
+            if "attention_mask" in names:
+                feed["attention_mask"] = np.ones((1, len(ids)), dtype=np.int64)
+            if "token_type_ids" in names:
+                feed["token_type_ids"] = np.zeros((1, len(ids)), dtype=np.int64)
+            return session.run(None, feed)[0][0]
+        return late_vectors(self.tokenizer, run, self.passage_prefix + prefix, text, spans, self.late_context_tokens)
 
     def embed_passages(self, texts: list[str]) -> list[list[float]]:
         """按长度排序后分批，每批 token 总量不超过 BATCH_TOKENS，避免长序列补齐导致内存暴涨。"""
@@ -185,6 +298,28 @@ class FastEmbedEmbedder:
 
     def count_tokens(self, text: str) -> int:
         return len(self.tokenizer.encode(text, add_special_tokens=True).ids)
+
+
+def _max_positions(directory: Path) -> int | None:
+    """模型的位置编码上限（config.json 的 max_position_embeddings）。分词器配置里的上限可能更小（jina 写的是 512）。"""
+    try:
+        value = json.loads((directory / "config.json").read_text(encoding="utf-8")).get("max_position_embeddings")
+        return int(value) if value else None
+    except (OSError, ValueError, TypeError):
+        return None
+
+
+def _register_custom(text_embedding: Any, model_name: str, dim: int) -> None:
+    """fastembed 未内置的已登记模型（model_store 中带 custom 的条目）：按其池化方式注册一次，之后与内置模型同样加载。"""
+    from . import model_store  # noqa: PLC0415 - 只在需要时读取模型清单
+
+    spec = next((m for m in model_store.EMBEDDING_MODELS.values() if m["model"] == model_name and "custom" in m), None)
+    if spec is None or any(m["model"] == model_name for m in text_embedding.list_supported_models()):
+        return
+    from fastembed.common.model_description import ModelSource, PoolingType  # noqa: PLC0415
+    text_embedding.add_custom_model(model=model_name, pooling=PoolingType[spec["custom"]["pooling"]],
+                                    normalization=True, sources=ModelSource(hf=spec["repo"]), dim=dim,
+                                    model_file=spec["custom"]["model_file"])
 
 
 def _file_digest(path: Path) -> str:

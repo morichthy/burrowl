@@ -9,7 +9,13 @@ from pathlib import Path
 
 from .core.config import BurrowlConfig
 from .index.embed import Embedder
-from .index.model_store import EMBEDDING_DIR, RERANKER_DIR, default_models_dir, embedding_dir_for
+from .index.model_store import (
+    EMBEDDING_DIR,
+    RERANKER_DIR,
+    default_models_dir,
+    embedding_dir_for,
+    new_data_dir_embedding,
+)
 from .services.config import ConfigService
 from .services.hub import HubService
 from .services.indexing import IndexService, build_embedder
@@ -24,7 +30,7 @@ from .services.relations import WorkbenchPrefs
 from .services.review import ReviewService, claim_lookup_factory
 from .services.runs import RunService
 from .storage.config_store import ConfigStore
-from .storage.layout import Workspace
+from .storage.layout import STATE_DIR, Workspace
 
 
 @dataclass
@@ -53,9 +59,13 @@ class App:
     @classmethod
     def open(cls, data_dir: str | Path, *, create: bool = False, embedder: Embedder | None = None,
              fake_vectors: bool = False) -> "App":
+        fresh = create and not (Path(data_dir).resolve() / STATE_DIR).exists()  # 全新数据目录（不是登记已有目录）
         workspace = Workspace.open(data_dir, create=create)
         storage = Storage.open(workspace.root)
         config_service = ConfigService(ConfigStore(workspace))
+        if fresh:  # R17：新数据目录在配置里写明默认嵌入模型；旧目录没有配置文件时仍按代码默认（MiniLM）
+            config_service.store.write(BurrowlConfig.model_validate(
+                {"index": {"embedding": new_data_dir_embedding()}}), "default")
         cfg: BurrowlConfig = config_service.current()
         shared = default_models_dir()
         if embedder is None and not fake_vectors:

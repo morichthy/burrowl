@@ -75,7 +75,10 @@
       "dim": 384,
       "max_tokens": null,
       "query_prefix": null,
-      "passage_prefix": null
+      "passage_prefix": null,
+      "chunking": "auto",
+      "late_context_tokens": 2048,
+      "span_tokens": 512
     },
     "vector": {
       "kind": "sqlite-vec",
@@ -529,6 +532,33 @@
           "default": null,
           "description": "文档指令前缀；多数模型不需要",
           "title": "Passage Prefix"
+        },
+        "chunking": {
+          "default": "auto",
+          "description": "向量切分方式。late=后切分：整条记录（不超过 late_context_tokens）一次编码，再按块/段落分别求平均，每段带着全文上下文；windows=各段单独编码（按模型上限切窗）。auto：模型是平均池化且位置上限≥1024 时用 late",
+          "enum": [
+            "auto",
+            "late",
+            "windows"
+          ],
+          "title": "Chunking",
+          "type": "string"
+        },
+        "late_context_tokens": {
+          "default": 2048,
+          "description": "后切分一次编码的上下文长度（token）。只决定每段能看到多少上下文，不决定向量粒度；越长越慢、越占内存（注意力随长度平方增长）。超过时按段落边界分批编码",
+          "maximum": 8192,
+          "minimum": 256,
+          "title": "Late Context Tokens",
+          "type": "integer"
+        },
+        "span_tokens": {
+          "default": 512,
+          "description": "后切分每个向量覆盖的最大长度（token）：块或段落超过时按段落、再按 token 切开，避免一个向量混入多个意思",
+          "maximum": 2048,
+          "minimum": 64,
+          "title": "Span Tokens",
+          "type": "integer"
         }
       },
       "title": "Embedding",

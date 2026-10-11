@@ -141,17 +141,22 @@ def main(argv: list[str] | None = None) -> None:
     if options.with_models:
         sys.path.insert(0, str(ROOT / "packages/burrowl/src"))
         from burrowl.index.model_store import (  # noqa: PLC0415 - 构建脚本按需导入
+            DEFAULT_EMBEDDING,
             EMBEDDING_DIR,
+            EMBEDDING_MODELS,
             RERANKER_DIR,
             default_models_dir,
             status,
         )
         source = default_models_dir()
         state = status(source)
-        if not (state["embedding"]["installed"] and state["reranker"]["installed"]):
-            raise SystemExit("本机模型未安装完整：先运行 burrowl models install")
-        # 只打包默认模型（MiniLM 嵌入 + 重排）；可选的长上下文模型（如 Qwen3，约 1.1 GB）由用户按需安装
-        for name in (EMBEDDING_DIR, RERANKER_DIR):
+        default_dir = EMBEDDING_MODELS[DEFAULT_EMBEDDING]["dir"]
+        if not (state["embedding"]["installed"] and state["reranker"]["installed"]
+                and state["embedding_models"][DEFAULT_EMBEDDING]["installed"]):
+            raise SystemExit("本机模型未安装完整：先运行 burrowl models install 与 burrowl models install --embedding-model minilm")
+        # 打包默认嵌入模型（jina-v2-base-zh，新数据目录使用）、MiniLM（已有数据目录的配置仍指向它）与重排模型；
+        # 其他可选模型（bge、Qwen3 等）由用户按需安装
+        for name in (default_dir, EMBEDDING_DIR, RERANKER_DIR):
             shutil.copytree(source / name, stage / "models" / name, ignore=shutil.ignore_patterns(".cache"))
 
     # 5. 启动器与安装脚本

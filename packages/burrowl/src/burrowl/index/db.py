@@ -21,6 +21,7 @@ from typing import Any
 from ..core.clock import utc_now
 from ..core.errors import BurrowlError
 from .embed import Embedder, pack
+from .late import late_windows
 from .tokenize import TOKENIZER_VERSION, fts_document, fts_query
 
 SCHEMA_VERSION = 5  # v2：entries.embed_prefix；v3：graph_nodes / graph_edges；v4：link_candidates；v5：graph_nodes.ref
@@ -199,11 +200,14 @@ class IndexDB:
         changed = [e for key, e in current.items() if existing.get(key) != (e["signature"], True)]
         removed = set(existing) - set(current)
         windows = []
-        for entry in changed:
-            for window in self.embedder.windows(entry["embed_prefix"] or entry["title"], entry["text"]):
-                windows.append((entry, window))
         try:
-            vectors = self.embedder.embed_passages([w.text for _e, w in windows]) if windows else []
+            if getattr(self.embedder, "late", False):
+                windows, vectors = late_windows(self.embedder, changed, list(current.values()))
+            else:
+                for entry in changed:
+                    for window in self.embedder.windows(entry["embed_prefix"] or entry["title"], entry["text"]):
+                        windows.append((entry, window))
+                vectors = self.embedder.embed_passages([w.text for _e, w in windows]) if windows else []
         except Exception as exc:
             with self.connect() as db:
                 self._set_state(db, owner_id, corpus, "vector", status="failed", model_fp=fp,
