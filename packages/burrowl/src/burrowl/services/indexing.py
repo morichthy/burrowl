@@ -47,7 +47,9 @@ def build_embedder(config: IndexConfig, data_root: Path, *, default_model_dir: P
     try:
         return FastEmbedEmbedder(directory, config.embedding.model, config.embedding.dim,
                                  max_tokens=config.embedding.max_tokens, query_prefix=config.embedding.query_prefix,
-                                 passage_prefix=config.embedding.passage_prefix)
+                                 passage_prefix=config.embedding.passage_prefix, chunking=config.embedding.chunking,
+                                 late_context_tokens=config.embedding.late_context_tokens,
+                                 span_tokens=config.embedding.span_tokens)
     except BurrowlError:
         return None  # 模型缺失：向量通道报告 disabled，关键词检索照常
 

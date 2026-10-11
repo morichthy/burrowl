@@ -1,6 +1,7 @@
 """本机模型目录：安装、校验与状态。所有数据目录共享一份模型。
 
-    <models>/multilingual-minilm/      默认嵌入模型（fastembed 的 ONNX 量化版，约 220 MB，128 token）
+    <models>/jina-embeddings-v2-base-zh/  默认嵌入模型（中英双语，8192 位置上限，平均池化，支持后切分；约 640 MB）
+    <models>/multilingual-minilm/      0.6 之前的默认嵌入模型（约 220 MB，128 token；已有数据目录的配置仍可能指向它）
     <models>/qwen3-embedding-0.6b-q/   可选长上下文嵌入模型（int8，约 1.1 GB，32k token；R12 T-P1.2）
     <models>/cross-encoder/            重排模型（含 model-manifest.json，逐文件 sha256 校验）
 
@@ -31,7 +32,33 @@ EMBEDDING_MODELS: dict[str, dict] = {
                      "dim": 1024, "model": "Qwen/Qwen3-Embedding-0.6B-Q",
                      "query_prefix": "Instruct: Given a question, retrieve research records that answer it\nQuery:",
                      "size": "约 1.1 GB"},
+    # 中等体量的候选（2026-10-11 召回评测，见 docs/design/R12 §10）：窗口 512 / 8192 token
+    "bge-small-zh": {"dir": "bge-small-zh-v1.5", "repo": "Qdrant/bge-small-zh-v1.5",
+                     "files": ["model_optimized.onnx", "tokenizer.json", "config.json", "special_tokens_map.json",
+                               "tokenizer_config.json"],
+                     "dim": 512, "model": "BAAI/bge-small-zh-v1.5",
+                     "query_prefix": "为这个句子生成表示以用于检索相关文章：", "size": "约 95 MB"},
+    # fastembed 未内置，按自定义模型登记（custom：池化方式与 onnx 文件；见 embed.FastEmbedEmbedder）
+    "bge-base-zh": {"dir": "bge-base-zh-v1.5", "repo": "Xenova/bge-base-zh-v1.5",
+                    "files": ["onnx/model.onnx", "tokenizer.json", "config.json", "special_tokens_map.json",
+                              "tokenizer_config.json"],
+                    "dim": 768, "model": "BAAI/bge-base-zh-v1.5",
+                    "query_prefix": "为这个句子生成表示以用于检索相关文章：", "size": "约 410 MB",
+                    "custom": {"pooling": "CLS", "model_file": "onnx/model.onnx"}},
+    "jina-v2-base-zh": {"dir": "jina-embeddings-v2-base-zh", "repo": "jinaai/jina-embeddings-v2-base-zh",
+                        "files": ["onnx/model.onnx", "tokenizer.json", "config.json", "special_tokens_map.json",
+                                  "tokenizer_config.json"],
+                        "dim": 768, "model": "jinaai/jina-embeddings-v2-base-zh", "query_prefix": None,
+                        "size": "约 640 MB"},
 }
+# 新建数据目录写进配置的嵌入模型（R17）。代码里的配置默认值仍是 MiniLM，保护没有配置文件的旧数据目录。
+DEFAULT_EMBEDDING = "jina-v2-base-zh"
+
+
+def new_data_dir_embedding() -> dict:
+    """新建数据目录时写入 index.embedding 的值（chunking 等其余字段用配置默认值）。"""
+    spec = EMBEDDING_MODELS[DEFAULT_EMBEDDING]
+    return {"model": spec["model"], "dim": spec["dim"], "query_prefix": spec["query_prefix"]}
 RERANKER_REPO = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
 
 

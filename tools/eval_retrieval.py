@@ -5,7 +5,8 @@
 
     uv run python tools/eval_retrieval.py --data-dir <目录> --set <题目.jsonl> [--corpus fulltext|discovery]
         [--channels identity,lexical,dense] [--label B0] [--scratch] [--fake-vectors] [--legacy-windows]
-        [--ablate envelope,record_text] [--model minilm|qwen3-0.6b-q] [--max-tokens N] [--graph-route] [--out <目录>]
+        [--ablate envelope,record_text] [--model <见 burrowl models status>] [--max-tokens N]
+        [--chunking auto|late|windows] [--late-context N] [--span-tokens N] [--graph-route] [--out <目录>]
 
 题目文件每行一题：{id, question, variants[], type: fact|multihop|conditional|negative,
 expected_owners[], expected_records[], must_not[], notes, checked_by_user}
@@ -144,6 +145,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--legacy-windows", action="store_true", help="B-1：修复截断之前的分窗方式")
     parser.add_argument("--model", help="换用本机已安装的嵌入模型（见 burrowl models install），不改数据目录配置")
     parser.add_argument("--max-tokens", type=int, help="与 --model 一起用：调小模型上限")
+    parser.add_argument("--chunking", default="auto", choices=["auto", "late", "windows"],
+                        help="与 --model 一起用：向量切分方式（R17；late 只对平均池化的长上下文模型生效）")
+    parser.add_argument("--late-context", type=int, default=2048, help="与 --model 一起用：后切分的上下文长度")
+    parser.add_argument("--span-tokens", type=int, default=512, help="与 --model 一起用：后切分每个向量的最大长度")
     parser.add_argument("--graph-route", action="store_true", help="打开图路线（R12 T-P2.9，默认关闭）")
     parser.add_argument("--ablate", default="", help="关掉的 P1 改动，逗号分隔：envelope,record_text")
     parser.add_argument("--out", type=Path, help="结果目录；默认 <数据目录>/eval/runs，--scratch 时为 build/eval/runs")
@@ -168,7 +173,9 @@ def main(argv: list[str] | None = None) -> int:
             from burrowl.index.embed import FastEmbedEmbedder  # noqa: PLC0415
             spec = model_store.EMBEDDING_MODELS[args.model]
             embedder = FastEmbedEmbedder(model_store.default_models_dir() / spec["dir"], spec["model"], spec["dim"],
-                                         max_tokens=args.max_tokens, query_prefix=spec["query_prefix"])
+                                         max_tokens=args.max_tokens, query_prefix=spec["query_prefix"],
+                                         chunking=args.chunking, late_context_tokens=args.late_context,
+                                         span_tokens=args.span_tokens)
         app = App.open(data_dir, fake_vectors=args.fake_vectors, embedder=embedder)
         embedder = app.index.db.embedder
         if args.legacy_windows:

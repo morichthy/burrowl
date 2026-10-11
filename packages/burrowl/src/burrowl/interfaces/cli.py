@@ -387,8 +387,9 @@ def models_status() -> None:
 
 @models_cli.command("install")
 def models_install(embedding: bool = typer.Option(True, help="下载嵌入模型（需要联网）"),
-                   embedding_model: str = typer.Option("minilm", help="嵌入模型：minilm（默认，约 220 MB）"
-                                                       " 或 qwen3-0.6b-q（长上下文，约 1.1 GB）"),
+                   embedding_model: str = typer.Option(model_store.DEFAULT_EMBEDDING, help=(
+                       "嵌入模型：jina-v2-base-zh（默认，约 640 MB）、minilm（0.6 之前的默认，约 220 MB）、"
+                       "bge-small-zh、bge-base-zh、qwen3-0.6b-q")),
                    reranker: bool = typer.Option(True, help="安装重排模型"),
                    reranker_from: Path | None = typer.Option(None, help="从本机已有的重排模型目录复制（含清单校验）")) -> None:
     """安装模型到本机模型目录（BURROWL_MODELS_DIR 或 %LOCALAPPDATA%/burrowl/models）。已安装的跳过。
@@ -403,7 +404,7 @@ def models_install(embedding: bool = typer.Option(True, help="下载嵌入模型
         if embedding and not current["embedding_models"][embedding_model]["installed"]:
             typer.echo(f"下载嵌入模型 {embedding_model}（{spec['size']}）…")
             model_store.install_embedding(models, embedding_model)
-            if embedding_model != "minilm":
+            if embedding_model != model_store.DEFAULT_EMBEDDING:
                 typer.echo("启用方法：config_update index.embedding = " + json.dumps(
                     {"model": spec["model"], "dim": spec["dim"], "query_prefix": spec["query_prefix"]},
                     ensure_ascii=False) + "，然后 burrowl call index.reconcile")

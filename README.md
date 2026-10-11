@@ -124,7 +124,7 @@ Skill 里反引号中的工具名（如 `memory_owners`）都由 burrowl MCP 服
    $burrowl = "<安装根目录>\bin\burrowl.cmd"
    ```
 
-2. 安装模型。只需一次，需要联网下载约 220 MB；安装包名带 `-models` 时已经包含，跳过这一步。
+2. 安装模型。只需一次，需要联网下载约 760 MB（默认嵌入模型 jina-v2-base-zh 约 640 MB，加重排模型）；安装包名带 `-models` 时已经包含，跳过这一步。
 
    ```powershell
    & $burrowl models install
@@ -370,6 +370,7 @@ burrowl validate
 - 不要手工修改 `memory/` 和 `.burrowl/` 中的文件。
 - 原件保持只读；内容更新时用新的来源 ID 登记。
 - 模型放在安装根目录下的 `models`（直接双击 setup.cmd 安装时为 `%LOCALAPPDATA%\burrowl\models`），所有数据目录共用；可用环境变量 `BURROWL_MODELS_DIR` 改位置。
+- 嵌入模型按数据目录配置：0.6 起新建的数据目录使用 jina-v2-base-zh（中英双语）并启用后切分；之前建的数据目录保持原模型（通常是 MiniLM）。切换方法和评测方法见 [R17 设计稿](docs/design/R17_LATE_CHUNKING.md) §5–§6；切换后重启工作台和 MCP，再运行 `index.reconcile` 重建向量。
 
 ## 命令速查
 
@@ -382,7 +383,7 @@ burrowl validate
 | `burrowl init <数据目录>`                                                                               | 新建数据目录并设为默认                              |
 | `burrowl serve`                                                                                         | 启动工作台                                          |
 | `burrowl doctor` / `burrowl validate`                                                                 | 检查运行环境 / 只读检查数据目录                     |
-| `burrowl models install` / `burrowl models status`                                                    | 安装 / 查看模型（`--embedding-model qwen3-0.6b-q` 安装可选的长上下文嵌入模型，约 1.1 GB） |
+| `burrowl models install` / `burrowl models status`                                                    | 安装 / 查看模型（默认装 jina-v2-base-zh；`--embedding-model minilm / bge-small-zh / bge-base-zh / qwen3-0.6b-q` 安装其他嵌入模型） |
 | `burrowl backup <包.zip> [--no-external]`                                                               | 备份（默认含被引用的外部原件）                      |
 | `burrowl verify-backup <包.zip>`                                                                        | 只校验备份，列出工作根与原件                        |
 | `burrowl restore <包.zip> <新目录> [--map 键=新位置] [--default]`                                       | 恢复并重定向原件                                    |

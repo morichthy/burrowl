@@ -162,10 +162,16 @@ if ((Resolve-Path -LiteralPath $here).Path -ne $dest) {
 
 $bundledModels = Join-Path $here "models"
 $sharedModels = Join-Path $Root "models"
-if ((Test-Path -LiteralPath $bundledModels) -and -not (Test-Path -LiteralPath (Join-Path $sharedModels "multilingual-minilm"))) {
-    Write-Host "复制模型到 $sharedModels"
-    New-Item -ItemType Directory -Force -Path $sharedModels | Out-Null
-    Copy-Item -Path (Join-Path $bundledModels "*") -Destination $sharedModels -Recurse -Force
+if (Test-Path -LiteralPath $bundledModels) {
+    # 逐个模型目录补齐：升级时只复制共享目录里还没有的模型（如 0.6 新增的默认嵌入模型），已有的不覆盖
+    foreach ($model in Get-ChildItem -LiteralPath $bundledModels -Directory) {
+        $target = Join-Path $sharedModels $model.Name
+        if (-not (Test-Path -LiteralPath $target)) {
+            Write-Host "复制模型 $($model.Name) 到 $sharedModels"
+            New-Item -ItemType Directory -Force -Path $sharedModels | Out-Null
+            Copy-Item -LiteralPath $model.FullName -Destination $target -Recurse -Force
+        }
+    }
 }
 
 Write-Shim $version

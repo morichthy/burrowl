@@ -48,7 +48,7 @@
   - 检索用一个 SQLite 文件：FTS5 全文，加 sqlite-vec 向量（按模型指纹隔离），以及图投影（节点、边）和关联候选。
   - 阅读会话用"不可变修订 + CAS"文档存储。
 - **模型**：
-  - 嵌入：fastembed 的多语言 MiniLM-384（ONNX，离线，输入上限 128 token）。可选 Qwen3-Embedding-0.6B-Q（`burrowl models install --embedding-model qwen3-0.6b-q`，32k 上限，CPU 上明显更慢、更占内存；实测见 R12 设计稿 §10）。
+  - 嵌入：fastembed 离线加载 ONNX 模型。新建数据目录默认 jina-embeddings-v2-base-zh（中英双语，768 维，位置上限 8192，平均池化），使用后切分：整条记录一次编码（`late_context_tokens`，默认 2048），再按块或段落分别求平均（`span_tokens`，默认 512）。已有数据目录可能仍在用 MiniLM-384（输入上限 128 token，各段单独切窗）。也可选 bge-small-zh、bge-base-zh、Qwen3-Embedding-0.6B-Q。选型和评测方法见 R17 设计稿。
   - 重排：可选的 ONNX Cross-encoder。
   - 模型统一放在 `%LOCALAPPDATA%\burrowl\models`，所有数据目录共用。
 - **前端**：React + Vite，构建产物随发行包分发，使用端不需要 Node。
@@ -75,7 +75,7 @@ core         记录模型与校验、契约说明、哈希、原子写与锁、�
 | STORE 规范存储 | `storage/memory_store.py`（提交、CAS、幂等、暂存回读、恢复；`read_head` 只读 HEAD、提交清单与指定指针记录；`VerifiedRecords` 已校验记录缓存）、`storage/owners.py`（对象发现、业务卡、核心算法准入；对象发现不进入 `runs/`，`RunLocator` 按编号与位置找 Run）、`storage/sources.py`（来源登记）、`core/atomic.py`（锁） | 所有服务；备份恢复；validate |
 | MEM 记忆服务 | `services/memory/`：service（提交与读取过滤、handle）、links（链接解析与重新固定）、concepts（概念库约束与术语扩展）、claims（结论、复核图、成熟度与派生统计）、documents（文稿）、history、raw_materials、provenance（影响与血缘）、associations、consolidation、export | REVIEW、QUERY、READ、HUB 的读取者；工作台记忆页；work 与 consolidate Skill |
 | REVIEW 复核 | `services/review.py`、`services/memory/claims.py` | 检索的复核类别、正式用途、中枢发布策略、复核页 |
-| IDX 检索 | `index/`（db、projections（含上下文信封）、graph（图投影）、fusion、query_plan、rerank、conditions、extract、embed、model_store）、`services/indexing.py`（同步、图路线、关联候选、缺口） | QUERY、READ 的召回；关系图页；模型安装；索引重建；发现可见性语义；评估脚本 `tools/eval_retrieval.py` |
+| IDX 检索 | `index/`（db、projections（含上下文信封）、graph（图投影）、fusion、query_plan、rerank、conditions、extract、embed、late（后切分分组）、model_store）、`services/indexing.py`（同步、图路线、关联候选、缺口） | QUERY、READ 的召回；关系图页；模型安装；索引重建；发现可见性语义；评估脚本 `tools/eval_retrieval.py`、`tools/eval_recall_models.py` |
 | RUN 执行证据 | `services/runs.py`（建立、登记、执行、显式查找、丢弃与回收站）、`storage/owners.py` 的 `RunLocator`（R14：按编号与位置查找，上级按目录位置） | 引用解析、时间线与原始材料、关键操作记录、归属判定、收口的 `unfixed_evidence`、`system.validate`、关系图的 Run 节点；`tests/service/test_run_evidence.py` |
 | ROUTE 归属判定 | `services/routing.py`（`memory.owner_route`：复用 `ReadingService.preview` → `screen` 的召回与筛选包，补充目标、检查点与来源重叠证据） | 阅读第一轮召回的任何变化都会同步改变归属候选；RULES 第 1、2 节与 work Skill；`tests/service/test_routing.py` |
 | ACT 关键操作记录 | `services/activity.py`（从业务卡、提交回执、复核记录、Run 业务卡、中枢执行记录派生；一行摘要生成函数）；写操作返回值的 `activity` 字段 | 提交回执与记录结构、Run 状态、中枢执行记录的变化；工作台首页；`tests/service/test_activity.py` |
@@ -190,7 +190,7 @@ handle 分配和正文链接解析发生在第 1 步（`MemoryService.prepare`�
 
 - Qdrant 服务器适配器未实现：sqlite-vec 是暴力检索，约 10 万向量以上需要它。
 - 检索评估只有浮点样例的小题集（13 题，`tools/eval_retrieval.py`），只能看相对变化；基于真实数据目录的 40–60 题评估集待用户抽查后建立（R12 的 T-P0.2）。样例只有一个对象、没有链接和结论，图路线在上面没有可测的收益。
-- 默认 MiniLM 的输入上限只有 128 token，长记录被切成很多小窗口；Qwen3 长上下文模型已可选安装，是否改为默认待用户根据实测决定（R12 §10）。
+- 嵌入模型和切分方式的证据还不完整（R17 §7）：jina 在合成中文题集上明显好于 MiniLM，但在浮点样例的 13 题上名次指标更低；英文科研题集（SciFact）上 jina 还没测；后切分与 windows、whole 的对比，需要以中文长 L1 记录为主的题集。fp32 版 jina 在 2 线程 CPU 上编码约每秒 450 token，首次建索引较慢。
 - 交换包尚未在 Obsidian 中人工验收（R12 AC-P3）。
 - LightRAG 连接器只有自动测试（假实现 + 真实 1.5.7 断网运行），尚未在本机做"发布 → 检索 → 核验"的人工验收（R12 AC-P4）。中枢路线（`index.hub_route`）默认关闭。
 - WeKnora 连接器只用模拟接口测试，尚未连真实服务实测。

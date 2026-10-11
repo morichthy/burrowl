@@ -98,6 +98,8 @@ class ReadingDefaults(_Model):
 
 class Embedding(_Model):
     provider: Literal["fastembed", "none"] = "fastembed"
+    # 代码默认值保持 MiniLM：没有配置文件的旧数据目录升级后不会被悄悄换模型。
+    # R17 起新建的数据目录在创建时把 jina-v2-base-zh 写进配置（model_store.NEW_DATA_DIR_EMBEDDING）。
     model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
     path: str | None = Field(None, description="本地模型目录；相对路径相对数据目录。为空时使用安装包自带模型")
     dim: int = Field(384, ge=1, le=4096)
@@ -106,6 +108,20 @@ class Embedding(_Model):
     query_prefix: str | None = Field(None, max_length=500,
                                      description="查询指令前缀（如 Qwen3 的 Instruct…Query:）；fastembed 不会自动添加")
     passage_prefix: str | None = Field(None, max_length=500, description="文档指令前缀；多数模型不需要")
+    chunking: Literal["auto", "late", "windows"] = Field("auto", description=(
+        "向量切分方式。late=后切分：整条记录（不超过 late_context_tokens）一次编码，再按块/段落分别求平均，"
+        "每段带着全文上下文；windows=各段单独编码（按模型上限切窗）。auto：模型是平均池化且位置上限≥1024 时用 late"))
+    late_context_tokens: int = Field(2048, ge=256, le=8192, description=(
+        "后切分一次编码的上下文长度（token）。只决定每段能看到多少上下文，不决定向量粒度；"
+        "越长越慢、越占内存（注意力随长度平方增长）。超过时按段落边界分批编码"))
+    span_tokens: int = Field(512, ge=64, le=2048, description=(
+        "后切分每个向量覆盖的最大长度（token）：块或段落超过时按段落、再按 token 切开，避免一个向量混入多个意思"))
+
+    @model_validator(mode="after")
+    def _late_sizes(self):
+        if self.span_tokens * 2 > self.late_context_tokens:
+            raise ValueError("span_tokens 不能超过 late_context_tokens 的一半（还要留出前缀与上下文）")
+        return self
 
 
 class VectorBackend(_Model):
