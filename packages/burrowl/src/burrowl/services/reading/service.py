@@ -32,6 +32,7 @@ from ..indexing import IndexService
 from ..memory import concepts
 from ..memory.context import Storage
 from . import notes, screening, text
+from .reuse import ScreenReuse
 from .session import STRATEGIES, VERDICTS, SessionStore, new_session
 
 AGENT_CLOSED = {"finished": "已结束", "aborted": "已被用户中止", "archived": "已归档"}
@@ -52,6 +53,7 @@ class ReadingService:
         self.config = config
         self.sessions = SessionStore(storage.ws)
         self.reranker_dir = reranker_dir
+        self.reuse = ScreenReuse()  # R18 D-02：同输入、同检索状态时复用筛选结果（进程内，可丢弃）
 
     # ---------- 共用 ----------
     def _agent_update(self, session_id: str, change: Callable[[dict], Any],
@@ -136,35 +138,67 @@ class ReadingService:
 
     def screen(self, plan: dict, *, corpus: str = "discovery", owner_ids: list[str] | None = None,
                review_filter: str, exclude: set[str] | frozenset = frozenset(), screening_cfg: dict, reranking: str,
-               conditions: list[dict] | None = None) -> dict:
-        """一轮召回 + 筛选包，不读写会话。阅读会话的每一轮与归属判定（R13 D-03）共用这一个实现。"""
+               conditions: list[dict] | None = None, origin: str = "reading") -> dict:
+        """一轮召回 + 筛选包，不读写会话。阅读会话的每一轮与归属判定（R13 D-03）共用这一个实现。
+
+        R18 D-02：输入相同、参与检索的对象及其索引都没变时复用上一次的结果，结果带 `reused_from`（来源 origin 与时间）。
+        缺口每次现算：未就绪的对象（如刚建的空对象）不影响召回，只多一条缺口。复用时 cost 只记本次实际开销
+        （candidates 照计，rerank_items 为 0）。"""
         started = time.monotonic()
+        config = self.config()
+        key = canonical_hash({"plan_id": plan["plan_id"], "corpus": corpus, "owner_ids": owner_ids,
+                              "review_filter": review_filter, "exclude": sorted(exclude),
+                              "screening": screening_cfg, "reranking": reranking, "conditions": conditions,
+                              "config": config.model_dump(mode="json"), "reranker": self._reranker_marker()})
+        state = self.index.search_state(corpus, owner_ids)
+        reused = self.reuse.get(key, state["digest"])
+        if reused is not None:
+            result, source = reused
+            # search_plan 的缺口 = 就绪缺口 + 查询相关的缺口（截断、图预算）；前者换成现算的
+            result["gaps"] = state["gaps"] + result["gaps"][source.pop("readiness_gaps"):]
+            result["reused_from"] = source
+            result["cost"] = {"candidates": result["cost"]["candidates"], "rerank_items": 0,
+                              "wall_ms": round((time.monotonic() - started) * 1000)}
+            return result
         owners, gaps = screening.recall(self.index, plan, corpus=corpus, owner_ids=owner_ids,
                                         review_filter=review_filter, exclude=set(exclude),
-                                        graph_route=self.config().index.graph_route)
+                                        graph_route=config.index.graph_route, readiness=state["readiness"])
         packets, diagnostics = screening.packets(self.index, plan, owners, regular=screening_cfg["regular_windows"],
                                                  maximum=screening_cfg["max_windows"], reranking=reranking,
                                                  reranker_path=self.reranker_dir, conditions=conditions)
         ordered = sorted((o["owner_id"] for o in owners), key=lambda o: screening.condition_rank(packets[o]))
-        return {"owners": ordered, "packets": packets, "gaps": gaps, "diagnostics": diagnostics,
-                "cost": {"candidates": len(owners), "rerank_items": diagnostics.get("rerank_items", 0),
-                         "wall_ms": round((time.monotonic() - started) * 1000)}}
+        result = {"owners": ordered, "packets": packets, "gaps": gaps, "diagnostics": diagnostics,
+                  "cost": {"candidates": len(owners), "rerank_items": diagnostics.get("rerank_items", 0),
+                           "wall_ms": round((time.monotonic() - started) * 1000)}, "reused_from": None}
+        # 召回期间若有对象被重新索引，之后的 digest 必然不同（水位行带更新时间），这份结果不会被命中
+        self.reuse.put(key, state["digest"], result, origin, readiness_gaps=len(state["gaps"]))
+        return result
+
+    def _reranker_marker(self) -> list | None:
+        """重排模型目录的存在与修改时间：装上或换掉模型后，筛选包的重排结果会不同（R18 D-02）。"""
+        try:
+            return [str(self.reranker_dir), self.reranker_dir.stat().st_mtime_ns] if self.reranker_dir else None
+        except OSError:
+            return [str(self.reranker_dir), None]
 
     def preview(self, question: str, *, variants: list[dict] | None = None,
-                protected_terms: list[str] | None = None, domains: list[str] | None = None) -> dict:
-        """按工作区阅读配置做一次与 reading.start 第一轮相同的发现召回和筛选，不建立会话。"""
+                protected_terms: list[str] | None = None, domains: list[str] | None = None,
+                origin: str = "preview") -> dict:
+        """按工作区阅读配置做一次与 reading.start 第一轮相同的发现召回和筛选，不建立会话。
+        结果可被随后同一问题的 reading.start 复用（R18 D-02）；origin 标明是谁算的。"""
         cfg = self.config().reading
         plan = self._plan(question, variants=variants, protected_terms=protected_terms, domains=domains)
         return {"plan_id": plan["plan_id"]} | self.screen(
             plan, review_filter=cfg.review_filter, screening_cfg=cfg.screening.model_dump(),
-            reranking=cfg.reranking.mode)
+            reranking=cfg.reranking.mode, origin=origin)
 
     def _round(self, session: dict, plan: dict, kind: str, *, corpus: str = "discovery") -> dict:
         """执行一轮召回，把新对象加入队列并生成筛选包（在会话锁外计算）。"""
         result = self.screen(plan, corpus=corpus, owner_ids=session.get("scope_owner_ids"),
                              review_filter=session["review_filter"], exclude=set(session["owners"]),
                              screening_cfg=session["screening"], reranking=session["reranking"],
-                             conditions=session.get("field_conditions") or None)
+                             conditions=session.get("field_conditions") or None,
+                             origin=f"reading.{kind}")
         gaps = result["gaps"]
         if kind == "discovery":
             # 发现召回不可用、不完整或不足时，才允许向用户申请全文补偿
@@ -174,7 +208,8 @@ class ReadingService:
             reasons = []
         return {"id": f"R{len(session['rounds']) + 1}", "kind": kind, "plan_id": plan["plan_id"], "corpus": corpus,
                 "at": utc_now(), "owners": result["owners"], "packets": result["packets"], "gaps": gaps,
-                "fulltext_reasons": reasons, "diagnostics": result["diagnostics"], "cost": result["cost"]}
+                "fulltext_reasons": reasons, "diagnostics": result["diagnostics"], "cost": result["cost"],
+                "reused_from": result["reused_from"]}
 
     @staticmethod
     def _apply_round(session: dict, round_: dict) -> None:
@@ -194,7 +229,9 @@ class ReadingService:
         for key, value in round_.get("cost", {}).items():
             consumed[key] = consumed.get(key, 0) + value
         session["rounds"].append(round_)
-        _event(session, "recall", f"{round_['kind']} 召回 {len(round_['owners'])} 个对象", round=round_["id"])
+        reused = round_.get("reused_from")
+        tail = f"（复用 {reused['origin']} 的结果）" if reused else ""
+        _event(session, "recall", f"{round_['kind']} 召回 {len(round_['owners'])} 个对象{tail}", round=round_["id"])
 
     @staticmethod
     def _fulltext_reasons(session: dict) -> list[str]:
@@ -239,6 +276,7 @@ class ReadingService:
                 "plan": {"variants": [v["question"] for v in plan["variants"]], "matched_terms": plan["matched_terms"]},
                 "batch": batch, "remaining": len(session["queue"]) - len(batch),
                 "gaps": last["gaps"], "fulltext_available": bool(last["fulltext_reasons"]),
+                "reused_from": last["reused_from"],
                 "inbox": [], "pending_requests": [], "revision": 1,
                 "next": "对每个对象给出 relevant / uncertain / irrelevant、理由和筛选包 digest（reading_assess）"
                         + ("；quick 策略还要用 accepted_windows 标出可依据的窗口" if strategy == "quick" else "")}

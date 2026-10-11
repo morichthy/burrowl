@@ -399,6 +399,39 @@ class IndexService:
         return {o.owner_id: self.storage.store.read_head(o).head if o.persisted else None
                 for o in owners if o.readable}
 
+    def readiness(self, corpus: Corpus, owner_ids: list[str] | None = None,
+                  heads: dict[str, dict | None] | None = None, *, dense: bool = True) -> tuple[list, list, list]:
+        """检索的就绪判断：(关键词就绪对象, 向量就绪对象, 缺口)。search_plan 与 R18 的复用判断共用这一个实现。"""
+        if heads is None and corpus != "source":
+            heads = self.heads(owner_ids)
+        lexical, gaps = self.ready_owners(corpus, "lexical", owner_ids, heads)
+        vector: list[str] = []
+        if dense and self.db.embedder is not None:
+            vector, vector_gaps = self.ready_owners(corpus, "vector", owner_ids, heads)
+            gaps = gaps + vector_gaps
+        elif dense:
+            gaps = gaps + [{"channel": "dense", "reason": "embedder_unavailable"}]
+        return lexical, vector, gaps
+
+    def search_state(self, corpus: Corpus, owner_ids: list[str] | None = None, *, dense: bool = True) -> dict:
+        """同一查询的检索结果能否复用的依据（R18 D-02）：{digest, gaps, readiness}。
+
+        检索只读就绪对象的索引（关键词、向量、图投影都按就绪对象过滤），所以结果由
+        "哪些对象就绪 + 这些对象的索引水位（含签名与更新时间）+ 嵌入模型 + 投影版本"决定，digest 覆盖这些。
+        未就绪的对象（例如刚建、还没有记录的对象）不进入结果，只体现在 gaps 里；gaps 每次现算，不参与 digest。
+        水位行带更新时间，所以检索进行中若有对象被重新索引，之后算出的 digest 必然不同，不会命中那次结果。
+        readiness 可以传给 search_plan，避免同一请求再做一遍就绪判断。"""
+        heads = self.heads(owner_ids) if corpus != "source" else None
+        lexical, vector, gaps = self.readiness(corpus, owner_ids, heads, dense=dense)
+        involved = set(lexical) | set(vector)
+        rows = sorted((s for s in self.db.states() if s["owner_id"] in involved),
+                      key=lambda s: (s["owner_id"], s["corpus"], s["channel"]))
+        digest = sha256_bytes(json.dumps({
+            "lexical": sorted(lexical), "vector": sorted(vector), "rows": rows,
+            "model": self.db.embedder.fingerprint if self.db.embedder else None, "versions": VERSIONS,
+        }, sort_keys=True, ensure_ascii=False, default=str).encode())
+        return {"digest": digest, "gaps": gaps, "readiness": (lexical, vector, gaps)}
+
     def ready_owners(self, corpus: Corpus | Literal["graph"], channel: Literal["lexical", "vector", "edges"],
                      owner_ids: list[str] | None = None,
                      heads: dict[str, dict | None] | None = None) -> tuple[list[str], list[dict]]:
@@ -465,7 +498,8 @@ class IndexService:
                     channels: tuple[Channel, ...] = ("identity", "lexical", "dense"),
                     graph_route: GraphRoute | None = None, graph_limits: tuple[int, int] | None = None,
                     hub_hits: list[dict] | None = None, hub_weight: float = 0.5,
-                    heads: dict[str, dict | None] | None = None) -> dict:
+                    heads: dict[str, dict | None] | None = None,
+                    readiness: tuple[list, list, list] | None = None) -> dict:
         """按冻结的查询计划并行执行各路线并融合。按 Owner 汇总时每个信号族只投一票。
 
         explicit_owners：调用方是否"显式指定了对象"（决定 owner_only 记录是否可见）；
@@ -475,6 +509,7 @@ class IndexService:
         hub_hits：中枢路线（R12 T-P4.2）的外部命中（按外部名次排列，含 record_id）；映射回当前投影中通过同样过滤的
         记录级条目后作为一路参与融合。对不上本地的命中不进入融合（调用方作为 external_only 提示）。
         heads：调用方已读的 HEAD（见 heads()）；未给出时本次只读一遍，供关键词与向量两个通道的就绪判断共用。
+        readiness：调用方刚做过的就绪判断（search_state 返回，须是同样的 corpus、owner_ids、dense）。
         """
         if review_filter not in REVIEW_FILTERS:
             raise BurrowlError("INVALID_ARGUMENT", "未知的复核过滤", {"review_filter": review_filter})
@@ -482,15 +517,7 @@ class IndexService:
         common = {"levels": levels, "kinds": kinds, "review": REVIEW_FILTERS[review_filter],
                   "explicit_owners": explicit}
         dense = dense and "dense" in channels
-        if heads is None and corpus != "source":
-            heads = self.heads(owner_ids)
-        lexical_owners, gaps = self.ready_owners(corpus, "lexical", owner_ids, heads)
-        vector_owners: list[str] = []
-        if dense and self.db.embedder is not None:
-            vector_owners, vector_gaps = self.ready_owners(corpus, "vector", owner_ids, heads)
-            gaps = gaps + vector_gaps
-        elif dense:
-            gaps = gaps + [{"channel": "dense", "reason": "embedder_unavailable"}]
+        lexical_owners, vector_owners, gaps = readiness or self.readiness(corpus, owner_ids, heads, dense=dense)
         selected = [r for r in query_plan.routes(plan)
                     if r["channel"] in channels and (r["channel"] != "dense" or vector_owners)]
         embedder = self.db.embedder

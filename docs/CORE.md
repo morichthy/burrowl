@@ -158,6 +158,8 @@ synthesize：跨对象综合，固定所依据的笔记
 全文补偿：仅当发现召回不可用、不完整或不足 → ask_user(fulltext) → 用户批准 → recall(fulltext)
 联想补查：associative 策略按主 Agent 给定方向，受轮数上限
 finish：交接文本 = 有效综合稿或逐对象笔记；陈旧笔记、超上限笔记不交付并列为缺口
+复用：start 的输入与刚做过的归属判定相同、参与检索的对象及其索引都没变时，直接用那一轮召回与筛选包
+      （回执 reused_from；缺口现算）；判定时的判断不带进会话，照常 assess
 用户侧：respond / override / direct / configure / abort / archive → 写入收件箱，随下次调用交付
 ```
 
@@ -319,6 +321,8 @@ memory.owner_route(task, variants?, protected_terms?, paths?, owner_hint?)：只
 AI：选暂定对象 → memory.resume 完整阅读 → 同一目标：第一次 memory.commit 带 attribution（确认点）
                                          → 不相关：换候选或新建（确认前不写入暂定对象）
 确认后放错：在正确对象重新保存并引用原记录，原结论 superseded 或建关联（consolidate Skill）
+判定之后的阅读（R18）：确认或新建对象 → reading.start(owner_id, question = 判定时的 task) → 复用判定的召回
+    判定与续接时觉得"可能相关"的对象不直接写成关联；实际读完、验证后由 AI 写记录时引用或 relations.decide
 关键操作记录 memory.activity：业务卡创建 | 回执 attribution | 提交（按层级计数一行）| 复核记录 |
     Run 结束（ended_at）| 中枢执行记录 → 时间倒序归并、分页；写操作返回值附同样的一行摘要
 ```
@@ -326,4 +330,4 @@ AI：选暂定对象 → memory.resume 完整阅读 → 同一目标：第一次
 - `attribution` 只存在提交回执里，进入请求指纹（同一 request_id 改了理由视为不同请求），不进记录内容指纹。
 - 关键操作记录不另存日志；受限记录不计入摘要；检索、阅读、归属判定调用、来源登记不在其中。
 
-实现：`services/routing.py`、`services/activity.py`、`services/reading/service.py`（`preview`、`screen`）、`storage/memory_store.py`（`read_head`、`commit_records`、`read_receipt`）。
+实现：`services/routing.py`、`services/activity.py`、`services/reading/service.py`（`preview`、`screen`）、`services/reading/reuse.py`、`storage/memory_store.py`（`read_head`、`commit_records`、`read_receipt`）。

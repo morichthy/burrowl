@@ -77,10 +77,10 @@ core         记录模型与校验、契约说明、哈希、原子写与锁、�
 | REVIEW 复核 | `services/review.py`、`services/memory/claims.py` | 检索的复核类别、正式用途、中枢发布策略、复核页 |
 | IDX 检索 | `index/`（db、projections（含上下文信封）、graph（图投影）、fusion、query_plan、rerank、conditions、extract、embed、late（后切分分组）、model_store）、`services/indexing.py`（同步、图路线、关联候选、缺口） | QUERY、READ 的召回；关系图页；模型安装；索引重建；发现可见性语义；评估脚本 `tools/eval_retrieval.py`、`tools/eval_recall_models.py` |
 | RUN 执行证据 | `services/runs.py`（建立、登记、执行、显式查找、丢弃与回收站）、`storage/owners.py` 的 `RunLocator`（R14：按编号与位置查找，上级按目录位置） | 引用解析、时间线与原始材料、关键操作记录、归属判定、收口的 `unfixed_evidence`、`system.validate`、关系图的 Run 节点；`tests/service/test_run_evidence.py` |
-| ROUTE 归属判定 | `services/routing.py`（`memory.owner_route`：复用 `ReadingService.preview` → `screen` 的召回与筛选包，补充目标、检查点与来源重叠证据） | 阅读第一轮召回的任何变化都会同步改变归属候选；RULES 第 1、2 节与 work Skill；`tests/service/test_routing.py` |
+| ROUTE 归属判定 | `services/routing.py`（`memory.owner_route`：复用 `ReadingService.preview` → `screen` 的召回与筛选包，补充目标、检查点与来源重叠证据；结果可被随后同一问题的 `reading.start` 复用，R18） | 阅读第一轮召回的任何变化都会同步改变归属候选；RULES 第 1、2 节与 work Skill；`tests/service/test_routing.py` |
 | ACT 关键操作记录 | `services/activity.py`（从业务卡、提交回执、复核记录、Run 业务卡、中枢执行记录派生；一行摘要生成函数）；写操作返回值的 `activity` 字段 | 提交回执与记录结构、Run 状态、中枢执行记录的变化；工作台首页；`tests/service/test_activity.py` |
 | QUERY 材料查询 | `services/query/`（search、page、assemble、expand、deepen、documents，以及预算） | 检索页；read Skill 的片段模式；context_reach 语义 |
-| READ 阅读会话 | `services/reading/`（service、screening、notes、text、session） | 阅读会话页（SSE）；read Skill；配置中的阅读默认值与预算 |
+| READ 阅读会话 | `services/reading/`（service、screening、notes、text、session、reuse（筛选结果复用，R18）） | 阅读会话页（SSE）；read Skill；配置中的阅读默认值与预算 |
 | HUB 知识中枢 | `services/hub.py`、`storage/hub_state.py`、`connectors/`（spi、registry、fake、mdvault），以及独立包 `burrowl-connector-weknora`、`burrowl-connector-lightrag`（图模式，按需重建） | 发布策略与复核类别；中枢页；wiki_page 记录；合约测试；LightRAG 版本锁定在 1.5.7，升级前重跑 `tests/connectors/test_lightrag.py` |
 | MAINT 维护与监测 | `services/maintenance.py`（计划状态 planned → queued → reviewed → applied / partial，执行仅限用户，R16）、`services/monitor.py`、`services/relations.py`（读取图投影、关联候选） | 维护页与导航计数、关系图页；consolidate Skill 与 MCP 说明；`maintenance.plan_from_candidates` 依赖候选记下的影响路径 |
 | NOTE 工作台笔记 | `services/notes.py`（R15：用户交给 AI 的待办；状态转换、AI 方案的预演与预览、用户执行时核对依据 HEAD 后按方案写入） | 关系图页笔记面板、首页状态卡与导航计数；`memory.resume` 的 `workbench_notes`；RULES 第 8 节、work 与 consolidate Skill；方案步骤依赖 `memory.commit` 与 `relations.decide` 的参数和 dry_run |
@@ -102,6 +102,7 @@ core         记录模型与校验、契约说明、哈希、原子写与锁、�
 | 复核 | 各 Owner 中的 review 记录 | 绑定内容指纹；内容变化即失效 |
 | 操作内对象列表 | 无独立权威：`OwnerRegistry.request_scope`（接口层每次 `call` 开启），按数据目录复用本次操作的 `owners.scan()` 结果 | 只在一次操作内有效，结束即丢弃，新线程不继承。写业务卡或 owner.json 后 `invalidate()`；发布前复核与读取回源用 `scan(fresh=True)` 重新扫描，所以操作开始后别处的修改仍会被拦下 |
 | 已校验记录缓存 | 无独立权威：`MemoryStore.verified`，进程内，键为（记忆目录, 记录文件, record_hash） | 派生状态，进程退出即丢失，丢了只是变慢；有条目上限。HEAD 与提交清单每次重读并做路径检查，只有清单仍指向同一指纹才命中，所以其他进程的新提交自然可见。首次读取后磁盘上的记录被篡改，普通读取在重启前发现不了；recovery 与 `system.validate` 用 `fresh=True` 逐条重读校验 |
+| 筛选结果复用 | 无独立权威：`ReadingService.reuse`，进程内，键为召回的全部输入（查询计划、语料、范围、过滤、条件、筛选与重排配置、整份配置、重排模型目录） | 派生状态，进程退出即丢失，丢了只是重新召回；10 分钟时限、8 条上限。命中还要求 `IndexService.search_state` 的指纹相同：就绪对象集合、这些对象的全部索引水位行、嵌入模型指纹与投影版本，检索只读就绪对象的索引，所以这些相同则召回结果相同。未就绪对象（如刚建的空对象）不进入结果，缺口每次现算。召回期间状态有变化的结果不保存 |
 | Run 登记 | 业务卡 `run.json`，在 `<上级对象目录>/runs/<编号小写>/` 或顶层 `runs/<编号小写>/`；上级按目录位置判断 | 不是对象：不进对象列表、不保存记录、不建检索投影，关系图的 Run 节点由引用它的对象投影。丢弃的 Run 在 `.burrowl/trash/runs/`（可恢复，不进备份包），清空回收站是用户专属操作 |
 | 检索投影 | `.burrowl/index/index.sqlite3`：每个 (Owner, 投影, 通道) 的水位绑定 HEAD、投影版本和模型指纹；图投影（corpus=graph）与关联候选也在这里 | 可删除重建；结构版本不符时整库清空重建；pending/stale 的投影如实报告。边由声明它的对象负责，另一端缺失时查询排除并计入悬空数 |
 | 概念库 | 配置 `graph.concept_owner_id` 指定的那一个 knowledge 对象（`knowledge/<slug>/knowledge.json`）；其他 knowledge 对象是通用知识对象 | 概念页是普通 wiki_page 记录；名称唯一性只在概念库内检查；未配置时概念链接都记为未解析 |
@@ -201,4 +202,5 @@ handle 分配和正文链接解析发生在第 1 步（`MemoryService.prepare`�
   - Run 不参与对象扫描（R14），扫描成本只随知识对象增长：1200 个 Run 时单次扫描约 14 ms，与 0 个 Run 相同。全局关键操作记录按 Run 目录修改时间（结束时间的上界）惰性读卡、页满即停；不限对象的 `runs.search` 按目录名（含创建时间）倒序读、找够即停，只有无命中的查询和 `unfixed_only` 的引用统计仍随 Run 数增长。批量读卡共用一次目录枚举、返回前复核（1200 张卡约 1.8 s，首次打开新文件时受杀毒扫描影响可达十余秒）。
   - 实测（每对象 6 条记录，假向量，本机）：提交 N=20 约 0.31 s、N=50 约 0.61 s；inspect N=20 约 0.08 s、N=50 约 0.21 s。就绪判断 50 个对象约 0.25 s（R13 §8）。
   - 关键操作记录每次请求都要为每个对象读最新提交，对象很多时需要可重建的派生缓存。
+- 只有业务卡、还没有提交过的对象不会被建索引（`memory.owner_create` 不触发同步），在每次召回里都显示为 not_indexed 缺口，阅读会话因此总是 `fulltext_available=true`，直到 `index.reconcile` 或第一次提交（R18 实施时发现，未处理）。
 - 第二台物理机安装与真实业务验收尚未进行。

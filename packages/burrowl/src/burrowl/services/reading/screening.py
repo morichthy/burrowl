@@ -27,10 +27,11 @@ def _window(text: str, terms: set[str]) -> str:
 
 
 def recall(index: IndexService, plan: dict, *, corpus: str, owner_ids: list[str] | None, review_filter: str,
-           exclude: set[str], graph_route=None) -> tuple[list[dict], list[dict]]:
-    """返回 (按融合分排序的对象列表, 缺口)。每个对象带命中的条目 ID。graph_route：图路线设置（默认关闭）。"""
+           exclude: set[str], graph_route=None, readiness: tuple | None = None) -> tuple[list[dict], list[dict]]:
+    """返回 (按融合分排序的对象列表, 缺口)。每个对象带命中的条目 ID。graph_route：图路线设置（默认关闭）。
+    readiness：调用方刚做过的就绪判断（IndexService.search_state），省掉重复判断。"""
     result = index.search_plan(plan, corpus=corpus, owner_ids=owner_ids, review_filter=review_filter, group="owner",
-                               per_route=200, graph_route=graph_route)
+                               per_route=200, graph_route=graph_route, readiness=readiness)
     owners = [item for item in result["items"] if item["owner_id"] not in exclude]
     return owners, result["gaps"]
 

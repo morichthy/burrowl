@@ -47,6 +47,11 @@ class Workspace:
 
 @pytest.fixture
 def ws(tmp_path):
+    return seeded_workspace(tmp_path)
+
+
+def seeded_workspace(tmp_path) -> Workspace:
+    """三个对象：SUM（目标、检查点、经过）、PUMP（经过）、FMT（只有业务卡，未索引）。test_screen_reuse 也用它。"""
     w = Workspace(tmp_path)
     w.storage.owners.create("research", "sum", "浮点求和误差研究", {"keywords": ["floating point", "summation"]})
     w.storage.owners.create("research", "pump", "泵站光学标定参数整理", {"keywords": ["calibration"]})

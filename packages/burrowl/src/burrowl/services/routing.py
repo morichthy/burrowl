@@ -5,6 +5,7 @@
 - 召回之外只补两类证据（R13 D-04）：候选的当前目标与最新检查点（只读这两条指针记录）；
   paths 给出时的来源重叠（读图投影的边）。程序不给建议动作。
 - 不建对象、不写记录。归属在第一次写入时才确认（R13 D-05），见 RULES 第 2 节。
+- 结果会留给随后同一问题的 reading.start 复用（R18 D-02）：阅读时 question 沿用这里的 task。
 """
 import os
 import time
@@ -52,7 +53,7 @@ def route(storage: Storage, index: IndexService, reading: ReadingService, *, tas
                                {"owner_id": owner_hint})
         add(hint, "user_specified", "用户指定")
 
-    screened = reading.preview(task, variants=variants, protected_terms=protected_terms)
+    screened = reading.preview(task, variants=variants, protected_terms=protected_terms, origin="owner_route")
     gaps = list(screened["gaps"])
     packets: dict[str, dict] = {}
     for owner_id in screened["owners"]:
@@ -82,7 +83,7 @@ def route(storage: Storage, index: IndexService, reading: ReadingService, *, tas
     candidates = [_candidate(storage, routable[o], packets.get(o), evidence.get(o, [])) for o in chosen]
     return {"task": task, "candidates": candidates, "gaps": gaps, "diagnostics": screened["diagnostics"],
             "cost": {"elapsed_ms": round((time.perf_counter() - started) * 1000, 1),
-                     "recall_ms": screened["cost"]["wall_ms"],
+                     "recall_ms": screened["cost"]["wall_ms"], "reused_from": screened["reused_from"],
                      "pointer_reads": sum(1 for o in chosen if routable[o].persisted)}}
 
 

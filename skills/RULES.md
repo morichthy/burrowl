@@ -54,6 +54,12 @@
   - 读完发现不相关：换下一个候选再读，或新建对象。暂定对象里不会留下痕迹。
   - 确认时，那次 `memory_commit` 带上 `attribution`：`action`（continue 沿用 / create 新建）、`decided_by`（用户在对话中决定写 user，否则 ai）、`reason`，以及 `rejected`（读过又放弃的对象和原因）。之后的保存不再填写。
   - 确认后才发现放错：不跨对象搬运，按 burrowl-consolidate 的"归属纠错"处理。
+- **判定之后的阅读**：判定和 `memory_resume` 是全文阅读前的预判断，回答"是不是同一目标"，判断结果不写进阅读会话。
+  - 需要读已有材料时，先确认或新建对象，再 `reading_start(owner_id=…)`，会话从一开始就有归属。
+  - 为同一需求开阅读时，`question` 沿用判定时的 `task`（以及 `variants`、`protected_terms`）：程序复用判定那一轮的召回与筛选包（回执 `reused_from`），不重复召回。进入会话后照常逐个 `reading_assess`。
+- **关联何时建立**：判定和续接时觉得"可能相关"的对象，不直接写成记录或关联。
+  - 已能确定的（用户指定；本次原件已被对方引用，且读过确认）在写第一条相关记录时引用。
+  - 其余留在阅读笔记的 `clues` 和工作清单里；某一轮实际读完、验证后，再写记录并引用交接给出的固定引用，或用 `relations_decide`。
 - **类型**：
   - `memory_owner_create` 能建 research、project、core-algorithm、data、tool、report；
   - Run 只用 `runs_create` 建立；
