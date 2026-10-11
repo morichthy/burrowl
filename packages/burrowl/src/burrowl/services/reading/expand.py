@@ -2,6 +2,8 @@ r"""联想 = 从关键节点出发、只走跨对象边的一跳图扩展（R19 
 
 种子与权重 $\sigma(n)$：笔记 `expand_from` 中的锚点为 1.0，笔记的其余出处为 0.3（该笔记没写锚点时为 1.0）；
 出处是整条记录时节点取该记录及其结论（不展开全部块），出处是 `MEM-…#块`、`CLM-…`、`SRC-…` 时就是该节点。
+块与结论种子另带上所在记录，权重减半且只走**入边**（其他对象指向这条记录的引用）：其他对象通常引用整条记录
+而不是某个块，只走块自身的边会漏掉它们；不走记录自己的出边，避免回到"整条记录作种子"的弱关联（R19 走查发现）。
 
 图分数（$w_e$ 查 index/graph.py 的统一边标准，$\deg$ 为节点度数，压低热门节点）：
 $$g(m)=\sum_{n\xrightarrow{e}m}\sigma(n)\,\frac{w_e}{\log_2(2+\deg m)}$$
@@ -26,6 +28,7 @@ from ..indexing import REVIEW_FILTERS, IndexService
 from . import screening
 
 SUPPORT_WEIGHT, ANCHOR_WEIGHT = 0.3, 1.0
+PARENT_FACTOR = 0.5  # 块、结论种子所在记录的权重系数（只走入边）
 MEDIATORS = {"concept", "source"}  # 只作中转的节点类型：概念页、已登记来源
 EXCLUDED_STATES = {"rejected", "withdrawn", "invalid"}
 UNSAFE = graph_projection.UNSAFE
@@ -81,8 +84,18 @@ def expand(index: IndexService, session: dict, *, focus: str, settings: dict, re
             seed_nodes[edge["dst"]] = max(seed_nodes.get(edge["dst"], 0.0), sigma[edge["src"]])
     node_rows = {n["node_id"]: n for n in index.db.graph_nodes(list(seed_nodes))}
     seed_owners = {row["owner_id"] for row in node_rows.values()}
+    # 块、结论种子的所在记录：权重减半，只走入边（其他对象指向这条记录的引用）
+    incoming_only: set[str] = set()
+    for node, weight in list(seed_nodes.items()):
+        parent = node.split("#", 1)[0] if "#" in node else (
+            (node_rows.get(node) or {}).get("record_id") if node.startswith("CLM-") else None)
+        if parent and parent != node and parent not in sigma:
+            seed_nodes[parent] = max(seed_nodes.get(parent, 0.0), weight * PARENT_FACTOR)
+            incoming_only.add(parent)
 
-    first = [e for e in edges_of(list(seed_nodes)) if e["category"] in graph_projection.EXPANDABLE]
+    # 所在记录只走入边；关联是对称的导航关系，两个方向都算
+    first = [e for e in edges_of(list(seed_nodes)) if e["category"] in graph_projection.EXPANDABLE
+             and not (e["src"] in incoming_only and e["dst"] not in seed_nodes and e["category"] != "navigation")]
     declared = {e["declared_by"] for e in first if e["declared_by"].startswith("CLM-")}
     others = {(e["dst"] if e["src"] in seed_nodes else e["src"]) for e in first}
     node_rows.update({n["node_id"]: n for n in index.db.graph_nodes(sorted(others | declared))})

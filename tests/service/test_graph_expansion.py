@@ -94,6 +94,10 @@ def lab(tmp_path):
     associations.decide(m, a, {"from": fixed(m, a, x1, "references"), "to": fixed(m, "RES-E", lab.ids["e"], "references"),
                                "explanation": "两者都处理大数抵消"}, actor=AI, reason="读过两端")
     lab.review.submit({"target_claim_id": "CLM-A-BAD", "state": "disputed", "reason": "样本太少", "actor": HUMAN})
+    k = lab.owner("k", "对象 K")  # K1 引用整条 X1（指向 X1 的入边）
+    lab.ids["k"] = put(m, k, narrative(k, "对象 K", "K1：复核了 X1 的顺序实验", "CLM-K-1",
+                                       [register_source(lab.storage, "SRC-K", "work/k.txt", "k" + chr(10)),
+                                        fixed(m, a, x1, "references")]))
     lab.ids.update(a=a, x1=x1, x2=x2)
     lab.index.db.embedder = None  # 只用关键词：第一轮召回可预期；焦点相关度走词重合
     return lab
@@ -232,3 +236,13 @@ def test_broaden_requires_approval(lab):
     with pytest.raises(BurrowlError) as caught:
         lab.reading.recall(sid, "association", association_text="旧写法")
     assert caught.value.code == "INVALID_ARGUMENT"
+
+
+def test_claim_seed_brings_incoming_references_to_its_record(lab):
+    # R19 走查发现：其他对象通常引用整条记录。结论（或块）种子带上所在记录，但只走入边与对称的关联
+    sid = noted_session(lab, sources=["CLM-A-1"])
+    owners, _ = candidates(lab, sid)
+    assert "RES-K" in owners                           # K1 引用了 X1：入边
+    assert "RES-E" in owners                           # X1 与 E1 的关联：对称，两个方向都算
+    assert "RES-C" in owners                           # 结论自己的矛盾边
+    assert "RES-B" not in owners                       # X1 自己引出去的参考不走
