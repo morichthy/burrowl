@@ -145,7 +145,7 @@ def _tool(app: App, spec: OpSpec, actor: dict):
         ctx = Ctx(app=app, actor=actor, channel="mcp", elicit=_elicitor(context))
         arguments = _pre_parse(spec, kwargs)
         try:
-            return await to_thread.run_sync(lambda: call(ctx, spec.name, arguments))
+            return await to_thread.run_sync(lambda: call(ctx, spec.name, arguments, raw=kwargs))
         except BurrowlError as exc:
             raise ToolError(json.dumps(exc.problem(), ensure_ascii=False)) from exc
 

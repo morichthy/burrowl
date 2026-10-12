@@ -147,6 +147,9 @@
   "connectors": [],
   "graph": {
     "concept_owner_id": null
+  },
+  "diagnostics": {
+    "request_log": "off"
   }
 }
 ```
@@ -497,6 +500,24 @@
         "type"
       ],
       "title": "ConnectorConfig",
+      "type": "object"
+    },
+    "Diagnostics": {
+      "additionalProperties": false,
+      "properties": {
+        "request_log": {
+          "default": "off",
+          "description": "请求日志（.burrowl/logs/requests.jsonl）：off 不记；summary 记每次调用的工具名、耗时、结果与参数结构（不含内容）；full 另记参数原文与返回内容（截断长字段），用于排查 MCP 传参问题。启动参数 --request-log 或环境变量 BURROWL_REQUEST_LOG 优先；修改后立即生效",
+          "enum": [
+            "off",
+            "summary",
+            "full"
+          ],
+          "title": "Request Log",
+          "type": "string"
+        }
+      },
+      "title": "Diagnostics",
       "type": "object"
     },
     "Embedding": {
@@ -1175,6 +1196,9 @@
     },
     "graph": {
       "$ref": "#/$defs/GraphSettings"
+    },
+    "diagnostics": {
+      "$ref": "#/$defs/Diagnostics"
     }
   },
   "title": "BurrowlConfig",

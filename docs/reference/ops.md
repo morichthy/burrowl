@@ -220,6 +220,7 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | `system.capabilities` | 只读 | 当前能力与降级情况（向量模型、重排模型、连接器）。 | 无 |
 | `system.guide` | 只读 | 读取 burrowl 工作流说明全文（与 Skill 文件相同）。客户端没有加载 burrowl Skill 时，用它代替 Skill。 | `name`*: string |
 | `system.ops` | 只读 | 全部操作的目录（名称、分组、读写类型、说明、参数 schema）。 | `groups`: array|null |
+| `system.request_log` | 只读 | 请求日志（新的在前）：每次工具调用收到的参数、MCP 层预处理后的参数（json_decoded 列出被从 JSON 字符串解析回来的）、 返回内容与耗时。用来排查"传过来的和服务看到的不一样"这类问题；报错里带 request_id 时直接按它查。 默认关闭（level=off 时为空），由用户在工作台设置或 MCP 启动参数 --request-log 打开。 | `limit`: integer，`op_name`: string|null，`errors_only`: boolean，`request_id`: string|null |
 | `system.tool_errors` | 只读 | 最近被拒绝的工具调用与内部错误，按工具汇总（R20 D-10）：参数错误（input）、其他拒绝（other）、内部错误（internal） 的次数和最常出错的参数路径，以及最近的内部错误 incident_id。参数错误多的工具，说明说明或示例需要改；不含参数内容。 | `limit`: integer |
 | `system.validate` | 只读 | 全工作区只读校验：提交链与指纹、写锁与残留、来源文件是否变化或缺失、索引是否落后。不修复。 | 无 |
 

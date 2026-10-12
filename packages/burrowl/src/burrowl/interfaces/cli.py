@@ -191,12 +191,18 @@ def _mode(value: str | None) -> str | None:
 
 
 @cli.command()
-def mcp(data_dir: Path | None = DataDir, work_dir: Path | None = WorkDir, mode: str | None = Mode) -> None:
+def mcp(data_dir: Path | None = DataDir, work_dir: Path | None = WorkDir, mode: str | None = Mode,
+        request_log: str | None = typer.Option(None, "--request-log", help=(
+            "请求日志：off / summary / full，写到数据目录的 .burrowl/logs/requests.jsonl；"
+            "默认取环境变量 BURROWL_REQUEST_LOG，再取配置 diagnostics.request_log（默认 off）"))) -> None:
     """以 stdio 运行 MCP 服务（由宿主客户端拉起）。"""
     from .mcp import run_stdio  # noqa: PLC0415
 
+    if request_log not in (None, "off", "summary", "full"):
+        raise typer.BadParameter("--request-log 只能是 off、summary 或 full")
     app = App.open(resolve_data_dir(data_dir))
     app.work_dir, app.mcp_mode = resolve_work_dir(work_dir, app.root), _mode(mode)
+    app.request_log = request_log
     app.skills_dir = skills_source()
     run_stdio(app, skills_dir=skills_source())
 

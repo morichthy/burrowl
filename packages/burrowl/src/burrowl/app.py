@@ -57,6 +57,7 @@ class App:
     # work_dir 是用户/agent 放原始数据与代码的工作目录（登记其中的文件时自动建工作根），mcp_mode 覆盖配置中的运行模式。
     work_dir: Path | None = None
     mcp_mode: str | None = None
+    request_log: str | None = None   # 请求日志级别，覆盖配置 diagnostics.request_log（burrowl mcp --request-log）
     skills_dir: Path | None = None   # 工作流说明（Skill 与公共规则）所在目录，供 system.guide 读取
     server: Any = None               # 工作台进程的停止 / 重启控制（只在 burrowl serve 中设置，R21 D-14）
 

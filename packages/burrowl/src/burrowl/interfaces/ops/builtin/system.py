@@ -7,7 +7,7 @@ from ....core.config import ReviewFilter
 from ....core.errors import BurrowlError
 from ....services import health
 from ....storage import secrets
-from .. import errorlog
+from .. import errorlog, reqlog
 from ..registry import Ctx, catalog, op
 
 
@@ -111,6 +111,19 @@ def tool_errors(ctx: Ctx, limit: Annotated[int, Field(ge=1, le=20000, descriptio
     """最近被拒绝的工具调用与内部错误，按工具汇总（R20 D-10）：参数错误（input）、其他拒绝（other）、内部错误（internal）
     的次数和最常出错的参数路径，以及最近的内部错误 incident_id。参数错误多的工具，说明说明或示例需要改；不含参数内容。"""
     return errorlog.summary(ctx.app.root, limit=limit)
+
+
+@op("system.request_log")
+def request_log(ctx: Ctx, limit: Annotated[int, Field(ge=1, le=500, description="最多返回最近多少条")] = 20,
+                op_name: Annotated[str | None, Field(description="只看这个工具，如 memory_commit")] = None,
+                errors_only: Annotated[bool, Field(description="true 只看出错的调用")] = False,
+                request_id: Annotated[str | None, Field(description="报错 details 里的 request_id")] = None) -> dict:
+    """请求日志（新的在前）：每次工具调用收到的参数、MCP 层预处理后的参数（json_decoded 列出被从 JSON 字符串解析回来的）、
+    返回内容与耗时。用来排查"传过来的和服务看到的不一样"这类问题；报错里带 request_id 时直接按它查。
+    默认关闭（level=off 时为空），由用户在工作台设置或 MCP 启动参数 --request-log 打开。"""
+    return {"level": reqlog.level(ctx.app), "path": str(reqlog.path(ctx.app.root)),
+            "items": reqlog.read(ctx.app.root, limit=limit, op=op_name, errors_only=errors_only,
+                                 request_id=request_id)}
 
 
 # ---------- 工作台进程（R21 D-14；只在工作台提供） ----------

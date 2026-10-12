@@ -3382,6 +3382,32 @@ export declare namespace SystemToolErrors {
   }
 }
 
+export declare namespace SystemRequestLog {
+  /**
+   * 请求日志（新的在前）：每次工具调用收到的参数、MCP 层预处理后的参数（json_decoded 列出被从 JSON 字符串解析回来的）、
+   * 返回内容与耗时。用来排查"传过来的和服务看到的不一样"这类问题；报错里带 request_id 时直接按它查。
+   * 默认关闭（level=off 时为空），由用户在工作台设置或 MCP 启动参数 --request-log 打开。
+   */
+  export interface Args {
+    /**
+     * 最多返回最近多少条
+     */
+    limit?: number;
+    /**
+     * 只看这个工具，如 memory_commit
+     */
+    op_name?: string | null;
+    /**
+     * true 只看出错的调用
+     */
+    errors_only?: boolean;
+    /**
+     * 报错 details 里的 request_id
+     */
+    request_id?: string | null;
+  }
+}
+
 export declare namespace ServerInfo {
   /**
    * 工作台进程：运行中的版本、已安装的版本（不同表示需要重启才能用上新版本）、进程号、启动时间、网址、日志。
@@ -3546,6 +3572,7 @@ export interface OpArgs {
   "system.validate": SystemValidate.Args;
   "system.ops": SystemOps.Args;
   "system.tool_errors": SystemToolErrors.Args;
+  "system.request_log": SystemRequestLog.Args;
   "server.info": ServerInfo.Args;
   "server.stop": ServerStop.Args;
   "server.restart": ServerRestart.Args;
@@ -3696,6 +3723,7 @@ export const OP_EFFECTS: Record<OpName, string> = {
   "system.validate": "read",
   "system.ops": "read",
   "system.tool_errors": "read",
+  "system.request_log": "read",
   "server.info": "user",
   "server.stop": "user",
   "server.restart": "user",

@@ -198,6 +198,13 @@ class McpConfig(_Model):
                             "manual：只在用户明确要求时使用。启动参数 --mode 优先；修改后需重启 MCP 服务")
 
 
+class Diagnostics(_Model):
+    request_log: Literal["off", "summary", "full"] = Field(
+        "off", description="请求日志（.burrowl/logs/requests.jsonl）：off 不记；summary 记每次调用的工具名、耗时、结果与参数结构"
+                           "（不含内容）；full 另记参数原文与返回内容（截断长字段），用于排查 MCP 传参问题。"
+                           "启动参数 --request-log 或环境变量 BURROWL_REQUEST_LOG 优先；修改后立即生效")
+
+
 class PublishPolicy(_Model):
     """哪些知识发布到外部知识中枢。默认只发布已复核的 L4/L3 概览经验与成稿文档。"""
 
@@ -244,6 +251,7 @@ class BurrowlConfig(_Model):
     mcp: McpConfig = Field(default_factory=McpConfig)
     connectors: list[ConnectorConfig] = Field(default_factory=list)
     graph: GraphSettings = Field(default_factory=GraphSettings)
+    diagnostics: Diagnostics = Field(default_factory=Diagnostics)
 
     @model_validator(mode="after")
     def _unique_connectors(self):

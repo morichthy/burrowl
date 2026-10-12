@@ -236,6 +236,33 @@ export function Settings() {
         </div>
       </Panel>
 
+      <Panel title="诊断：请求日志">
+        <div className="segmented">
+          {(
+            [
+              ["off", "关闭"],
+              ["summary", "摘要：工具名、耗时、结果与参数结构（不含内容）"],
+              ["full", "完整：另记参数原文与返回内容（长字段截断）"],
+            ] as const
+          ).map(([value, text]) => (
+            <label key={value} className={(config.diagnostics?.request_log ?? "off") === value ? "on" : ""}>
+              <input
+                type="radio"
+                name="request-log"
+                checked={(config.diagnostics?.request_log ?? "off") === value}
+                onChange={() => set(["diagnostics", "request_log"], value)}
+              />
+              {text}
+            </label>
+          ))}
+        </div>
+        <p className="hint">
+          排查“AI 传来的参数和服务看到的不一样”时打开，用完关闭。写在数据目录的 .burrowl/logs/requests.jsonl，不进备份包。保存后立即生效；
+          MCP 启动参数 --request-log（或环境变量 BURROWL_REQUEST_LOG）优先于这里。
+        </p>
+        <RequestLog />
+      </Panel>
+
       <Panel
         title="知识中枢连接器"
         actions={
@@ -421,5 +448,54 @@ function SecretInput({ secretRef, status }: { secretRef: string; status?: { set:
       </button>
       <ErrorBox error={store.error} />
     </div>
+  );
+}
+
+interface RequestRow {
+  at: string;
+  request_id: string;
+  op: string;
+  channel: string;
+  ms: number;
+  status: string;
+  json_decoded?: string[];
+  [key: string]: unknown;
+}
+
+/** 最近的请求（新的在前）；点开一行看收到的参数、预处理后的参数与返回。 */
+function RequestLog() {
+  const [errorsOnly, setErrorsOnly] = useState(false);
+  const log = useOp<{ level: string; path: string; items: RequestRow[] }>("system.request_log", { limit: 50, errors_only: errorsOnly });
+  const [open, setOpen] = useState<string>();
+  return (
+    <>
+      <div className="toolbar">
+        <label className="check hint">
+          <input type="checkbox" checked={errorsOnly} onChange={() => setErrorsOnly(!errorsOnly)} /> 只看出错的调用
+        </label>
+        <button type="button" className="small" onClick={log.reload}>
+          刷新
+        </button>
+        {log.data ? <span className="hint">当前生效：{log.data.level}</span> : null}
+      </div>
+      <ErrorBox error={log.error} />
+      {log.data && !log.data.items.length ? <p className="hint">还没有记录。</p> : null}
+      <table className="table">
+        <tbody>
+          {log.data?.items.map((r) => (
+            <tr key={r.request_id} onClick={() => setOpen(open === r.request_id ? undefined : r.request_id)} style={{ cursor: "pointer" }}>
+              <td>
+                <code>{r.op}</code> <Tag tone={r.status === "ok" ? "muted" : "bad"}>{r.status}</Tag>
+                {r.json_decoded?.length ? <Tag tone="warn">字符串转回：{r.json_decoded.join("、")}</Tag> : null}
+                <div className="hint">
+                  {r.at} · {r.channel} · {r.ms} ms · {r.request_id}
+                </div>
+                {open === r.request_id ? <pre className="raw">{JSON.stringify(r, null, 2)}</pre> : null}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
   );
 }

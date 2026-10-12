@@ -7736,6 +7736,60 @@
   }
  },
  {
+  "name": "system.request_log",
+  "group": "system",
+  "effect": "read",
+  "summary": "请求日志（新的在前）：每次工具调用收到的参数、MCP 层预处理后的参数（json_decoded 列出被从 JSON 字符串解析回来的）、 返回内容与耗时。用来排查\"传过来的和服务看到的不一样\"这类问题；报错里带 request_id 时直接按它查。 默认关闭（level=off 时为空），由用户在工作台设置或 MCP 启动参数 --request-log 打开。",
+  "input": {
+   "additionalProperties": false,
+   "description": "请求日志（新的在前）：每次工具调用收到的参数、MCP 层预处理后的参数（json_decoded 列出被从 JSON 字符串解析回来的）、\n返回内容与耗时。用来排查\"传过来的和服务看到的不一样\"这类问题；报错里带 request_id 时直接按它查。\n默认关闭（level=off 时为空），由用户在工作台设置或 MCP 启动参数 --request-log 打开。",
+   "properties": {
+    "limit": {
+     "default": 20,
+     "description": "最多返回最近多少条",
+     "maximum": 500,
+     "minimum": 1,
+     "title": "Limit",
+     "type": "integer"
+    },
+    "op_name": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "只看这个工具，如 memory_commit",
+     "title": "Op Name"
+    },
+    "errors_only": {
+     "default": false,
+     "description": "true 只看出错的调用",
+     "title": "Errors Only",
+     "type": "boolean"
+    },
+    "request_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "报错 details 里的 request_id",
+     "title": "Request Id"
+    }
+   },
+   "title": "system_request_log_input",
+   "type": "object"
+  }
+ },
+ {
   "name": "server.info",
   "group": "server",
   "effect": "user",

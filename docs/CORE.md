@@ -135,6 +135,7 @@ AI 组成提交请求：{owner_id, expected_head, request_id, operations:[put_re
 - 工具参数只在操作注册表（`registry.call`）校验一次，HTTP、MCP、CLI 共用。AI 直接编写的结构化参数（提交操作、归属说明、关联 payload、阅读判断、扩展锚点、维护处置、工作台方案等）在工具的参数 schema 中声明字段；记录相关的结构直接取自记录契约。复杂参数附经校验的示例。
 - 报错结构 `{code, message, details, errors[], retryable}`：顶层 `message` 直接写出第一处错误的路径与原因（有的客户端只显示它）；`errors` 一次列出全部问题，每项的 `path` 从工具参数的根算起（如 `/operations/0/draft/title`），`expected` 给允许的值或字段，`details.hint` 给下一步。
 - 意外异常返回 `INTERNAL_ERROR`（异常类型、一句摘要、`incident_id`），完整堆栈只写入数据目录的 `.burrowl/logs/errors.jsonl`。被拒绝的调用只记工具名、错误码和出错路径（不记参数内容），`system.tool_errors` 按工具汇总，用来发现哪些工具的说明需要改。
+- 请求日志（默认关闭）：`.burrowl/logs/requests.jsonl` 每次调用一行；summary 只记结构，full 另记收到的原样参数、MCP 层从 JSON 字符串解析回来的参数与返回。开启时报错的 `details.request_id` 指向这一行，`system.request_log` 可按它查。开关在工作台设置（`diagnostics.request_log`），`burrowl mcp --request-log` 或环境变量 `BURROWL_REQUEST_LOG` 优先。
 
 **删除与恢复（R22）**
 

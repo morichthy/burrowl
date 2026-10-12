@@ -9,8 +9,11 @@
 参数只在 call() 这一处校验（R20 D-08）：MCP 适配层不预校验，HTTP/CLI 同样经过这里。
 结构化参数的字段由 shapes.Shape 声明并按同一份 schema 校验；所有参数错误一次列全，中文、带完整路径（D-05）。
 意外异常转为 INTERNAL_ERROR，堆栈只写日志（D-06）；被拒绝的调用记下错误码与路径用于统计（D-10）。
+请求日志（reqlog，默认关闭）也在这里写：一次调用一行，记收到的参数、预处理后的参数与返回。
 """
 import inspect
+import time
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from importlib.metadata import entry_points
@@ -22,7 +25,7 @@ from ...app import App
 from ...core.errors import BurrowlError, headline
 from ...core.jsonschema import validate
 from ...storage.owners import OwnerRegistry
-from . import errorlog
+from . import errorlog, reqlog
 from .shapes import Shape, shape_of
 
 # user：只给人在工作台/CLI 使用（如批准全文补偿、改判），不暴露为 MCP 工具，agent 不能替用户批准。
@@ -150,8 +153,29 @@ def check_arguments(spec: OpSpec, arguments: dict) -> BaseModel:
     return parsed
 
 
-def call(ctx: Ctx, name: str, arguments: dict | None) -> Any:
-    """校验参数后执行。业务错误原样抛出（被拒绝的调用记入错误日志）；意外异常转为 INTERNAL_ERROR。"""
+def call(ctx: Ctx, name: str, arguments: dict | None, *, raw: dict | None = None) -> Any:
+    """校验参数后执行。业务错误原样抛出（被拒绝的调用记入错误日志）；意外异常转为 INTERNAL_ERROR。
+
+    raw：入口收到的原样参数（MCP 层把 JSON 字符串解析回列表或对象之前），只用于请求日志。"""
+    mode = reqlog.level(ctx.app) if name not in reqlog.SKIP else "off"
+    if mode == "off":
+        return _call(ctx, name, arguments)
+    request_id, started = f"REQ-{uuid.uuid4().hex[:12]}", time.perf_counter()
+    common = {"request_id": request_id, "op": name, "channel": ctx.channel, "actor": ctx.actor,
+              "raw": raw, "arguments": arguments}
+    root = getattr(ctx.app, "root", None)
+    try:
+        result = _call(ctx, name, arguments)
+    except BurrowlError as exc:
+        exc.details = {**(exc.details or {}), "request_id": request_id}  # 凭它在 requests.jsonl 找到这次调用
+        reqlog.write(root, reqlog.event(mode, ms=(time.perf_counter() - started) * 1000, problem=exc.problem(),
+                                        **common))
+        raise
+    reqlog.write(root, reqlog.event(mode, ms=(time.perf_counter() - started) * 1000, result=result, **common))
+    return result
+
+
+def _call(ctx: Ctx, name: str, arguments: dict | None) -> Any:
     spec = load().get(name)
     if spec is None:
         raise BurrowlError("NOT_FOUND", "未知操作", {"op": name})

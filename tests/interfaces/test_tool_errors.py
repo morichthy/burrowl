@@ -215,3 +215,51 @@ def test_mcp_time_fields_null_ok_and_bad_format_explained_in_message(app):
             record = app.memory.inspect(owner, record_id=receipt["record_results"][0]["record_id"])["record"]
             assert record["payload"]["acquired_at"] == "2026-10-13T08:00:00Z"     # 保存时统一换算为 UTC
     anyio.run(scenario)
+
+
+def test_request_log_off_by_default_and_full_shows_mcp_decoding(app, monkeypatch):
+    """请求日志：默认不写；full 记下收到的原样参数、MCP 层从 JSON 字符串解析回来的参数与返回，
+    报错带 request_id 可直接查到；读日志的调用本身不记。"""
+    from burrowl.interfaces.ops import reqlog
+    monkeypatch.delenv(reqlog.ENV, raising=False)
+    server = mcp_module.build_server(app, skills_dir=SKILLS)
+    operation = json.loads((Path(__file__).resolve().parents[2] / "packages/burrowl/src/burrowl/core/schema"
+                            / "examples/question.json").read_text(encoding="utf-8"))["operation"]
+
+    async def scenario():
+        async with Client(server) as client:
+            head = app.memory.inspect(OWNER)["head"]["commit_id"]
+            await client.call_tool("memory_inspect", {"owner_id": OWNER})
+            assert not reqlog.path(app.root).exists()                                 # 默认关闭
+            app.request_log = "full"
+            ok = await client.call_tool("memory_commit", {"owner_id": OWNER, "expected_head": head, "dry_run": True,
+                                                           "operations": json.dumps([operation], ensure_ascii=False)})
+            assert not ok.is_error
+            bad = await client.call_tool("memory_commit", {"owner_id": OWNER, "expected_head": head, "operations": [1]})
+            problem = _problem(bad)
+            listed = json.loads("".join(b.text for b in (await client.call_tool(
+                "system_request_log", {"limit": 10})).content))
+            return problem, listed
+    problem, listed = anyio.run(scenario)
+    assert listed["level"] == "full" and [r["op"] for r in listed["items"]] == ["memory.commit", "memory.commit"]
+    failed, passed = listed["items"]
+    assert failed["request_id"] == problem["details"]["request_id"] and failed["status"] == "INVALID_ARGUMENT"
+    assert failed["response"]["errors"][0]["path"] == "/operations/0"
+    assert passed["json_decoded"] == ["operations"] and isinstance(passed["received"]["operations"], str)
+    assert passed["after_decode"]["operations"][0]["op"] == "put_record" and passed["response"]["valid"] is True
+
+
+def test_request_log_summary_has_no_content_and_config_switch(app, monkeypatch):
+    from burrowl.interfaces.ops import reqlog
+    monkeypatch.delenv(reqlog.ENV, raising=False)
+    current = call(_ctx(app), "config.get", {})
+    call(_ctx(app), "config.update", {"expected_revision": current["revision"],
+                                      "patch": {"diagnostics": {"request_log": "summary"}}})
+    call(_ctx(app), "memory.records", {"owner_id": OWNER, "query": "机密查询词"})
+    text = reqlog.path(app.root).read_text(encoding="utf-8")
+    row = json.loads(text.splitlines()[-1])
+    assert row["op"] == "memory.records" and row["status"] == "ok" and row["received"]["query"] == "str[5]"
+    assert "机密查询词" not in text and "response" in row
+    monkeypatch.setenv(reqlog.ENV, "off")                                             # 环境变量优先于配置
+    call(_ctx(app), "memory.records", {"owner_id": OWNER})
+    assert reqlog.path(app.root).read_text(encoding="utf-8") == text
