@@ -12,10 +12,11 @@ pytestmark = [pytest.mark.packaging, pytest.mark.skipif(sys.platform != "win32",
 
 
 def _run_setup(source: Path, root: Path, *extra: str) -> subprocess.CompletedProcess:
-    # -NoPath 禁止安装器改用户 PATH 和 BURROWL_ROOT；假启动器也不会执行真实的 upgrade。
+    # -NoPath 禁止安装器改用户 PATH 和 BURROWL_ROOT，-NoShortcut 禁止在用户的开始菜单建快捷方式；
+    # 假启动器也不会执行真实的 upgrade。
     return subprocess.run(
         ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
-         str(source / "setup.ps1"), "-Root", str(root), "-NoPath", *extra],
+         str(source / "setup.ps1"), "-Root", str(root), "-NoPath", "-NoShortcut", *extra],
         capture_output=True, text=True, encoding="utf-8", check=False,
     )
 
@@ -45,7 +46,7 @@ def test_same_version_reinstall_syncs_frontend_backend_and_build_info(installer_
     assert first.returncode == 0, first.stdout + first.stderr
     assert "first-build" in first.stdout
     assert "安装根目录" in first.stdout
-    assert "重启 burrowl 工作台" in first.stdout
+    assert "重启服务" in first.stdout and "开始菜单建立快捷方式" not in first.stdout
 
     # 真实故障场景是反复发布同一版本；第二次安装必须刷新内容并切回同一个版本目录。
     (installer_source / "frontend/dist/index.html").write_text("new frontend with filtering", encoding="utf-8")

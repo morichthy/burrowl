@@ -6,6 +6,7 @@
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from .core.config import BurrowlConfig
 from .index.embed import Embedder
@@ -29,6 +30,7 @@ from .services.reading.service import ReadingService
 from .services.relations import WorkbenchPrefs
 from .services.review import ReviewService, claim_lookup_factory
 from .services.runs import RunService
+from .services.snapshots import SnapshotService
 from .storage.config_store import ConfigStore
 from .storage.layout import STATE_DIR, Workspace
 
@@ -49,12 +51,14 @@ class App:
     prefs: WorkbenchPrefs
     notes: WorkbenchNotes
     hub: HubService
+    snapshots: SnapshotService
     lock: threading.RLock = field(default_factory=threading.RLock)
     # 本进程的接入方式，由启动参数给出、不写入数据目录：
     # work_dir 是用户/agent 放原始数据与代码的工作目录（登记其中的文件时自动建工作根），mcp_mode 覆盖配置中的运行模式。
     work_dir: Path | None = None
     mcp_mode: str | None = None
     skills_dir: Path | None = None   # 工作流说明（Skill 与公共规则）所在目录，供 system.guide 读取
+    server: Any = None               # 工作台进程的停止 / 重启控制（只在 burrowl serve 中设置，R21 D-14）
 
     @classmethod
     def open(cls, data_dir: str | Path, *, create: bool = False, embedder: Embedder | None = None,
@@ -80,6 +84,7 @@ class App:
         hub = HubService(storage, config_service.current,
                          graph_source=lambda: (index.ensure_graph(), index.db.graph_nodes(),
                                                index.db.graph_all_edges())[1:])
+        snapshots = SnapshotService(storage, ocr_enabled=lambda: config_service.current().index.ocr_enabled)
         reranker = Path(cfg.index.reranker.path) if cfg.index.reranker.path else (shared / RERANKER_DIR if shared else None)
         if reranker is not None and not reranker.is_absolute():
             reranker = workspace.root / reranker
@@ -87,10 +92,11 @@ class App:
                    review=review, query=QueryService(storage, index, config_service.current, hub=hub),
                    reading=ReadingService(storage, index, config_service.current,
                                           reranker_dir=reranker if reranker and reranker.is_dir() else None),
-                   runs=RunService(storage), maintenance=MaintenanceService(memory, review),
+                   runs=RunService(storage), maintenance=MaintenanceService(memory, review, snapshots),
                    monitor=Monitor(storage), prefs=WorkbenchPrefs(storage),
                    notes=WorkbenchNotes(storage, memory, index),
-                   hub=hub)
+                   hub=hub,
+                   snapshots=snapshots)
 
     def capabilities(self) -> dict:
         """当前可用能力（供工作台与 agent 了解降级情况）。"""

@@ -7,7 +7,7 @@ from pydantic import Field
 from ....core import contract as record_contract
 from ....core.errors import BurrowlError
 from ....services import activity, routing, workflow
-from ....services.memory import consolidation, documents, export, history, raw_materials, structure
+from ....services.memory import consolidation, documents, export, history, raw_materials, structure, targets
 from ....storage import recovery
 from .. import shapes
 from ..registry import Ctx, op
@@ -184,14 +184,23 @@ def commit(ctx: Ctx, owner_id: OwnerId,
 
 @op("memory.document")
 def document(ctx: Ctx, owner_id: OwnerId,
-             view: Annotated[Literal["full", "outline", "section", "impact"], Field(description=(
-                 "full 完整文稿；outline 目录；section 单章上下文包（改写某章用）；impact 依据变化的影响"))] = "full",
+             view: Annotated[Literal["full", "outline", "section", "impact", "coverage", "expansion"], Field(description=(
+                 "full 完整文稿；outline 目录；section 单章上下文包（改写某章用）；impact 依据变化的影响；"
+                 "coverage 转写原件的覆盖报告（需 source_id）；expansion 按原文顺序展开转写它的 L1 块（需 source_id）"))] = "full",
              document_type: Annotated[DocType, Field(description=(
                  "research_process 完整过程稿；research_report 精简报告"))] = "research_process",
              document_id: Annotated[str | None, Field(description="文稿根记录 ID；对象有多份同类文稿时指定")] = None,
              section_id: Annotated[str | None, Field(description="view=section 时必填：章节记录 ID")] = None,
-             max_chars: Annotated[int, Field(description="返回正文的字符上限")] = 20000) -> dict:
-    """读取研究文稿：完整文稿 / 目录 / 单章上下文包（改写某章用）/ 依据变化影响。"""
+             max_chars: Annotated[int, Field(description="返回正文的字符上限")] = 20000,
+             source_id: Annotated[str | None, Field(description=(
+                 "view=coverage / expansion 时必填：被转写的原件（SRC-…，需已有快照）"))] = None) -> dict:
+    """读取研究文稿：完整文稿 / 目录 / 单章上下文包（改写某章用）/ 依据变化影响；
+    以及转写外部原件时的覆盖报告（哪些原文分段没被 L1 认领或明显偏短）与原文展开（R21）。"""
+    if view in {"coverage", "expansion"}:
+        if not source_id:
+            raise BurrowlError("INVALID_ARGUMENT", f"view={view} 需要 source_id")
+        method = ctx.app.snapshots.coverage if view == "coverage" else ctx.app.snapshots.expansion
+        return method(owner_id, source_id)
     selection = {"document_type": document_type, "document_id": document_id}
     if view == "full":
         return documents.build_document(ctx.app.storage, owner_id, **selection)
@@ -208,6 +217,19 @@ def document(ctx: Ctx, owner_id: OwnerId,
 def figure(ctx: Ctx, owner_id: OwnerId, record_id: str, revision: int, index: int) -> dict:
     """技术单元登记的图片（data URL）。"""
     return documents.figure(ctx.app.storage, owner_id, record_id, revision, index)
+
+
+@op("ui.ref_targets")
+def ui_ref_targets(ctx: Ctx, owner_id: OwnerId, record_id: str, revision: int | None = None) -> dict:
+    """工作台显示记录时用：把来源、正文链接与其他固定引用解析为标题与跳转位置（R21 D-11）。"""
+    record = ctx.app.memory.inspect(owner_id, record_id=record_id, revision=revision)["record"]
+    return targets.ref_targets(ctx.app.storage, owner_id, record)
+
+
+@op("ui.transcriptions")
+def ui_transcriptions(ctx: Ctx, owner_id: OwnerId) -> list:
+    """工作台"原文展开"页用：本对象转写或登记过的原件，附是否有快照与覆盖计数（R21 D-07）。"""
+    return ctx.app.snapshots.transcriptions(owner_id)
 
 
 @op("memory.timeline")
@@ -255,7 +277,9 @@ def export_(ctx: Ctx, owner_id: OwnerId, fmt: Literal["markdown", "json", "html"
 def consolidate_prepare(ctx: Ctx, owner_id: OwnerId,
                         since_commit: Annotated[str | None, Field(description=(
                             "从这个提交之后算变化；不给时从上次巩固算起"))] = None) -> dict:
-    """阶段巩固的待处理清单：自上次巩固以来的变化、受影响下游与合并/冲突候选。"""
+    """阶段巩固的待处理清单：自上次巩固以来的变化、受影响下游与合并/冲突候选；
+    unfixed_evidence 是没被任何 L1–L4 引用的 Run 与 L0，unlinked_details 是没被任何 L2–L4 或文稿指向的本对象 L1
+    （逐项补就近链接，或写明不需要的理由）。"""
     return consolidation.prepare(ctx.app.memory, owner_id, since_commit=since_commit)
 
 

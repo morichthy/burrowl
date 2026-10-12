@@ -112,6 +112,8 @@ def main(argv: list[str] | None = None) -> None:
     shutil.copytree(standalone_python(), stage / "python", ignore=shutil.ignore_patterns("__pycache__"))
     (stage / "python/Lib/EXTERNALLY-MANAGED").unlink(missing_ok=True)
     python = stage / "python/python.exe"
+    # 后台工作台用的无窗口解释器副本（R21 D-13）：任务管理器里按 burrowl-workbench 找到并可直接结束
+    shutil.copy2(stage / "python/pythonw.exe", stage / "python/burrowl-workbench.exe")
 
     # 2. 本项目的包与全部依赖（版本与 uv.lock 一致）
     wheels = BUILD / "wheels"

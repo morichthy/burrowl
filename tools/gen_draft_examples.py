@@ -45,7 +45,8 @@ def draft(kind, title, body, payload, sources, reason, keywords=(), gap=None):
 EXAMPLES = {
     "source": (
         "L0 原始依据：先用 sources_register 登记文件（得到 SRC-ID 与 sha256），再写这条登记说明。"
-        "body_markdown 说明材料是什么、谁产生、怎么解释（列、单位、限制）；原件不改，未展开原件不能声称已核验全文。",
+        "body_markdown 说明材料是什么、谁产生、怎么解释（列、单位、限制）；原件不改，未展开原件不能声称已核验全文。"
+        "导入转写时，有意省略的原文段落写进可选的 omitted=[{locators, reason}]（locators 取原件分段标签）。",
         draft("source", "第一轮原始结果：单位增量与抵消（登记说明）",
               "第一轮实验脚本输出的原始结果表：顺序求和与 Kahan 补偿求和在三项抵消输入上的逐步累加值。"
               "列依次为步号、累加值、精确参考值，数值无量纲。本条只登记原件，不给结论。",
@@ -55,6 +56,9 @@ EXAMPLES = {
     "detail": (
         "L1 技术单元：完整正文只放 payload.blocks，body_markdown 必须为空字符串；retrieval_description 是检索用摘要，"
         "不是正文。unit_type=experiment 时 run_ref 必须是真实 Run；结果块用 requires_block_ids 声明依赖的定义块。"
+        "转写外部原件时写 origin={source_ref: 原件的固定引用, locators: [原件分段标签]}（块上可再写 locators），"
+        "按原文顺序接近原文保留细节，原文中的实验可用 origin 代替 run_ref；不属于实验/方法/推导/分析的内容用 "
+        "unit_type=general。"
         "L1 可以写 fact / calculation 类结论并用 block_id 指向结果块；块正文里用 [[概念]] 链接概念库中的概念，"
         "handle 是给 [[@handle]] 链接用的可读短名（不填按标题生成，创建后不能改）。",
         draft("detail", "顺序求和误差的精确基准计算方法", "",

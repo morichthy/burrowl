@@ -22,8 +22,13 @@
 | Run | 一次真实执行（分析、仿真、训练、报告生成）的证据：输入版本、程序、产物、日志、成功或失败。放在上级对象目录的 `runs/` 下（对象内 Run）或顶层 `runs/` 下（独立 Run），上级按目录位置判断 | 不保存记忆记录、不进检索；执行得到的知识写进引用它的记录；业务卡的 `conclusion` 只是执行摘要。没有执行就不建 Run，没有知识的 Run 丢弃到回收站 | `RUN-…`，`runs.*` |
 | 记录（record） | 记忆中的一条带版本的 JSON 内容，有类型（kind）、正文和来源 | 不是原始文件 | `MEM-…` |
 | 外壳 / payload | 外壳是所有记录共用的部分：身份、所属对象、类型与层级、标题、正文、来源、修订信息。payload 是随类型变化的结构化字段，供程序读取和校验，例如技术块、适用条件、结论、关联端点 | payload 不会被拼回正文；给人读的内容写在正文（L1 写在 blocks） | `payload`；字段见 `memory_contract(kind)` |
-| L0–L4 | 记录的内容层级：L0 原始依据、L1 技术单元、L2 经过、L3 可复用认识、L4 概览。表示内容职责和默认阅读粒度 | 不是可信等级，也不要求逐级补齐 | `level` |
-| 技术单元 | L1 记录：实验、方法、推导或分析的完整技术内容。正文写在 `blocks`，检索说明写在 `retrieval_description` | `retrieval_description` 只是检索摘要，不是正文 | `kind=detail` |
+| L0–L4 | 记录的内容层级，即信息的压缩与展开：L0 原始依据、L1 技术单元（细节完整保留）、L2 经过、L3 可复用认识、L4 概览（入口与当前状态）。按内容片段回答的问题落层，不按文档类型套模板（RECORDING 第 1 节） | 不是可信等级，也不要求逐级补齐 | `level` |
+| 技术单元 | L1 记录：实验、方法、推导、分析或其他内容（`general`）的完整细节；导入外部资料时接近原文保留。正文写在 `blocks`，检索说明写在 `retrieval_description` | `retrieval_description` 只是检索摘要，不是正文 | `kind=detail` |
+| 原文快照 | 导入时对原件抽取的分段文本与指纹（`snapshot=true` 登记或 `sources_snapshot` 生成），存在数据目录的程序状态里，随备份迁移。分段的 key 供 L1 的 `origin.locators` 引用 | 不是原件副本，也不是缓存：原件改了就无法再生成旧版 | `.burrowl/snapshots/`、`sources.snapshot` |
+| origin | L1 转写自哪个原件的哪些分段：`{source_ref, locators}`；块上可细到 `locators` | 不是证据关系的替代：证据仍写在 sources / evidence_refs | `payload.origin` |
+| 覆盖报告 | 把原文快照逐段与转写它的 L1 对比，列出未覆盖、明显偏短且没登记省略的段落 | 只是提示，不阻断提交；合理的省略或改写也会降低指标 | `memory.document(view=coverage)` |
+| 原文展开 | 按原文顺序拼出认领各分段的 L1 块，在工作台核对导入是否完整 | 是现算的视图，不是保存的文稿 | `memory.document(view=expansion)` |
+| 附件 | 从原件中复制进数据目录的图片，按内容命名并登记为来源，供 L1 的 figures 引用 | 不是原件；原件仍留在原位 | `attachments/`、`SRC-ATT-…`、`sources.attach` |
 | 经过 | L2 记录：研究、实施、排错或决策的实际经过 | 不是操作日志（日志留在 Run） | `kind=narrative` |
 | 经验 | L3 记录：可复用的观察、结论、假设或建议，写明适用边界 | `knowledge_type` 是内容分类，不是复核状态 | `kind=experience` |
 | 概览 | L4 记录：Owner 的顶层发现入口，说明用途、范围、当前结果和限制 | 不是文稿根，不能代替全文 | `kind=overview` |

@@ -7092,6 +7092,13 @@
       "$ref": "#/$defs/UnresolvedRef"
      },
      "minItems": 0
+    },
+    "omitted": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/OmittedPart"
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -7288,6 +7295,14 @@
       "minLength": 1
      },
      "minItems": 0
+    },
+    "locators": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
     }
    },
    "required": [
@@ -7309,7 +7324,8 @@
       "experiment",
       "method",
       "derivation",
-      "analysis"
+      "analysis",
+      "general"
      ]
     },
     "retrieval_description": {
@@ -7359,6 +7375,16 @@
       "$ref": "#/$defs/Claim"
      },
      "minItems": 0
+    },
+    "origin": {
+     "oneOf": [
+      {
+       "$ref": "#/$defs/SourceOrigin"
+      },
+      {
+       "type": "null"
+      }
+     ]
     }
    },
    "required": [
@@ -8003,6 +8029,49 @@
    "required": [
     "action",
     "decided_by",
+    "reason"
+   ],
+   "additionalProperties": false
+  },
+  "SourceOrigin": {
+   "type": "object",
+   "properties": {
+    "source_ref": {
+     "$ref": "#/$defs/Ref"
+    },
+    "locators": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 0
+    }
+   },
+   "required": [
+    "source_ref",
+    "locators"
+   ],
+   "additionalProperties": false
+  },
+  "OmittedPart": {
+   "type": "object",
+   "properties": {
+    "locators": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1
+     },
+     "minItems": 1
+    },
+    "reason": {
+     "type": "string",
+     "minLength": 1
+    }
+   },
+   "required": [
+    "locators",
     "reason"
    ],
    "additionalProperties": false

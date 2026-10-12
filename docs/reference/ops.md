@@ -47,8 +47,10 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | `maintenance.handoff` | 仅用户（不暴露给 agent） | （仅用户）把计划交给 AI 起草处置，或把待确认 / 部分完成的计划退回 AI（附意见）。 | `plan_id`*: string，`note`: string |
 | `maintenance.plan` | 写入 | 来源变化或新反证后：列出受影响记录及其完整正文，生成维护计划。 | `changed_ids`*: array，`note`: string，`targets`: array|null |
 | `maintenance.plan_from_candidates` | 仅用户（不暴露给 agent） | （仅用户）为所选维护候选生成计划：变化来源取自候选记下的影响路径，计划只含所选记录；候选标为 planned。 | `target_ids`*: array，`note`: string |
+| `maintenance.plan_ref_rewrite` | 仅用户（不暴露给 agent） | （仅用户）为勾选的记录生成引用改写计划：长编号机械替换为短名链接，其余不变，预览后执行。 | `target_ids`*: array，`note`: string |
 | `maintenance.plan_visibility` | 仅用户（不暴露给 agent） | （仅用户）为勾选的记录生成可见范围补齐计划：处置已写好（修订为全库可见，正文不变），预览后执行。 | `target_ids`*: array，`note`: string |
 | `maintenance.plans` | 只读 | 维护计划概况（最近有变化的在前）。queued 表示用户交给 AI 起草处置。 | `status`: array|null |
+| `maintenance.ref_rewrite_candidates` | 只读 | 正文（L1–L4、文稿）里写了长编号（如 MEM-<uuid>）或 64 位指纹的记录，逐处给出可替换的短名链接（replacement）； replacement 为空的需要 AI 或人工改写。新提交会直接拒绝这类写法（UNREADABLE_REF），这里处理已有记录。 | 无 |
 | `maintenance.review` | 写入 | 记录逐项处置与修订草案，并逐对象预检（不写记忆）。之后由用户在工作台预览并执行。 | `plan_id`*: string，`decisions`*: array，`expected_revision`: integer|null，`message`: string |
 | `maintenance.status` | 只读 | 维护计划的当前状态。 | `plan_id`*: string |
 | `maintenance.visibility_candidates` | 只读 | R19 之前按旧默认存成 owner_only 的知识记录（L1–L4、已采纳的关联、概念页）。对象策略显式要求保密的对象不列出。 | 无 |
@@ -60,9 +62,9 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | `memory.activity` | 只读 | 关键操作记录（只读，按时间倒序）：建立对象、归属确认、保存、复核、Run 结束、发布，每条一行，带可追溯的引用。 检索、阅读、来源登记等不改变资产的操作不在其中。 | `owner_id`: string|null，`kinds`: array|null，`limit`: integer，`before`: string|null |
 | `memory.commit` | 写入 | 保存一批记录到一个对象（同一对象内原子提交，要么全写入要么都不写）。dry_run=true 只预检不写入。 草案必须写 kind、title、body_markdown、payload、sources、record_reason；owner_id、sensitivity、discovery、 keywords、provenance_gap、handle 可省略（由服务补上，修订时沿用原值）；修订已有记录时写 change_reason。 payload 结构随 kind 不同，写之前用 memory_contract(kind) 查字段与示例。引用一律写固定引用 （刚保存的记录用回执的 fixed_ref）。出错时 errors 一次列出所有问题，path 指向要改的参数位置。 | `owner_id`*: string，`operations`*: array，`expected_head`*: string|null，`request_id`: string|null，`dry_run`: boolean，`attribution`: object|null |
 | `memory.consolidate_apply` | 写入 | 保存巩固处置（retain/revise/retract/defer…），可与本批实际修订一起提交。 | `owner_id`*: string，`basis`*: object，`decisions`*: array，`reason`*: string，`operations`: array|null，`dry_run`: boolean |
-| `memory.consolidate_prepare` | 只读 | 阶段巩固的待处理清单：自上次巩固以来的变化、受影响下游与合并/冲突候选。 | `owner_id`*: string，`since_commit`: string|null |
+| `memory.consolidate_prepare` | 只读 | 阶段巩固的待处理清单：自上次巩固以来的变化、受影响下游与合并/冲突候选； unfixed_evidence 是没被任何 L1–L4 引用的 Run 与 L0，unlinked_details 是没被任何 L2–L4 或文稿指向的本对象 L1 （逐项补就近链接，或写明不需要的理由）。 | `owner_id`*: string，`since_commit`: string|null |
 | `memory.contract` | 只读 | 某类记录的草案契约：每个字段是 required / optional / conditional（以及省略时的默认值）、不要写的服务端字段、 payload 结构、写作要点和一份经校验的示例草案。写 memory_commit / memory_summary_save 的草案前先调用。 | `kind`*: string |
-| `memory.document` | 只读 | 读取研究文稿：完整文稿 / 目录 / 单章上下文包（改写某章用）/ 依据变化影响。 | `owner_id`*: string，`view`: string，`document_type`: string，`document_id`: string|null，`section_id`: string|null，`max_chars`: integer |
+| `memory.document` | 只读 | 读取研究文稿：完整文稿 / 目录 / 单章上下文包（改写某章用）/ 依据变化影响； 以及转写外部原件时的覆盖报告（哪些原文分段没被 L1 认领或明显偏短）与原文展开（R21）。 | `owner_id`*: string，`view`: string，`document_type`: string，`document_id`: string|null，`section_id`: string|null，`max_chars`: integer，`source_id`: string|null |
 | `memory.export` | 只读 | 导出对象的记忆（不产生新记录、不复制原件）。 | `owner_id`*: string，`fmt`: string，`record_ids`: array|null，`exclude_ids`: array|null，`include_raw_materials`: boolean |
 | `memory.feedback` | 写入 | 记录检索结果的使用反馈（采用次数不是复核）。label=outcome 时 adopted_in 须指向实际应用它的 Run 或记录。 | `owner_id`*: string，`query_id`*: string，`target`*: object，`label`*: string，`note`: string，`adopted_in`: object|null，`request_id`: string|null |
 | `memory.figure` | 只读 | 技术单元登记的图片（data URL）。 | `owner_id`*: string，`record_id`*: string，`revision`*: integer，`index`*: integer |
@@ -181,17 +183,27 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | `runs.trash` | 只读 | 回收站中已丢弃的 Run（原位置、理由、时间、执行者）。 | 无 |
 | `runs.update` | 写入 | 修改 Run 的执行摘要、限制、状态等（不改输入/产物登记）。 | `run_id`*: string，`fields`*: object，`expected_sha256`: string|null |
 
+## server
+
+| 操作 | 类型 | 说明 | 参数 |
+|---|---|---|---|
+| `server.info` | 仅用户（不暴露给 agent） | 工作台进程：运行中的版本、已安装的版本（不同表示需要重启才能用上新版本）、进程号、启动时间、网址、日志。 | 无 |
+| `server.restart` | 仅用户（不暴露给 agent） | 重启工作台：新进程加载当前安装的版本，接管同一网址；页面稍后自动恢复。AI 客户端的 MCP 需在客户端里重启。 | 无 |
+| `server.stop` | 仅用户（不暴露给 agent） | 停止工作台（处理完当前请求后退出）。AI 客户端里经 stdio 运行的 MCP 是另外的进程，不受影响。 | 无 |
+
 ## sources
 
 | 操作 | 类型 | 说明 | 参数 |
 |---|---|---|---|
 | `sources.add_root` | 写入 | 登记一个工作根。通常不必手动调用：登记本次工作目录里的文件时会自动建根。 | `path`*: string，`title`: string |
+| `sources.attach` | 写入 | 把原件中的图片复制为数据目录内的受控附件并登记为来源，返回固定引用 ref。 L1 的 payload.figures 写 {caption: 照录原文图注, ref}，块正文用 ![图注](figure:序号) 在原位置引用。 附件随数据目录备份和迁移；同一张图重复附加是幂等的。 | `source_id`*: string，`asset_label`: string|null，`title`: string |
 | `sources.list` | 只读 | 已登记的来源文件（file 引用的唯一授权入口），附当前解析出的位置 location。 | 无 |
-| `sources.register` | 写入 | 登记一个来源文件并记录当前字节指纹：L0 原件的唯一授权入口。原件留在原处，不复制、不修改。 工作目录里的文件自动记为"工作根 + 相对路径"，迁移时随根重定向。 同一 ID 重复登记同一文件是幂等的；内容变了请用新 ID；文件搬家用 sources_relocate / sources_relocate_root。 | `source_id`*: string，`path`*: string，`title`: string，`sensitivity`: string |
-| `sources.register_many` | 写入 | 批量登记来源（导入已有资料时使用）。 | `items`*: array |
+| `sources.register` | 写入 | 登记一个来源文件并记录当前字节指纹：L0 原件的唯一授权入口。原件留在原处，不复制、不修改。 工作目录里的文件自动记为"工作根 + 相对路径"，迁移时随根重定向。 同一 ID 重复登记同一文件是幂等的；内容变了请用新 ID；文件搬家用 sources_relocate / sources_relocate_root。 | `source_id`*: string，`path`*: string，`title`: string，`sensitivity`: string，`snapshot`: boolean |
+| `sources.register_many` | 写入 | 批量登记来源（导入已有资料时使用）。 | `items`*: array，`snapshot`: boolean |
 | `sources.relocate` | 写入 | 原件搬家：新位置的字节必须与登记时一致，旧路径记入 relocated_from，已有固定引用继续有效。 | `source_id`*: string，`new_path`*: string |
 | `sources.relocate_root` | 写入 | 工作目录整体搬家：逐个核对新位置下已登记文件的指纹，全部一致才改根的位置；已有固定引用不变。 | `root_id`*: string，`new_path`*: string，`allow_missing`: boolean |
 | `sources.roots` | 只读 | 已登记的工作根（工作目录）与本次会话的工作目录。工作根下的来源记为"根 + 相对路径"，目录搬家只改根。 | 无 |
+| `sources.snapshot` | 写入 | 原文快照：没有就先生成（只读原件、核对登记指纹）。返回分段目录（key 与字数）、提取出的图片（assets 的 label） 与抽取警告；给 keys 时附这些分段的全文。转写时 L1 的 origin.locators 与块的 locators 写这里的 key； 图片用 sources_attach 复制为附件后再引用。 | `source_id`*: string，`keys`: array|null，`max_chars`: integer |
 | `sources.update` | 仅用户（不暴露给 agent） | （仅用户）启用/停用来源或调整敏感级别。停用或设为 restricted 后，读取被拒的记录在检索和关系图中也同时隐去。 | `source_id`*: string，`enabled`: boolean|null，`sensitivity`: string|null |
 
 ## system
@@ -203,6 +215,13 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | `system.ops` | 只读 | 全部操作的目录（名称、分组、读写类型、说明、参数 schema）。 | `groups`: array|null |
 | `system.tool_errors` | 只读 | 最近被拒绝的工具调用与内部错误，按工具汇总（R20 D-10）：参数错误（input）、其他拒绝（other）、内部错误（internal） 的次数和最常出错的参数路径，以及最近的内部错误 incident_id。参数错误多的工具，说明说明或示例需要改；不含参数内容。 | `limit`: integer |
 | `system.validate` | 只读 | 全工作区只读校验：提交链与指纹、写锁与残留、来源文件是否变化或缺失、索引是否落后。不修复。 | 无 |
+
+## ui
+
+| 操作 | 类型 | 说明 | 参数 |
+|---|---|---|---|
+| `ui.ref_targets` | 只读 | 工作台显示记录时用：把来源、正文链接与其他固定引用解析为标题与跳转位置（R21 D-11）。 | `owner_id`*: string，`record_id`*: string，`revision`: integer|null |
+| `ui.transcriptions` | 只读 | 工作台"原文展开"页用：本对象转写或登记过的原件，附是否有快照与覆盖计数（R21 D-07）。 | `owner_id`*: string |
 
 ## wiki
 

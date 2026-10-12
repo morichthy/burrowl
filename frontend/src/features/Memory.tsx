@@ -1,8 +1,8 @@
 // 系统记忆：对象列表 → 对象（按层级的记录、文稿、时间线） → 单条记录（正文、结论复核徽标、依据）。
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useAction, useOp } from "../api";
 import { KINDS, label, LEVELS, OWNER_TYPES } from "../labels";
-import { Empty, ErrorBox, href, Loading, Markdown, Panel, ReviewBadge, Tag, Time, useDebounced } from "../ui";
+import { Empty, ErrorBox, href, type LinkTargets, linkify, Loading, Markdown, Panel, ReviewBadge, Tag, Time, useDebounced } from "../ui";
 import type { QueueItem } from "./Review";
 
 interface OwnerSummary {
@@ -133,7 +133,7 @@ function useClaimBadges(ownerId: string) {
 }
 
 export function OwnerView({ ownerId }: { ownerId: string }) {
-  const [tab, setTab] = useState<"records" | "document" | "raw" | "timeline">("records");
+  const [tab, setTab] = useState<"records" | "document" | "expansion" | "raw" | "timeline">("records");
   const [mainOnly, setMainOnly] = useState(true);
   const [query, setQuery] = useState("");
   // 多选取并集；空数组表示不按类型筛选（全部）
@@ -169,6 +169,7 @@ export function OwnerView({ ownerId }: { ownerId: string }) {
             [
               ["records", "记录"],
               ["document", "文稿"],
+              ["expansion", "原文展开"],
               ["raw", "原始材料"],
               ["timeline", "时间线"],
             ] as const
@@ -241,6 +242,7 @@ export function OwnerView({ ownerId }: { ownerId: string }) {
           </>
         ) : null}
         {tab === "document" ? <DocumentView ownerId={ownerId} /> : null}
+        {tab === "expansion" ? <Expansion ownerId={ownerId} /> : null}
         {tab === "raw" ? <RawMaterials ownerId={ownerId} /> : null}
         {tab === "timeline" ? <Timeline ownerId={ownerId} /> : null}
       </Panel>
@@ -370,6 +372,16 @@ export function RecordView({ ownerId, recordId }: { ownerId: string; recordId: s
   const r = record.data?.record;
   const links = (r as unknown as { links?: { text: string; status: string; ref: { target_id: string } | null }[] })?.links ?? [];
   const handle = (r as unknown as { handle?: string })?.handle;
+  // R21 D-11：引用的记录、结论、原件解析为名称与跳转地址；读不到的退回显示 ID
+  const targets = useOp<Record<string, RefTarget>>("ui.ref_targets", { owner_id: ownerId, record_id: recordId, revision }).data ?? {};
+  const linkUrls: LinkTargets = Object.fromEntries(links.map((l) => [l.text, l.ref ? targetHref(targets[l.ref.target_id]) : undefined]));
+  const blocks = r?.payload.blocks ?? [];
+  const inline = new Set(blocks.flatMap((b) => [...b.markdown.matchAll(/\]\(figure:(\d+)\)/g)].map((m) => Number(m[1]))));
+  const figureAt = useCallback(
+    (index: number, alt: string) =>
+      r ? <Figure ownerId={ownerId} record={r} index={index} caption={figureCaption(r, index) || alt} /> : null,
+    [ownerId, r],
+  );
   return (
     <>
       <p>
@@ -430,8 +442,12 @@ export function RecordView({ ownerId, recordId }: { ownerId: string; recordId: s
             </div>
           ) : null}
           {r.provenance_gap ? <div className="notice">依据缺口：{r.provenance_gap}</div> : null}
-          <Markdown text={r.body_markdown} />
-          {r.payload.blocks?.map((b) => <Markdown key={b.block_id} text={b.markdown} />)}
+          <Markdown text={linkify(r.body_markdown, linkUrls)} />
+          {blocks.map((b) => (
+            <div key={b.block_id} id={`block-${b.block_id}`}>
+              <Markdown text={linkify(b.markdown, linkUrls)} figure={figureAt} />
+            </div>
+          ))}
           {r.payload.claims?.length ? (
             <>
               <h3>结论</h3>
@@ -439,7 +455,7 @@ export function RecordView({ ownerId, recordId }: { ownerId: string; recordId: s
                 {r.payload.claims.map((c) => (
                   <li key={c.claim_id}>
                     <div className="claim-body">
-                      <ReviewBadge value={badges.get(c.claim_id) ?? "not-reviewed"} /> {c.statement}
+                      <ReviewBadge value={badges.get(c.claim_id) ?? "not-reviewed"} /> <Markdown text={linkify(c.statement, linkUrls)} />
                       <div className="hint">
                         适用范围：{c.scope} · <a href={href("review")}>去复核</a>
                       </div>
@@ -456,20 +472,21 @@ export function RecordView({ ownerId, recordId }: { ownerId: string; recordId: s
                 {links.map((l) => (
                   <li key={l.text}>
                     <code>[[{l.text}]]</code> →{" "}
-                    {l.ref ? <code>{l.ref.target_id}</code> : <span className="hint">概念库中还没有这个概念</span>}
+                    {l.ref ? <RefName id={l.ref.target_id} targets={targets} /> : <span className="hint">概念库中还没有这个概念</span>}
                   </li>
                 ))}
               </ul>
             </>
           ) : null}
-          <Figures ownerId={ownerId} record={r} />
+          <Figures ownerId={ownerId} record={r} skip={inline} />
           <Provenance recordId={r.record_id} />
           <h3>来源（{r.sources.length}）</h3>
           <ol className="sources">
             {r.sources.map((s, i) => (
               <li key={i}>
-                <Tag>{s.relation}</Tag> <code>{s.target_id}</code>
-                {s.revision != null ? `@${s.revision}` : ""} {s.locator}
+                <Tag>{s.relation}</Tag> <RefName id={s.target_id} targets={targets} />
+                {s.revision != null ? <span className="hint"> 修订 {s.revision}</span> : null}{" "}
+                {s.locator && s.locator !== "record" ? <span className="hint">{s.locator}</span> : null}
               </li>
             ))}
           </ol>
@@ -583,26 +600,42 @@ function RawMaterials({ ownerId }: { ownerId: string }) {
   );
 }
 
-function Figures({ ownerId, record }: { ownerId: string; record: FullRecord }) {
-  const figures = (record.payload.figures as { caption: string }[] | undefined) ?? [];
-  if (!figures.length) return null;
+function figureCaption(record: FullRecord, index: number): string {
+  return ((record.payload.figures as { caption: string }[] | undefined) ?? [])[index]?.caption ?? "";
+}
+
+function Figures({ ownerId, record, skip }: { ownerId: string; record: FullRecord; skip: Set<number> }) {
+  const figures = ((record.payload.figures as { caption: string }[] | undefined) ?? []).map((f, i) => ({ ...f, i }));
+  const rest = figures.filter((f) => !skip.has(f.i));
+  if (!rest.length) return null;
   return (
     <>
-      <h3>图（{figures.length}）</h3>
-      {figures.map((f, i) => (
-        <Figure key={i} ownerId={ownerId} record={record} index={i} caption={f.caption} />
+      <h3>{skip.size ? `其他图（${rest.length}）` : `图（${rest.length}）`}</h3>
+      {rest.map((f) => (
+        <Figure key={f.i} ownerId={ownerId} record={record} index={f.i} caption={f.caption} />
       ))}
     </>
   );
 }
 
 function Figure({ ownerId, record, index, caption }: { ownerId: string; record: FullRecord; index: number; caption: string }) {
-  const figure = useOp<{ data_url: string }>("memory.figure", {
-    owner_id: ownerId,
-    record_id: record.record_id,
-    revision: record.revision,
-    index,
-  });
+  return <RecordFigure ownerId={ownerId} recordId={record.record_id} revision={record.revision} index={index} caption={caption} />;
+}
+
+function RecordFigure({
+  ownerId,
+  recordId,
+  revision,
+  index,
+  caption,
+}: {
+  ownerId: string;
+  recordId: string;
+  revision: number;
+  index: number;
+  caption: string;
+}) {
+  const figure = useOp<{ data_url: string }>("memory.figure", { owner_id: ownerId, record_id: recordId, revision, index });
   return (
     <figure className="figure">
       <ErrorBox error={figure.error} />
@@ -658,4 +691,170 @@ function Provenance({ recordId }: { recordId: string }) {
       ) : null}
     </details>
   );
+}
+
+// ---------- R21：引用的名称与跳转 ----------
+interface RefTarget {
+  kind: "record" | "claim" | "file" | "owner";
+  owner_id?: string;
+  record_id?: string;
+  title: string;
+  handle?: string | null;
+  level?: string | null;
+}
+
+function targetHref(target: RefTarget | undefined): string | undefined {
+  if (!target) return undefined;
+  if (target.owner_id && target.record_id) return href("memory", target.owner_id, target.record_id);
+  if (target.kind === "owner" && target.owner_id) return href("memory", target.owner_id);
+  return undefined;
+}
+
+/** 显示引用目标的标题（短名）而不是长编号；完整 ID 在悬停提示里。 */
+function RefName({ id, targets }: { id: string; targets: Record<string, RefTarget> }) {
+  const target = targets[id];
+  if (!target) return <code>{id}</code>;
+  const url = targetHref(target);
+  const text = target.kind === "claim" && target.title.length > 60 ? target.title.slice(0, 60) + "…" : target.title;
+  const prefix = target.kind === "file" ? "原件：" : target.kind === "claim" ? "结论：" : target.level ? `${target.level} ` : "";
+  const body = (
+    <>
+      {prefix}
+      {text}
+      {target.handle ? <span className="hint"> @{target.handle}</span> : null}
+    </>
+  );
+  return url ? (
+    <a href={url} title={id}>
+      {body}
+    </a>
+  ) : (
+    <span title={id}>{body}</span>
+  );
+}
+
+// ---------- R21 D-07：原文展开与覆盖 ----------
+interface Transcription {
+  source_id: string;
+  title: string;
+  has_snapshot: boolean;
+  counts?: Record<string, number>;
+}
+
+interface ExpansionSection {
+  key: string;
+  path: string;
+  status: "covered" | "omitted" | "gap";
+  reason?: string;
+  excerpt?: string;
+  blocks: {
+    record_id: string;
+    revision: number;
+    title: string;
+    handle: string | null;
+    block_id: string;
+    markdown?: string;
+    see_above?: boolean;
+  }[];
+}
+
+const COVERAGE_TONES: Record<string, { label: string; tone: string }> = {
+  covered: { label: "已转写", tone: "good" },
+  thin: { label: "偏短", tone: "warn" },
+  uncovered: { label: "未覆盖", tone: "bad" },
+  omitted: { label: "已省略", tone: "muted" },
+};
+
+function Expansion({ ownerId }: { ownerId: string }) {
+  const list = useOp<Transcription[]>("ui.transcriptions", { owner_id: ownerId });
+  const [picked, setPicked] = useState<string>();
+  const sources = list.data ?? [];
+  const current = picked ?? sources.find((s) => s.has_snapshot)?.source_id;
+  return (
+    <>
+      <p className="hint">
+        按原文顺序展开转写它的技术单元（L1），用来核对导入是否完整。只有导入时保存了原文快照的原件才能展开；“偏短”“未覆盖”只是提示，
+        觉得哪里简略，可以在关系图页写笔记交给 AI 补写。
+      </p>
+      <ErrorBox error={list.error} />
+      <Loading show={list.loading} />
+      {list.data && !sources.length ? <Empty>这个对象没有登记或转写过原件。</Empty> : null}
+      {sources.length ? (
+        <div className="toolbar">
+          <select aria-label="选择原件" value={current ?? ""} onChange={(e) => setPicked(e.target.value)}>
+            {sources.map((s) => (
+              <option key={s.source_id} value={s.source_id} disabled={!s.has_snapshot}>
+                {s.title}
+                {s.has_snapshot ? "" : "（没有快照）"}
+              </option>
+            ))}
+          </select>
+          {Object.entries(sources.find((s) => s.source_id === current)?.counts ?? {}).map(([status, n]) =>
+            n ? (
+              <Tag key={status} tone={COVERAGE_TONES[status]?.tone}>
+                {COVERAGE_TONES[status]?.label ?? status} {n}
+              </Tag>
+            ) : null,
+          )}
+        </div>
+      ) : null}
+      {current ? <ExpansionView ownerId={ownerId} sourceId={current} /> : null}
+    </>
+  );
+}
+
+function ExpansionView({ ownerId, sourceId }: { ownerId: string; sourceId: string }) {
+  const doc = useOp<{ file_name: string; sections: ExpansionSection[] }>("memory.document", {
+    owner_id: ownerId,
+    view: "expansion",
+    source_id: sourceId,
+  });
+  const coverage = useOp<{ segments: { key: string; status: string; ratio?: number; overlap?: number }[] }>("memory.document", {
+    owner_id: ownerId,
+    view: "coverage",
+    source_id: sourceId,
+  });
+  const status = new Map((coverage.data?.segments ?? []).map((s) => [s.key, s]));
+  return (
+    <>
+      <ErrorBox error={doc.error ?? coverage.error} />
+      <Loading show={doc.loading} />
+      <article className="document">
+        {doc.data?.sections.map((s) => {
+          const row = status.get(s.key);
+          const tone = COVERAGE_TONES[row?.status ?? s.status] ?? COVERAGE_TONES.uncovered;
+          return (
+            <section key={s.key}>
+              <div className="hint">
+                <Tag tone={tone.tone}>{tone.label}</Tag> 原文：{s.key}
+                {row?.ratio != null ? ` · 字数比 ${row.ratio} · 重合度 ${row.overlap}` : ""}
+              </div>
+              {s.status === "omitted" ? <p className="hint">省略理由：{s.reason}</p> : null}
+              {s.status === "gap" ? <blockquote className="hint">原文开头：{s.excerpt}</blockquote> : null}
+              {s.blocks.map((b) => (
+                <div key={`${b.record_id}#${b.block_id}`} className="unit">
+                  <div className="hint">
+                    <a href={href("memory", ownerId, b.record_id)}>{b.title}</a>
+                    {b.handle ? ` @${b.handle}` : ""} · {b.block_id}
+                    {b.see_above ? "（同一块已在上文显示）" : ""}
+                  </div>
+                  {b.markdown ? <BlockMarkdown ownerId={ownerId} block={b} /> : null}
+                </div>
+              ))}
+            </section>
+          );
+        })}
+      </article>
+    </>
+  );
+}
+
+function BlockMarkdown({ ownerId, block }: { ownerId: string; block: ExpansionSection["blocks"][number] }) {
+  const figure = useCallback(
+    (index: number, alt: string) => (
+      <RecordFigure ownerId={ownerId} recordId={block.record_id} revision={block.revision} index={index} caption={alt} />
+    ),
+    [ownerId, block.record_id, block.revision],
+  );
+  return <Markdown text={block.markdown} figure={figure} />;
 }

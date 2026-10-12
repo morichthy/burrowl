@@ -40,7 +40,8 @@
 
 - **运行环境**：Windows x64 本地应用，Python 3.12（uv 管理）。发行时内置独立 CPython 与全部依赖，见 [packaging](packaging/)。
 - **接口**：
-  - `burrowl serve`：FastAPI 工作台，同时在 `/<token>/mcp` 提供 Streamable HTTP 形式的 MCP；只监听 127.0.0.1，需要随机 token，校验 Host/Origin，并设置 CSP。
+  - `burrowl serve`：FastAPI 工作台，同时在 `/<token>/mcp` 提供 Streamable HTTP 形式的 MCP；只监听 127.0.0.1，需要 token，校验 Host/Origin，并设置 CSP。端口与 token 第一次启动时选定并存入数据目录，以后网址不变。
+  - `burrowl start / open / stop / restart / status`：工作台以无窗口的后台进程运行（`interfaces/server.py`，R21）。
   - `burrowl mcp`：stdio 形式的 MCP，供宿主直接拉起。
   - `burrowl call`：命令行调用任意操作。
 - **存储**：
@@ -58,7 +59,7 @@
 interfaces   ops 注册表 → FastAPI / MCP / Typer CLI
 app          组合根：按数据目录与配置装配服务
 services     memory, review, query, reading, indexing, hub, runs, relations, monitor, maintenance, config, health, workflow,
-             routing, activity, notes
+             routing, activity, notes, snapshots
 storage | index | connectors | portable   （四者互不导入）
 core         记录模型与校验、契约说明、哈希、原子写与锁、路径安全、配置模型、错误
 ```
@@ -84,9 +85,10 @@ core         记录模型与校验、契约说明、哈希、原子写与锁、�
 | HUB 知识中枢 | `services/hub.py`、`storage/hub_state.py`、`connectors/`（spi、registry、fake、mdvault），以及独立包 `burrowl-connector-weknora`、`burrowl-connector-lightrag`（图模式，按需重建） | 发布策略与复核类别；中枢页；wiki_page 记录；合约测试；LightRAG 版本锁定在 1.5.7，升级前重跑 `tests/connectors/test_lightrag.py` |
 | MAINT 维护与监测 | `services/maintenance.py`（计划状态 planned → queued → reviewed → applied / partial，执行仅限用户，R16）、`services/monitor.py`、`services/relations.py`（读取图投影、关联候选） | 维护页与导航计数、关系图页；consolidate Skill 与 MCP 说明；`maintenance.plan_from_candidates` 依赖候选记下的影响路径 |
 | NOTE 工作台笔记 | `services/notes.py`（R15：用户交给 AI 的待办；状态转换、AI 方案的预演与预览、用户执行时核对依据 HEAD 后按方案写入） | 关系图页笔记面板、首页状态卡与导航计数；`memory.resume` 的 `workbench_notes`；RULES 第 8 节、work 与 consolidate Skill；方案步骤依赖 `memory.commit` 与 `relations.decide` 的参数和 dry_run |
+| SNAP 导入与原文快照 | `services/snapshots.py`（快照生成与读取、图片附件、原件与快照的逐段对比、覆盖报告与原文展开，R21）、`core/segments.py`（分段、对比、覆盖的纯函数）、`index/extract.py`（各格式抽取，含 docx） | L1 契约的 `origin` 与 L0 的 `omitted`；维护计划的 `source_changes`；工作台"原文展开"页；work / consolidate Skill 的导入与收口步骤；备份包（快照与附件随数据目录打包）；`tests/service/test_faithful_import.py` |
 | CFG 配置 | `core/config.py`（BurrowlConfig）、`services/config.py`（CAS 与影响提示）、`storage/config_store.py`、`storage/secrets.py` | 所有读取默认值的服务；设置页；MCP 工具组 |
 | PORT 可移植包 | `portable/bundle.py`（burrowl-bundle 备份、校验、恢复） | 数据目录布局变化；排除规则 |
-| APP 入口 | `interfaces/`（ops 注册表、api、mcp、cli）、`app.py`、`frontend/`；`interfaces/ops/shapes.py`（结构化参数的形状：发布给 AI 与校验用同一份 schema）、`interfaces/ops/errorlog.py`（错误日志）。参数只在 `registry.call` 校验，MCP 适配层关闭 SDK 的预校验（R20） | 同一操作在 HTTP/MCP/CLI/前端的一致性；生成类型；effect 分类；参数说明与形状（`tests/interfaces/test_tool_errors.py`）；MCP SDK 升级后重跑该测试（关闭预校验依赖 SDK 内部的工具注册对象） |
+| APP 入口 | `interfaces/`（ops 注册表、api、mcp、cli、server（工作台后台运行与停止 / 重启，R21））、`app.py`、`frontend/`；`interfaces/ops/shapes.py`（结构化参数的形状：发布给 AI 与校验用同一份 schema）、`interfaces/ops/errorlog.py`（错误日志）。参数只在 `registry.call` 校验，MCP 适配层关闭 SDK 的预校验（R20） | 同一操作在 HTTP/MCP/CLI/前端的一致性；生成类型；effect 分类；参数说明与形状（`tests/interfaces/test_tool_errors.py`）；MCP SDK 升级后重跑该测试（关闭预校验依赖 SDK 内部的工具注册对象） |
 | GUIDE 规则与说明 | `skills/`（RULES、RECORDING、4 个 Skill）、六份必读文档 | 所描述能力的代码与契约；`burrowl skills check` |
 | QA 测试与交付 | `tests/`、`frontend/src/**/*.test.tsx`、`frontend/e2e/`、`packaging/` | 见 [TESTING](docs/TESTING.md) |
 
@@ -115,6 +117,9 @@ core         记录模型与校验、契约说明、哈希、原子写与锁、�
 | 交换包 | 数据目录的 `exports/<名称>/`（manifest、vault、graph），由 `exchange.export` 生成 | 派生数据，可以删除重建；不进备份包；在其中的修改不会回到 burrowl |
 | 外部中枢内容 | WeKnora 等；LightRAG 的暂存表、构建目录与嵌入缓存在连接器 `options.path` 下 | 派生副本，可以由本地重新发布；LightRAG 每次有修改或删除时整体重建，切换成功前旧构建照常可查 |
 | 工作台偏好 | `.burrowl/workbench/view.json`（关系图视图） | 本机偏好，不是研究记录 |
+| 原文快照 | `.burrowl/snapshots/<SRC>/<原件sha256>.json`（R21）：导入时对原件抽取的分段文本、指纹与图片标签，由 `SnapshotService.take` 写入，不再修改 | 不是缓存：原件改了就无法再生成旧版，所以随备份打包；只保存抽取的文本，不保存原件；原件变化后的逐段对比以它为基线，新内容用新来源 ID 登记并另存快照 |
+| 图片附件 | 数据目录 `attachments/<sha256>.<ext>`（R21），登记为来源 `SRC-ATT-<sha 前 16 位>` | 按内容寻址，同一张图幂等；受来源登记的授权与敏感级别约束；随数据目录备份迁移；L1 的 figures 只接受数据目录内的附件 |
+| 工作台进程 | `.burrowl/server.json`（R21）：端口与 token（第一次启动时选定，长期保存）；运行中的进程号、进程创建时间、启动时间、版本、网址（正常退出时清除） | 被强行结束时残留，`running()` 发现进程不在或 PID 已被复用就清除；token 是网址里的访问口令，与其他程序状态同等保护；`.burrowl/logs/serve.log` 是后台进程的输出（超过 2 MB 时清空重写） |
 | 错误日志 | `.burrowl/logs/errors.jsonl`（R20）：意外异常的堆栈与 incident_id；被拒绝调用的工具名、渠道、错误码与出错路径 | 派生诊断数据，可以删除；不记参数内容；超过 2 MB 轮转一份；不进备份包；写失败不影响操作本身 |
 | 检索与图投影的访问一致性 | 投影时隐去读取会被拒的记录；来源停用或改敏感级别时由 `IndexService.on_access_change` 重新投影依赖者（投影新鲜度不含来源登记，E9） | 读取被拒的记录不能出现在检索结果和关系图中 |
 | 工作台笔记 | `.burrowl/workbench/notes.json`（R15：笔记、往来、待确认方案与执行结果） | 用户交给 AI 的待办，不是研究记录；随备份带走；每个状态只由一方推进，读改写在同一把锁内；写入记忆只经用户执行方案 |
@@ -206,4 +211,6 @@ handle 分配和正文链接解析发生在第 1 步（`MemoryService.prepare`�
   - 实测（每对象 6 条记录，假向量，本机）：提交 N=20 约 0.31 s、N=50 约 0.61 s；inspect N=20 约 0.08 s、N=50 约 0.21 s。就绪判断 50 个对象约 0.25 s（R13 §8）。
   - 关键操作记录每次请求都要为每个对象读最新提交，对象很多时需要可重建的派生缓存。
 - 第二台物理机安装与真实业务验收尚未进行。
+- 覆盖报告（R21 D-06）的阈值（字数比、字符 4-gram 重合度都低于 0.3 算"偏短"）没有真实导入数据的依据，只作提示。docx 中的公式（OMML）按线性文字抽取，扫描件依赖 OCR，转写时都要对照原文。PDF 按页分段，原件改版后页码移动会让较多分段显示为"改了"。
+- 正文长编号检查（R21 D-10）只拦新写入的；上一修订已有的由维护页"引用改写"处理，替换不了的（Run、指纹、找不到 L0 的原件）要 AI 或人工改写。
 - MCP 适配层通过 SDK 内部的工具注册对象关闭参数预校验（R20 D-08），SDK 升级后可能失效，由 `tests/interfaces/test_tool_errors.py` 检测。宿主是否把 `errors` 列表完整交给模型由宿主决定。

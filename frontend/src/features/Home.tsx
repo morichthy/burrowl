@@ -1,6 +1,6 @@
 // 首页：当前阅读、待处理事项、最近关键操作、复核概况、能力与降级情况。
-import { useEffect } from "react";
-import { useOp } from "../api";
+import { useEffect, useState } from "react";
+import { op, useAction, useOp } from "../api";
 import { label, SESSION_STATUS } from "../labels";
 import { ErrorBox, href, Panel, Tag, Time } from "../ui";
 import { useNoteCounts } from "./Notes";
@@ -143,8 +143,93 @@ export function Home() {
             </ul>
           ) : null}
         </Panel>
+        <ServerCard />
       </div>
     </div>
+  );
+}
+
+interface ServerInfo {
+  version: string;
+  installed_version: string | null;
+  update_pending: boolean;
+  pid: number;
+  started_at: string | null;
+  url: string | null;
+  log: string | null;
+  executable: string;
+}
+
+// R21 D-14：工作台进程。安装了新版本后在这里重启即可加载；AI 客户端里的 MCP 是另外的进程，需在客户端重启。
+function ServerCard() {
+  const info = useOp<ServerInfo>("server.info", {});
+  const restart = useAction<{ started_before: string | null }>("server.restart");
+  const stop = useAction("server.stop");
+  const [phase, setPhase] = useState<"idle" | "restarting" | "stopped" | "timeout">("idle");
+  if (info.error?.code === "CAPABILITY_UNAVAILABLE") return null;
+  const data = info.data;
+  const doRestart = async () => {
+    const result = await restart.run({});
+    if (!result) return;
+    setPhase("restarting");
+    // 新进程等旧进程退出后接管同一网址；启动时间变了说明已是新进程，刷新页面加载新前端
+    for (let i = 0; i < 90; i++) {
+      await new Promise((resolve) => window.setTimeout(resolve, 1000));
+      try {
+        const now = await op<ServerInfo>("server.info", {});
+        if (now.started_at && now.started_at !== result.started_before) {
+          window.location.reload();
+          return;
+        }
+      } catch {
+        // 重启期间连接失败是正常的，继续等
+      }
+    }
+    setPhase("timeout");
+  };
+  const doStop = async () => {
+    if (!window.confirm("停止工作台？之后可以在命令行运行 burrowl start，或从开始菜单打开“burrowl 工作台”。")) return;
+    if (await stop.run({})) setPhase("stopped");
+  };
+  return (
+    <Panel title="工作台服务">
+      <ErrorBox error={info.error ?? restart.error ?? stop.error} />
+      {phase === "stopped" ? (
+        <div className="notice">工作台已停止。重新打开：运行 burrowl start，或从开始菜单打开“burrowl 工作台”。</div>
+      ) : null}
+      {phase === "restarting" ? <div className="notice">正在重启，完成后页面会自动刷新…</div> : null}
+      {phase === "timeout" ? (
+        <div className="notice">90 秒内没有等到新进程。请查看日志，或在命令行运行 burrowl status。</div>
+      ) : null}
+      {data ? (
+        <ul className="status-list">
+          <li>
+            <span className={`status-dot ${data.update_pending ? "warn" : "good"}`} />
+            <span>运行版本</span>
+            <span className="hint">
+              {data.version}
+              {data.update_pending ? `（已安装 ${data.installed_version}，重启后生效）` : ""}
+            </span>
+          </li>
+          <li>
+            <span className="status-dot muted" />
+            <span>进程</span>
+            <span className="hint" title={data.log ?? ""}>
+              {data.executable} · {data.pid} · 启动于 <Time value={data.started_at} />
+            </span>
+          </li>
+        </ul>
+      ) : null}
+      <div className="batchbar">
+        <button type="button" className={`small ${data?.update_pending ? "primary" : ""}`} disabled={phase !== "idle" || restart.busy} onClick={doRestart}>
+          重启服务
+        </button>
+        <button type="button" className="small" disabled={phase !== "idle" || stop.busy} onClick={doStop}>
+          停止服务
+        </button>
+      </div>
+      <p className="hint">任务管理器里的进程名是 burrowl-workbench（开发环境为 pythonw），也可以在那里直接结束。</p>
+    </Panel>
   );
 }
 

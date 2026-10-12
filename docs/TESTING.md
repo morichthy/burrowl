@@ -73,6 +73,8 @@
 
 - 契约标注与服务行为一致：每类记录逐字段省略，标 required 的失败且路径指向该字段，标 optional 的通过；服务端字段写了被拒。草案 `owner_id`、`sensitivity` 可省略，修订沿用原值；错误一次列全、路径从参数根算起、带字段说明与 `memory_contract` 提示；总结保存与关联的路径换成各自参数（`tests/service/test_ai_fields.py`）。
 - Skill 提到的工具每个参数都有说明、结构化参数声明了字段、说明里用 MCP 工具名、形状与示例通过校验；顶层与嵌套参数的错误一次列全；MCP 不预校验（类型错误也返回统一结构）、JSON 字符串参数照常解析；意外异常只返回 `incident_id`，堆栈在日志里；被拒绝调用的统计不含参数内容（`tests/interfaces/test_tool_errors.py`）。
+- 导入不丢细节（R21，`tests/service/test_faithful_import.py`）：docx 按标题路径分段、表格转 Markdown、列表与内嵌图片保留；快照分段按内容对比（改版后未改的段落仍对得上）；附件进数据目录、重复附加幂等；原文中的实验用 `origin` 代替 `run_ref`、`general` 无需其他依据；覆盖报告区分已转写、未覆盖、已省略，展开视图按原文顺序；`unlinked_details` 随上层链接变化；正文新写的长编号被拒并给出替换写法、代码里的不拦；原件改版后维护计划的 `origin_changes` 只把改了的分段标给对应 L1；旧记录的"引用改写"计划执行后正文变为短名链接并解析为 links。前端 `linkify` 只替换已解析的链接、不碰代码（`frontend/src/ui.test.tsx`）。
+- 工作台后台运行（R21，`tests/unit/test_server_state.py`）：端口与 token 复用、端口被占时换端口不换 token；进程已退出或 PID 被复用时清除运行信息；旧进程退出时不清掉重启后新进程写入的记录。后台启动、重启、停止的真实进程行为靠手工验收（见设计稿 R21 §8）。
 - 真源兼容：每次全量测试都用当前代码读取 `tests/fixtures/compat/` 下所有历史标本，检查四项：
   1. 沿提交链逐条校验全部修订的身份与指纹；
   2. Run（含回收站）、来源登记、阅读会话、工作台笔记、配置都能加载，工作根能重定向；

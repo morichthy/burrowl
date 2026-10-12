@@ -5,7 +5,8 @@
     burrowl upgrade                                  新版本切换后刷新已安装的 Skill（setup 自动调用）
     burrowl enable / disable <项目目录>             在项目中启用 / 关闭 burrowl 工作流
     burrowl init D:/BurrowlData/main                   新建数据目录并设为默认
-    burrowl serve [--port 0] [--no-browser]        启动工作台（同时挂载 MCP HTTP）
+    burrowl start / open / stop / restart / status    后台运行工作台（网址固定；进程名 burrowl-workbench）
+    burrowl serve [--port 0] [--no-browser]        在前台启动工作台（同时挂载 MCP HTTP）
     burrowl mcp [-d 数据] [-w 工作目录] [--mode auto|manual]   以 stdio 运行 MCP（客户端拉起）
     burrowl backup x.zip / burrowl restore x.zip <新目录> [--map ROOT-X=E:/proj]   迁移（含外部原件与重定向）
     burrowl models install                          安装嵌入/重排模型到本机模型目录
@@ -26,7 +27,7 @@ from ..app import App
 from ..core.errors import BurrowlError
 from ..index import model_store
 from ..storage import secrets
-from . import agents
+from . import agents, server
 from .agents import server_entry, skills_source
 from .ops.registry import Ctx, call, catalog
 
@@ -79,34 +80,94 @@ def init(data_dir: Path, make_default: bool = typer.Option(True, help="登记为
 
 
 @cli.command()
-def serve(data_dir: Path | None = DataDir, port: int = typer.Option(0, help="0 表示随机端口"),
+def serve(data_dir: Path | None = DataDir, port: int = typer.Option(0, help="0 表示沿用上次的端口（第一次随机选定）"),
           no_browser: bool = typer.Option(False, "--no-browser"),
           static: Path | None = typer.Option(None, help="前端构建目录（默认 frontend/dist）"),
           work_dir: Path | None = typer.Option(None, "--work-dir", "-w", help="经 HTTP 接入的 MCP 使用的工作目录"),
-          mode: str | None = Mode) -> None:
-    """启动工作台与 MCP HTTP（只监听 127.0.0.1）。"""
-    import socket  # noqa: PLC0415
-
+          mode: str | None = Mode,
+          takeover: int | None = typer.Option(None, hidden=True, help="重启：等这个进程退出后再监听")) -> None:
+    """在前台启动工作台与 MCP HTTP（只监听 127.0.0.1）；后台运行用 burrowl start。"""
     import uvicorn  # noqa: PLC0415
 
     from .api import create_api  # noqa: PLC0415
     from .mcp import build_server  # noqa: PLC0415
 
-    app = App.open(resolve_data_dir(data_dir))
+    root = resolve_data_dir(data_dir).resolve()
+    if takeover:
+        server.wait_exit(takeover, None, 30)
+    elif (other := server.running(root)) is not None:
+        typer.echo(f"这个数据目录的工作台已在运行：{other['url']}（进程 {other['pid']}）")
+        raise typer.Exit(0)
+    app = App.open(root)
     app.work_dir = work_dir.resolve() if work_dir else None
     app.mcp_mode, app.skills_dir = _mode(mode), skills_source()
-    if port == 0:
-        with socket.socket() as probe:
-            probe.bind(("127.0.0.1", 0))
-            port = probe.getsockname()[1]
+    port, token = server.endpoint(app.root, port)
     static = static or skills_source().parent / "frontend" / "dist"
-    api, token = create_api(app, static_dir=static, port=port,
+    api, token = create_api(app, static_dir=static, port=port, token=token,
                             mcp_server=build_server(app, skills_dir=skills_source()))
-    url = f"http://127.0.0.1:{port}/{token}/"
-    typer.echo(f"工作台：{url}\nMCP（HTTP）：{url}mcp\n关闭浏览器不会停止服务；按 Ctrl+C 退出。")
+    url = server.url_of(port, token)
+    instance = uvicorn.Server(uvicorn.Config(api, host="127.0.0.1", port=port, log_level="warning"))
+    app.server = server.Control(instance, app.root, work_dir=app.work_dir, mode=mode)
+    typer.echo(f"工作台：{url}\nMCP（HTTP）：{url}mcp\n关闭浏览器不会停止服务；按 Ctrl+C 退出（后台运行用 burrowl start）。")
     if not no_browser:
         webbrowser.open(url)
-    uvicorn.run(api, host="127.0.0.1", port=port, log_level="warning")
+    server.mark_running(app.root, port, token)
+    try:
+        instance.run()
+    finally:
+        server.mark_stopped(app.root)
+
+
+def _background(data_dir: Path | None, work_dir: Path | None, mode: str | None) -> dict:
+    root = resolve_data_dir(data_dir).resolve()
+    if (state := server.running(root)) is not None:
+        return state
+    App.open(root)  # 先在前台确认数据目录可用，错误直接报给用户
+    server.launch(root, work_dir=work_dir.resolve() if work_dir else None, mode=mode)
+    state = server.wait_ready(root)
+    if state is None:
+        typer.echo(f"工作台没有在 60 秒内就绪；查看日志：{root / '.burrowl' / server.LOG_FILE}", err=True)
+        raise typer.Exit(1)
+    return state
+
+
+@cli.command()
+def start(data_dir: Path | None = DataDir, work_dir: Path | None = typer.Option(None, "--work-dir", "-w"),
+          mode: str | None = Mode) -> None:
+    """在后台启动工作台（不占用命令行窗口；已在运行时直接给出网址）。进程名 burrowl-workbench。"""
+    state = _background(data_dir, work_dir, mode)
+    typer.echo(f"工作台：{state['url']}（进程 {state['pid']}）")
+
+
+@cli.command(name="open")
+def open_(data_dir: Path | None = DataDir) -> None:
+    """打开工作台网址；没在运行就先在后台启动。"""
+    state = _background(data_dir, None, None)
+    typer.echo(f"工作台：{state['url']}")
+    webbrowser.open(state["url"])
+
+
+@cli.command()
+def stop(data_dir: Path | None = DataDir) -> None:
+    """停止后台工作台（先请求正常退出，超时再结束进程）。"""
+    result = server.stop(resolve_data_dir(data_dir).resolve())
+    typer.echo({"not_running": "工作台未运行", "stopped": "工作台已停止",
+                "killed": "工作台没有正常退出，已结束进程"}[result])
+
+
+@cli.command()
+def restart(data_dir: Path | None = DataDir, work_dir: Path | None = typer.Option(None, "--work-dir", "-w"),
+            mode: str | None = Mode) -> None:
+    """重启后台工作台（加载当前安装的版本）。"""
+    server.stop(resolve_data_dir(data_dir).resolve())
+    state = _background(data_dir, work_dir, mode)
+    typer.echo(f"工作台：{state['url']}（进程 {state['pid']}，版本 {state.get('version')}）")
+
+
+@cli.command()
+def status(data_dir: Path | None = DataDir) -> None:
+    """工作台是否在运行、网址、进程号与版本。"""
+    typer.echo(server.describe(resolve_data_dir(data_dir).resolve()))
 
 
 def resolve_work_dir(value: Path | None, data: Path) -> Path | None:

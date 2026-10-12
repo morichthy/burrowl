@@ -6,6 +6,7 @@
 from pathlib import PurePosixPath
 from typing import Any
 
+from ..core import links
 from ..core.errors import BurrowlError
 from ..core.hashing import sha256_file
 from ..storage import recovery
@@ -39,6 +40,13 @@ def validate(storage: Storage, index: IndexService) -> dict[str, Any]:
                              "message": "有孤立提交或暂存残留（不影响当前数据；用原 request_id 重试可得到幂等结果）",
                              "details": {"commits": report["unreachable_commits"][:5],
                                          "staging": report["uncommitted_staging"][:5]}})
+        if owner.readable:  # R21 D-10：正文里的长编号只提示，由用户在维护页"引用改写"生成计划
+            unreadable = [rid for rid, record in storage.store.read_snapshot(owner).records.items()
+                          if record["sensitivity"] != "restricted" and links.raw_identifiers(record)]
+            if unreadable:
+                warnings.append({"area": "memory", "owner_id": owner.owner_id, "code": "UNREADABLE_REF",
+                                 "message": f"{len(unreadable)} 条记录的正文写了长编号或指纹；在维护页“引用改写”处理",
+                                 "details": {"records": unreadable[:5]}})
         state = index.status(owner.owner_id)
         if state["index_status"] != "indexed":
             problems.append({"area": "index", "owner_id": owner.owner_id, "code": "INDEX_PENDING",

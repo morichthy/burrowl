@@ -111,3 +111,28 @@ def tool_errors(ctx: Ctx, limit: Annotated[int, Field(ge=1, le=20000, descriptio
     """最近被拒绝的工具调用与内部错误，按工具汇总（R20 D-10）：参数错误（input）、其他拒绝（other）、内部错误（internal）
     的次数和最常出错的参数路径，以及最近的内部错误 incident_id。参数错误多的工具，说明说明或示例需要改；不含参数内容。"""
     return errorlog.summary(ctx.app.root, limit=limit)
+
+
+# ---------- 工作台进程（R21 D-14；只在工作台提供） ----------
+def _control(ctx: Ctx):
+    if ctx.app.server is None:
+        raise BurrowlError("CAPABILITY_UNAVAILABLE", "只有经 burrowl serve / start 运行的工作台能查看或控制自己的进程")
+    return ctx.app.server
+
+
+@op("server.info", effect="user")
+def server_info(ctx: Ctx) -> dict:
+    """工作台进程：运行中的版本、已安装的版本（不同表示需要重启才能用上新版本）、进程号、启动时间、网址、日志。"""
+    return _control(ctx).info()
+
+
+@op("server.stop", effect="user")
+def server_stop(ctx: Ctx) -> dict:
+    """停止工作台（处理完当前请求后退出）。AI 客户端里经 stdio 运行的 MCP 是另外的进程，不受影响。"""
+    return _control(ctx).stop()
+
+
+@op("server.restart", effect="user")
+def server_restart(ctx: Ctx) -> dict:
+    """重启工作台：新进程加载当前安装的版本，接管同一网址；页面稍后自动恢复。AI 客户端的 MCP 需在客户端里重启。"""
+    return _control(ctx).restart()

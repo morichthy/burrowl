@@ -138,6 +138,60 @@ class LinkResolver:
                 "CLM-" + link.name, names, n=5, cutoff=0.3))
         return {"text": link.text, "ref": claim_ref(next(iter(matches.values()))), "status": "resolved"}
 
+    # ---------- 正文中的长编号（R21 D-10） ----------
+    def _owner_name(self, owner: Owner) -> str:
+        return owner.native.get("short_name") or owner.native.get("slug") or owner.owner_id
+
+    def _link_to(self, record: dict) -> str:
+        handle = stored_or_derived_handle(record)
+        if record.get("owner_id", self.owner.owner_id) == self.owner.owner_id:
+            return f"[[@{handle}]]"
+        owner = self.index.find(record["owner_id"])
+        return f"[[@{self._owner_name(owner) if owner else record['owner_id']}/{handle}]]"
+
+    def _find_records(self, predicate) -> list[dict]:
+        """先找本对象（含同批草案），找不到再找其他可读对象。只在报错时调用。"""
+        found = [r for r in self._owner_records(self.owner).values() if predicate(r)]
+        if found:
+            return found
+        for owner in self.index.readable():
+            if owner.owner_id != self.owner.owner_id and owner.persisted:
+                found.extend(r for r in self._owner_records(owner).values() if predicate(r))
+        return found
+
+    def replacement(self, item: dict) -> str | None:
+        """能机械替换的长编号（记录、有 L0 登记的原件）→ 短名链接；其他返回 None。"""
+        raw, prefix = item["text"], item["prefix"]
+        if prefix == "MEM":
+            hits = self._find_records(lambda r: r.get("record_id") == raw)
+        elif prefix == "SRC":
+            hits = self._find_records(lambda r: r.get("kind") == "source"
+                                      and (r.get("payload") or {}).get("source_ref", {}).get("target_id") == raw)
+        else:
+            return None
+        return self._link_to(hits[0]) if len(hits) == 1 else None
+
+    def suggest(self, item: dict) -> str:
+        prefix = item["prefix"]
+        if prefix in {"MEM", "SRC"}:
+            if link := self.replacement(item):
+                return f"改写为 {link}" + ("（登记这个原件的 L0 记录）" if prefix == "SRC" else "")
+            return ("找不到这条记录；正文用 [[@记录短名]] 链接，固定版本由服务写进 links" if prefix == "MEM"
+                    else "先为这个原件写一条 L0 登记记录，再用 [[@L0短名]] 链接；固定引用写在 sources")
+        if prefix == "RUN":
+            return "Run 不能写进正文：实验类 L1 用 run_ref、L2 阶段用 evidence_refs 引用，正文用 Run 的标题描述"
+        if prefix == "sha256":
+            return "指纹只写在固定引用（sources、evidence_refs、figures 等）里，正文删去"
+        return "这是服务内部编号，正文不要写；需要引用记录、块或结论时用 [[@短名]]、[[@短名#块]]、[[!结论短名]]"
+
+    def raw_id_errors(self, record: dict, previous: dict | None = None) -> list[dict]:
+        """只拦新写进正文的长编号：上一修订里已有的不拦（只改别的字段、程序生成的修订不被旧内容卡住），
+        它们由 system_validate 扫描后经"引用改写"维护计划处理。"""
+        existing = {item["text"] for item in syntax.raw_identifiers(previous)} if previous else set()
+        return [{"path": item["path"], "code": "UNREADABLE_REF", "text": item["text"],
+                 "message": "正文里不要写长编号或指纹，读者看不懂；改用可读的短名链接",
+                 "hint": self.suggest(item)} for item in syntax.raw_identifiers(record) if item["text"] not in existing]
+
     # ---------- 整条记录 ----------
     def resolve(self, record: dict, *, record_id: str, previous: list[dict] | None = None,
                 repin: bool = False) -> list[dict]:

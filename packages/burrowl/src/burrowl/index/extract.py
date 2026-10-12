@@ -15,11 +15,16 @@ from xml.etree import ElementTree as ET
 
 from ..core.errors import BurrowlError
 
-BINARY_SUFFIXES = {".pptx", ".pdf", ".png", ".jpg", ".jpeg", ".bmp", ".webp", ".xlsx", ".csv"}
+BINARY_SUFFIXES = {".pptx", ".docx", ".pdf", ".png", ".jpg", ".jpeg", ".bmp", ".webp", ".xlsx", ".csv"}
 MAX_MEMBER = 30_000_000
+DOCX_CHUNK = 60  # 一个章节内超过这么多段落（表格算一段）时再切分，同一标题路径
 _NS_A = {"a": "http://schemas.openxmlformats.org/drawingml/2006/main"}
 _NS_S = {"s": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+_NS_W = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+_W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+_M = "{http://schemas.openxmlformats.org/officeDocument/2006/math}"
 _REL_ID = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
+_REL_EMBED = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed"
 _OCR = None
 
 
@@ -125,6 +130,58 @@ class _Extraction:
                 self.warnings.append(f"{unit}: 未提取到文字或图片，可能是矢量图或特殊字体，需查看原页")
             self.units.append((unit, "\n".join(parts)))
 
+    def docx(self, raw: bytes) -> None:
+        """按标题切成章节（标签 Section n，路径为标题路径）；段落保留列表符号，表格转为 Markdown 表格，
+        内嵌图片进缓存，公式（OMML）按线性文字抽取。修订痕迹中被删除的文字（w:delText）不抽取。"""
+        with zipfile.ZipFile(io.BytesIO(raw)) as package:
+            names = set(package.namelist())
+            if "word/document.xml" not in names:
+                raise BurrowlError("INVALID_ARGUMENT", "不是有效的 docx（缺少 word/document.xml）")
+            levels = _docx_heading_levels(package, names)
+            rels = {}
+            if "word/_rels/document.xml.rels" in names:
+                rels = {r.attrib["Id"]: posixpath.normpath(posixpath.join("word", r.attrib["Target"]))
+                        for r in ET.fromstring(_member(package, "word/_rels/document.xml.rels"))
+                        if r.attrib.get("TargetMode") != "External"}
+            body = ET.fromstring(_member(package, "word/document.xml")).find("w:body", _NS_W)
+            stack: list[tuple[int, str]] = []
+            lines: list[str] = []
+            has_math = False
+
+            def flush() -> None:
+                if any(line.strip() for line in lines):
+                    path = " › ".join(t for _d, t in stack)
+                    self.units.append((f"Section {len(self.units) + 1}", "\n\n".join(lines), path))
+                lines.clear()
+
+            for child in body if body is not None else []:
+                if child.tag == _W + "tbl":
+                    lines.append(_docx_table(child))
+                elif child.tag == _W + "p":
+                    has_math = has_math or child.find(f".//{_M}oMath") is not None
+                    text = _docx_text(child)
+                    unit = f"Section {len(self.units) + 1}"
+                    for blip in (n for n in child.iter() if n.tag.endswith("}blip")):
+                        target = rels.get(blip.attrib.get(_REL_EMBED, ""))
+                        if target in names:
+                            text += "\n" + self.asset(_member(package, target), target, unit)
+                    level = _docx_level(child, levels)
+                    if level and text.strip():
+                        flush()
+                        stack = [(d, t) for d, t in stack if d < level] + [(level, text.strip())]
+                        lines.append("#" * min(level, 6) + " " + text.strip())
+                        continue
+                    if child.find("w:pPr/w:numPr", _NS_W) is not None and text.strip():
+                        text = "- " + text
+                    lines.append(text)
+                else:
+                    continue
+                if len(lines) >= DOCX_CHUNK:
+                    flush()
+            flush()
+            if has_math:
+                self.warnings.append("文中有公式（OMML），已按线性文字抽取，转写时需对照原文核对")
+
     def xlsx(self, raw: bytes) -> None:
         with zipfile.ZipFile(io.BytesIO(raw)) as package:
             names = set(package.namelist())
@@ -180,6 +237,62 @@ class _Extraction:
                 self.units.append((f"Lines {i + 1}-{i + len(chunk)}", "\n".join(chunk), path))
 
 
+def _docx_heading_levels(package: zipfile.ZipFile, names: set[str]) -> dict[str, int]:
+    """样式 ID → 标题级别：样式名 heading N / Title，或样式的大纲级别。"""
+    levels: dict[str, int] = {}
+    if "word/styles.xml" not in names:
+        return levels
+    for style in ET.fromstring(_member(package, "word/styles.xml")).findall("w:style", _NS_W):
+        style_id = style.attrib.get(_W + "styleId", "")
+        name_node = style.find("w:name", _NS_W)
+        name = (name_node.attrib.get(_W + "val", "") if name_node is not None else "").strip().lower()
+        outline = style.find("w:pPr/w:outlineLvl", _NS_W)
+        if match := re.fullmatch(r"heading (\d)", name):
+            levels[style_id] = int(match[1])
+        elif name == "title":
+            levels[style_id] = 1
+        elif outline is not None and outline.attrib.get(_W + "val", "").isdigit() and int(outline.attrib[_W + "val"]) < 9:
+            levels[style_id] = int(outline.attrib[_W + "val"]) + 1
+    return levels
+
+
+def _docx_level(paragraph: ET.Element, levels: dict[str, int]) -> int:
+    """段落的标题级别（0 = 正文）：段落自带的大纲级别优先，其次样式表，最后按常见样式 ID 猜测。"""
+    outline = paragraph.find("w:pPr/w:outlineLvl", _NS_W)
+    if outline is not None and outline.attrib.get(_W + "val", "").isdigit() and int(outline.attrib[_W + "val"]) < 9:
+        return int(outline.attrib[_W + "val"]) + 1
+    style = paragraph.find("w:pPr/w:pStyle", _NS_W)
+    style_id = style.attrib.get(_W + "val", "") if style is not None else ""
+    if style_id in levels:
+        return levels[style_id]
+    match = re.fullmatch(r"(?i)(?:heading|标题)\s*(\d)", style_id)
+    return int(match[1]) if match else 0
+
+
+def _docx_text(node: ET.Element) -> str:
+    parts = []
+    for item in node.iter():
+        if item.tag in {_W + "t", _M + "t"}:
+            parts.append(item.text or "")
+        elif item.tag == _W + "tab":
+            parts.append("\t")
+        elif item.tag in {_W + "br", _W + "cr"}:
+            parts.append("\n")
+    return "".join(parts)
+
+
+def _docx_table(table: ET.Element) -> str:
+    rows = []
+    for row in table.findall("w:tr", _NS_W):
+        cells = [" ".join(_docx_text(p).strip() for p in cell.findall(".//w:p", _NS_W)).replace("|", "\\|")
+                 for cell in row.findall("w:tc", _NS_W)]
+        rows.append("| " + " | ".join(cells) + " |")
+    if not rows:
+        return ""
+    width = rows[0].count(" | ") + 1
+    return "\n".join([rows[0], "|" + "---|" * width, *rows[1:]])
+
+
 _MD_HEADING = re.compile(r"^ {0,3}(#{1,6})\s+(.*?)\s*#*\s*$")
 _MD_FENCE = re.compile(r"^ {0,3}(```|~~~)")
 
@@ -205,11 +318,13 @@ def _markdown_sections(lines: list[str]) -> list[tuple[int, int, str]]:
 
 def extract(name: str, raw: bytes, *, cache_dir: Path, ocr_enabled: bool = True, max_assets: int = 40) -> dict:
     """返回 {"units": [{label, text, path}], "assets": [...], "warnings": [...]}；不支持的格式抛 INVALID_ARGUMENT。
-    path 是 Markdown 的标题路径（其他格式为空），只用于上下文信封。"""
+    path 是 Markdown / docx 的标题路径（其他格式为空），用于上下文信封和原文快照的分段（R21）。"""
     suffix = Path(name).suffix.lower()
     job = _Extraction(cache_dir / hashlib.sha256(raw).hexdigest()[:24], ocr_enabled, max_assets)
     if suffix == ".pptx":
         job.pptx(raw)
+    elif suffix == ".docx":
+        job.docx(raw)
     elif suffix == ".pdf":
         job.pdf(raw)
     elif suffix in {".png", ".jpg", ".jpeg", ".bmp", ".webp"}:

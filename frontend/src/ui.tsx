@@ -1,7 +1,7 @@
 // 共享界面组件：徽标、Markdown、错误、加载、路由。
 import "katex/dist/katex.min.css";
-import { type ReactNode, useEffect, useState } from "react";
-import ReactMarkdown from "react-markdown";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
+import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -18,11 +18,58 @@ export function Tag({ children, tone = "muted" }: { children: ReactNode; tone?: 
   return <span className={`badge ${tone}`}>{children}</span>;
 }
 
-export function Markdown({ text }: { text: string | null | undefined }) {
+/** 正文链接 [[…]] 的解析结果：链接原文（竖线前）→ 跳转地址（缺省表示没解析，原样显示）。 */
+export type LinkTargets = Record<string, string | undefined>;
+
+// 代码围栏与行内代码里的 [[…]] 不是链接（与服务端 core/links.py 一致）
+const CODE = /(^ {0,3}(```|~~~)[\s\S]*?^ {0,3}\2[^\n]*$|`[^`\n]*`)/gm;
+const WIKI = /\[\[([^[\]\n]+?)\]\]/g;
+
+/** 把 [[文字|显示]] 换成 Markdown 链接；没有地址的保留为 [[文字]] 原样文字。 */
+export function linkify(text: string, targets: LinkTargets): string {
+  return text
+    .split(CODE)
+    .map((part, i) => {
+      if (i % 3 !== 0) return i % 3 === 1 ? part : ""; // split 的捕获组：1 是代码片段，2 是围栏符号（丢弃）
+      return part.replace(WIKI, (whole, inner: string) => {
+        const [raw, shown] = inner.split("|", 2);
+        const key = raw.trim();
+        const url = targets[key];
+        const label = (shown ?? key.replace(/^[@!]/, "")).trim().replace(/[[\]]/g, "");
+        return url ? `[${label}](${url})` : whole;
+      });
+    })
+    .join("");
+}
+
+export function Markdown({
+  text,
+  figure,
+}: {
+  text: string | null | undefined;
+  /** 技术单元正文中的 ![图注](figure:N)：在原位置显示第 N 张登记的图 */
+  figure?: (index: number, alt: string) => ReactNode;
+}) {
+  // 组件表必须稳定：每次渲染换一个新的 img 组件，React 会卸载重建图片（图片的读取请求随之反复发出）
+  const components = useMemo(
+    () => ({
+      img: ({ src, alt }: { src?: string | Blob; alt?: string }) => {
+        const match = typeof src === "string" ? /^figure:(\d+)$/.exec(src) : null;
+        if (match && figure) return <>{figure(Number(match[1]), alt ?? "")}</>;
+        return match ? <span className="hint">[图 {Number(match[1]) + 1}：{alt}]</span> : <img src={src as string} alt={alt} />;
+      },
+    }),
+    [figure],
+  );
   if (!text) return null;
   return (
     <div className="markdown">
-      <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeKatex]}
+        urlTransform={(url) => (url.startsWith("figure:") || url.startsWith("#/") ? url : defaultUrlTransform(url))}
+        components={components}
+      >
         {text}
       </ReactMarkdown>
     </div>

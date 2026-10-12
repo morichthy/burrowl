@@ -288,6 +288,19 @@ def maintenance_visibility_candidates(ctx: Ctx) -> list:
     return ctx.app.maintenance.visibility_candidates()
 
 
+@op("maintenance.ref_rewrite_candidates")
+def maintenance_ref_rewrite_candidates(ctx: Ctx) -> list:
+    """正文（L1–L4、文稿）里写了长编号（如 MEM-<uuid>）或 64 位指纹的记录，逐处给出可替换的短名链接（replacement）；
+    replacement 为空的需要 AI 或人工改写。新提交会直接拒绝这类写法（UNREADABLE_REF），这里处理已有记录。"""
+    return ctx.app.maintenance.ref_rewrite_candidates()
+
+
+@op("maintenance.plan_ref_rewrite", effect="user")
+def maintenance_plan_ref_rewrite(ctx: Ctx, target_ids: list[str], note: str = "") -> dict:
+    """（仅用户）为勾选的记录生成引用改写计划：长编号机械替换为短名链接，其余不变，预览后执行。"""
+    return ctx.app.maintenance.plan_ref_rewrite(target_ids, actor=ctx.actor, note=note)
+
+
 @op("maintenance.plan_visibility", effect="user")
 def maintenance_plan_visibility(ctx: Ctx, target_ids: list[str], note: str = "") -> dict:
     """（仅用户）为勾选的记录生成可见范围补齐计划：处置已写好（修订为全库可见，正文不变），预览后执行。"""
@@ -499,7 +512,10 @@ def sources_register(ctx: Ctx, source_id: Annotated[str, Field(pattern=r"^SRC-",
                      path: Annotated[str, Field(description="工作目录等外部位置用绝对路径；数据目录内可用相对路径")],
                      title: Annotated[str, Field(description="给人看的名称")] = "",
                      sensitivity: Annotated[Sensitivity, Field(description=(
-                         "restricted 的来源不进索引、不能被引用"))] = "internal") -> dict:
+                         "restricted 的来源不进索引、不能被引用"))] = "internal",
+                     snapshot: Annotated[bool, Field(description=(
+                         "导入转写时设为 true：同时保存原文快照（分段文本与指纹），供 L1 的 origin.locators、"
+                         "覆盖报告和原件变化后的逐段对比使用"))] = False) -> dict:
     """登记一个来源文件并记录当前字节指纹：L0 原件的唯一授权入口。原件留在原处，不复制、不修改。
     工作目录里的文件自动记为"工作根 + 相对路径"，迁移时随根重定向。
     同一 ID 重复登记同一文件是幂等的；内容变了请用新 ID；文件搬家用 sources_relocate / sources_relocate_root。"""
@@ -508,12 +524,17 @@ def sources_register(ctx: Ctx, source_id: Annotated[str, Field(pattern=r"^SRC-",
                                              work_dir=ctx.app.work_dir)
     if sensitivity == "restricted":  # 重复登记可能把已被引用的来源提升为 restricted，同样要从投影中隐去依赖者
         ctx.app.index.on_access_change([source_id])
+    if snapshot:
+        return {**entry, "snapshot": ctx.app.snapshots.outline(ctx.app.snapshots.take(source_id))}
     return entry
 
 
 @op("sources.register_many", effect="write")
 def sources_register_many(ctx: Ctx, items: shapes.shaped(list[dict], shapes.SOURCE_ITEMS, (
-        "[{source_id, path, title?, sensitivity?}]，逐条登记；单条失败不影响其他"))) -> dict:
+        "[{source_id, path, title?, sensitivity?}]，逐条登记；单条失败不影响其他")),
+                          snapshot: Annotated[bool, Field(description=(
+                              "导入转写时设为 true：为每个登记成功的原件保存原文快照；结果中给出分段数，"
+                              "分段列表用 sources_snapshot 读取"))] = False) -> dict:
     """批量登记来源（导入已有资料时使用）。"""
     results = []
     for item in items:
@@ -522,7 +543,12 @@ def sources_register_many(ctx: Ctx, items: shapes.shaped(list[dict], shapes.SOUR
             entry = ctx.app.storage.sources.register(item["source_id"], path, title=item.get("title", ""),
                                                      sensitivity=item.get("sensitivity", "internal"),
                                                      work_dir=ctx.app.work_dir)
-            results.append({"source_id": item["source_id"], "ok": True, "sha256": entry["sha256"]})
+            result = {"source_id": item["source_id"], "ok": True, "sha256": entry["sha256"]}
+            if snapshot:
+                taken = ctx.app.snapshots.take(item["source_id"])
+                result["snapshot"] = {"segments": len(taken["segments"]), "assets": len(taken["assets"]),
+                                      "warnings": taken["warnings"]}
+            results.append(result)
         except (BurrowlError, KeyError, OSError) as exc:
             results.append({"source_id": item.get("source_id"), "ok": False,
                             "error": exc.problem() if isinstance(exc, BurrowlError) else str(exc)})
@@ -531,6 +557,28 @@ def sources_register_many(ctx: Ctx, items: shapes.shaped(list[dict], shapes.SOUR
         ctx.app.index.on_access_change(restricted)
     return {"succeeded": sum(r["ok"] for r in results), "failed": sum(not r["ok"] for r in results),
             "results": results}
+
+
+@op("sources.snapshot", effect="write")
+def sources_snapshot(ctx: Ctx, source_id: Annotated[str, Field(description="已登记的来源 ID（SRC-…）")],
+                     keys: Annotated[list[str] | None, Field(description=(
+                         "要读全文的分段 key（取自返回的 segments）；不给时只返回分段目录"))] = None,
+                     max_chars: Annotated[int, Field(ge=1000, le=100000, description="返回全文的字符上限")] = 20000) -> dict:
+    """原文快照：没有就先生成（只读原件、核对登记指纹）。返回分段目录（key 与字数）、提取出的图片（assets 的 label）
+    与抽取警告；给 keys 时附这些分段的全文。转写时 L1 的 origin.locators 与块的 locators 写这里的 key；
+    图片用 sources_attach 复制为附件后再引用。"""
+    return ctx.app.snapshots.outline(ctx.app.snapshots.take(source_id), keys, max_chars=max_chars)
+
+
+@op("sources.attach", effect="write")
+def sources_attach(ctx: Ctx, source_id: Annotated[str, Field(description="原件的来源 ID（SRC-…）")],
+                   asset_label: Annotated[str | None, Field(description=(
+                       "原件中图片的标签（sources_snapshot 返回的 assets[].label）；原件本身就是图片时不写"))] = None,
+                   title: Annotated[str, Field(description="附件名称；不写时用原件名称 + 图片标签")] = "") -> dict:
+    """把原件中的图片复制为数据目录内的受控附件并登记为来源，返回固定引用 ref。
+    L1 的 payload.figures 写 {caption: 照录原文图注, ref}，块正文用 ![图注](figure:序号) 在原位置引用。
+    附件随数据目录备份和迁移；同一张图重复附加是幂等的。"""
+    return ctx.app.snapshots.attach(source_id, asset_label, title=title)
 
 
 @op("sources.relocate", effect="write")

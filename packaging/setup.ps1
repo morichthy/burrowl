@@ -4,6 +4,8 @@
 #   <Root>\current.txt          当前版本号
 #   <Root>\bin\burrowl.cmd          指向当前版本的启动器（加入用户 PATH）
 #   <Root>\models\              共享模型（安装包带模型且这里没有时复制）
+#   开始菜单\burrowl 工作台.lnk  打开工作台（burrowl open：没在运行就先在后台启动）；-NoShortcut 不建。
+#                                快捷方式只是一个文件，不写注册表
 #
 # Root（安装根目录）：-Root 指定 → 上次安装记下的用户环境变量 BURROWL_ROOT → %LOCALAPPDATA%\burrowl。
 # 路径可含中文与空格。升级时不必再写 -Root，会装到上次的位置。
@@ -11,7 +13,8 @@ param(
     [string]$Root,
     [string]$Use,
     [switch]$List,
-    [switch]$NoPath
+    [switch]$NoPath,
+    [switch]$NoShortcut
 )
 $ErrorActionPreference = "Stop"
 # 构建脚本通过管道读取输出；明确 UTF-8，避免 PowerShell 5.1 默认代码页把中文读坏。
@@ -175,9 +178,22 @@ if (Test-Path -LiteralPath $bundledModels) {
 }
 
 Write-Shim $version
+if (-not $NoShortcut) {
+    # 开始菜单快捷方式（R21 D-15）：指向 bin\burrowl.cmd open，最小化运行，命令行窗口一闪即关；工作台在后台运行
+    $programs = [Environment]::GetFolderPath("Programs")
+    $shell = New-Object -ComObject WScript.Shell
+    $link = $shell.CreateShortcut((Join-Path $programs "burrowl 工作台.lnk"))
+    $link.TargetPath = Join-Path (Join-Path $Root "bin") "burrowl.cmd"
+    $link.Arguments = "open"
+    $link.WorkingDirectory = $Root
+    $link.WindowStyle = 7
+    $link.Description = "打开 burrowl 工作台（没在运行时先在后台启动）"
+    $link.Save()
+    Write-Host "已在开始菜单建立快捷方式“burrowl 工作台”（-NoShortcut 可不建）"
+}
 & (Join-Path $dest "burrowl.cmd") models status
 if ($LASTEXITCODE -ne 0) { throw "安装后自检失败" }
-Write-Host "安装完成。首次使用：burrowl init <数据目录>，然后 burrowl serve。"
+Write-Host "安装完成。首次使用：burrowl init <数据目录>，然后 burrowl start（后台运行）或从开始菜单打开“burrowl 工作台”。"
 # 文件同步不会替换已被 Python 进程加载的模块，也不会自动重启服务。
 # 只明确告知用户后续步骤，不终止用户正在进行的阅读或其他工作。
-Write-Host "更新已有安装：请重启 burrowl 工作台和 AI 客户端的 MCP 服务，再在浏览器按 Ctrl+F5 刷新。"
+Write-Host "更新已有安装：在工作台首页点“重启服务”（或运行 burrowl restart），并重启 AI 客户端的 MCP 服务，再在浏览器按 Ctrl+F5 刷新。"

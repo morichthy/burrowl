@@ -77,6 +77,22 @@ def test_runs_sources_and_state_files_load(opened):
     assert w.call("config.get")["config"]["reading"]["strategy"] == "quick"
 
 
+def test_transcription_state_reads(opened):
+    """v0.8.0 起的标本含导入转写：快照、附件与 L1 的 origin 在新代码下照常读取（R21）。"""
+    w, meta = opened
+    if "transcription" not in meta:
+        pytest.skip("该版本没有导入转写的数据")
+    owner_id, source_id = meta["transcription"]["owner_id"], meta["transcription"]["source_id"]
+    counts = w.call("memory.document", owner_id=owner_id, view="coverage", source_id=source_id)["counts"]
+    assert counts["uncovered"] == 0 and counts["omitted"] == 1
+    sections = w.call("memory.document", owner_id=owner_id, view="expansion", source_id=source_id)["sections"]
+    assert any(b.get("markdown") for s in sections for b in s["blocks"])
+    detail = next(r for r in w.call("memory.records", owner_id=owner_id, kinds=["detail"])["items"])
+    record = w.call("memory.inspect", owner_id=owner_id, record_id=detail["record_id"])["record"]
+    assert w.call("memory.figure", owner_id=owner_id, record_id=record["record_id"], revision=record["revision"],
+                  index=0)["data_url"].startswith("data:image/png")
+
+
 def test_no_new_problems_and_derived_state_rebuilds(opened):
     """升级后不能多出问题；检索索引与关系图投影（不入标本）能从零重建并检索到标本内容。"""
     w, meta = opened

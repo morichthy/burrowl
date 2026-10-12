@@ -1,6 +1,6 @@
 {
   "kind": "source",
-  "note": "L0 原始依据：先用 sources_register 登记文件（得到 SRC-ID 与 sha256），再写这条登记说明。body_markdown 说明材料是什么、谁产生、怎么解释（列、单位、限制）；原件不改，未展开原件不能声称已核验全文。",
+  "note": "L0 原始依据：先用 sources_register 登记文件（得到 SRC-ID 与 sha256），再写这条登记说明。body_markdown 说明材料是什么、谁产生、怎么解释（列、单位、限制）；原件不改，未展开原件不能声称已核验全文。导入转写时，有意省略的原文段落写进可选的 omitted=[{locators, reason}]（locators 取原件分段标签）。",
   "operation": {
     "op": "put_record",
     "client_key": "new-source",

@@ -1,7 +1,7 @@
 ---
 name: burrowl-work
 description: 在研发工作区开展需要归属、留痕、复用或续接的工作时使用：选对象、续接上下文、导入已有资料、执行 Run、按 L0–L4 保存成果与交接。简单的源码/配置/状态检查不要使用。
-requires_tools: [memory_owner_route, memory_owners, memory_owner_create, memory_owner_adopt, memory_resume, memory_inspect, memory_records, memory_contract, memory_commit, runs_create, runs_execute, runs_register, runs_update, sources_register, sources_register_many, sources_add_root, sources_list, index_status, index_reconcile, relations_decide]
+requires_tools: [memory_owner_route, memory_owners, memory_owner_create, memory_owner_adopt, memory_resume, memory_inspect, memory_records, memory_contract, memory_commit, runs_create, runs_execute, runs_register, runs_update, sources_register, sources_register_many, sources_add_root, sources_list, sources_snapshot, sources_attach, memory_document, index_status, index_reconcile, relations_decide]
 ---
 # 工作与记录
 
@@ -45,16 +45,22 @@ requires_tools: [memory_owner_route, memory_owners, memory_owner_create, memory_
 
 ## 导入已有资料
 
-用户给出资料路径、用途和授权范围时：
+用户给出资料路径、用途和授权范围时。目标：**有用的部分和仔细叙述的部分一个不丢**——L1 接近原文完整保留细节，L2–L4 再提炼（RECORDING 第 1 节原则 2、3、6）。
 
 1. 用 `memory_owner_route` 找已有对象（资料路径放进 `paths`）。资料缺稳定身份时：
    - 已有说明文档：用 `memory_owner_adopt` 采用（原文不改）；
    - 否则新建对象；
    - 公司核心算法要先核对文档依据。
-2. 用 `sources_register_many` 批量登记原件（用绝对路径；原件留在原位，只记路径和指纹，见 RULES 第 0 节）。资料在工作目录之外的一整个文件夹时，先 `sources_add_root` 把它登记为工作根，以后迁移可整体重定向。已在 Run 中登记过的材料不重复登记。
-3. **分批实际阅读**，按内容写记录：L4 说明是什么、能做什么；方法、定义、计算写 L1；能独立复用的判断写 L3。原文没写形成过程就不编 L2。
-4. 在工作清单里记下读到哪里、失败和下一批起点。登记不等于已读，已读不等于已验证。
-5. 导入后，用资料里独有的词或典型问题检索一次，确认能被找到；找不到就如实报告缺口。
+2. **登记并保存快照**：`sources_register_many(items, snapshot=true)` 批量登记原件（用绝对路径；原件留在原位，只记路径和指纹，见 RULES 第 0 节），同时保存原文快照。资料在工作目录之外的一整个文件夹时，先 `sources_add_root` 把它登记为工作根。已在 Run 中登记过的材料不重复登记。用 `sources_snapshot(source_id)` 看分段目录（key 与字数）、提取出的图片和抽取警告（公式按文字抽取、OCR 文字都要对照原文核对）。
+3. **按分段转写 L1（保全）**：用 `sources_snapshot(source_id, keys=[…])` 分批读全文，按原文结构切成 L1：
+   - 接近原文保留全部有用细节（公式、表格、参数、步骤、例子、论证、观点原话），开头写一小段上下文，写 `origin`（`locators` 是分段 key）；
+   - 落层按 RECORDING 第 1、3 节**逐段**判断，材料里论文、随笔、实验说明穿插时也逐段判断；拿不准就保留、放 L1、类型用 `general`；
+   - 图片用 `sources_attach(source_id, asset_label)` 复制为附件，写进 `figures`，在原位置用 `![图注](figure:序号)` 引用；
+   - 有意省略的段落（目录、致谢等）写进 L0 记录的 `omitted` 并写理由。
+4. **再提炼 L2–L4**：L4 写是什么、能做什么、关键结论、限制和下一步（如还有哪些未导入或未核实）；能独立复用的判断写 L3 并标"原文主张"；原文写了形成过程才写 L2。写到关键内容时就近链接对应的 L1。
+5. **核对覆盖**：`memory_document(view="coverage", owner_id, source_id)` 逐段列出未覆盖（`uncovered`）和明显偏短（`thin`）的原文，逐项补写 L1，或在 `omitted` 写明理由；`unknown_locators` 是写错的分段 key。这只是提示，判断由你做。用户可以在工作台"原文展开"页按原文顺序核对。
+6. 在工作清单里记下读到哪里、失败和下一批起点。登记不等于已读，已读不等于已验证。
+7. 导入后，用资料里独有的词或典型问题检索一次，确认能被找到；找不到就如实报告缺口。
 
 ## 需要 AI 判断的地方
 

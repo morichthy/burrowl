@@ -187,6 +187,9 @@ class MemoryService:
             try:
                 rules.validate_change(old, record, record_id=rid, resolve=resolver)
                 # R12 T-P2.2：解析正文链接并固定版本；没有链接时省略 links（D-27，保持旧记录指纹）
+                if raw := link_resolver.raw_id_errors(record, old):  # R21 D-10：正文中的长编号，给出可直接替换的写法
+                    raise BurrowlError("UNREADABLE_REF", "正文里有长编号或指纹；按 hint 改写成短名链接后重新提交",
+                                       errors=raw)
                 resolved = link_resolver.resolve(record, record_id=rid, previous=old.get("links") if old else None,
                                                  repin=bool(operation.get("repin")))
                 self._check_sensitivity(record, resolver)

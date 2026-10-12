@@ -122,17 +122,24 @@ def validate_unit(record: dict) -> Errors:
         for match in re.finditer(r"!\[[^\]]*\]\(figure:(\d+)\)", block["markdown"]):
             if int(match[1]) >= len(payload["figures"]):
                 errors.append((f"/blocks/{position}/markdown", "正文引用的图号没有登记在本单元的 figures 中"))
-    run = payload["run_ref"]
-    if payload["unit_type"] == "experiment" and run is None:
-        errors.append(("/run_ref", "experiment 类型必须用 run_ref 引用实际执行过的 Run"))
+    run, origin = payload["run_ref"], payload.get("origin")
+    if payload["unit_type"] == "experiment" and run is None and origin is None:
+        errors.append(("/run_ref", "experiment 类型必须用 run_ref 引用实际执行过的 Run；"
+                                   "转写外部资料中的实验时改用 origin 指向原文出处"))
+    if origin is not None:  # 转写自外部原件（R21 D-02）：覆盖报告、变更对比按 locators 找到这条记录
+        ref = origin["source_ref"]
+        if ref["target_kind"] != "file" or not ref["target_id"].startswith("SRC-"):
+            errors.append(("/origin/source_ref", "origin.source_ref 必须指向已登记的原件（SRC-，target_kind=file）"))
+        errors.extend(fixed_ref_errors(ref, "/origin/source_ref"))
     if run is not None:
         if run["target_kind"] != "owner" or not run["target_id"].startswith("RUN-"):
             errors.append(("/run_ref", "run_ref 必须指向 RUN- 对象"))
         errors.extend(fixed_ref_errors(run, "/run_ref"))
     for position, ref in enumerate(payload["evidence_refs"]):
         errors.extend(fixed_ref_errors(ref, f"/evidence_refs/{position}"))
-    if not payload["evidence_refs"] and run is None and not record["sources"] and not record.get("provenance_gap"):
-        errors.append(("/evidence_refs", "非实验单元需要 evidence_refs、sources，或在 provenance_gap 说明缺口"))
+    if not payload["evidence_refs"] and run is None and origin is None and not record["sources"] \
+            and not record.get("provenance_gap"):
+        errors.append(("/evidence_refs", "非实验单元需要 evidence_refs、sources、origin，或在 provenance_gap 说明缺口"))
     return errors
 
 

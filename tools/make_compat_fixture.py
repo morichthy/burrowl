@@ -86,6 +86,37 @@ def narrative(owner_id: str, sources: list[dict], claim_id: str, statement: str)
                         "experience_refs": [], "process_refs": [], "technical_refs": []}}
 
 
+def _docx_with_image() -> bytes:
+    """最小的 docx：两个标题章节（第二个带一张 PNG）和一个致谢章节。"""
+    import io  # noqa: PLC0415 - 只在生成标本时使用
+    import zipfile  # noqa: PLC0415
+
+    from PIL import Image  # noqa: PLC0415 - 可选依赖 burrowl[documents]
+
+    image = io.BytesIO()
+    Image.new("RGB", (8, 8), (30, 120, 200)).save(image, format="PNG")
+    w = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+    r = 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"'
+    a = 'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"'
+
+    def para(text: str, style: str = "", picture: bool = False) -> str:
+        blip = f'<w:r><w:drawing><a:blip {a} r:embed="rId1"/></w:drawing></w:r>' if picture else ""
+        props = f'<w:pPr><w:pStyle w:val="{style}"/></w:pPr>' if style else ""
+        return f"<w:p>{props}<w:r><w:t>{text}</w:t></w:r>{blip}</w:p>"
+
+    body = "".join([para("标本算法", "Heading1"), para("定义与步骤。"), para("结果", "Heading2"),
+                    para("结果说明。", picture=True), para("致谢", "Heading1"), para("感谢。")])
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as package:
+        package.writestr("word/document.xml", f"<w:document {w} {r}><w:body>{body}</w:body></w:document>")
+        package.writestr("word/_rels/document.xml.rels",
+                         '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                         '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/'
+                         'relationships/image" Target="media/image1.png"/></Relationships>')
+        package.writestr("word/media/image1.png", image.getvalue())
+    return buffer.getvalue()
+
+
 def build(data: Path, work: Path) -> dict:
     shutil.copytree(BASE, data, ignore=shutil.ignore_patterns("__pycache__"))
     work.mkdir()
@@ -118,7 +149,7 @@ def build(data: Path, work: Path) -> dict:
     for path in sorted(examples.iterdir(), key=lambda p: p.name):
         if path.name.endswith(".json"):
             operation = json.loads(path.read_text(encoding="utf-8"))["operation"]
-            w.commit(operation["draft"]["owner_id"], operation)
+            w.commit(operation["draft"].get("owner_id", OWNER), operation)  # R20 起示例草案不写 owner_id
             made["kinds"].append(path.name.removesuffix(".json"))
 
     # 其他对象类型；采用的文档对象
@@ -146,6 +177,34 @@ def build(data: Path, work: Path) -> dict:
                     "CLM-COMPAT-OWNED", "标本样本共两行"))
     w.put(narrative(knowledge, [file_ref(app, "SRC-COMPAT-INSIDE"), owner_ref(app, standalone)],
                     "CLM-COMPAT-STANDALONE", "独立 Run 产生的标本知识"))
+
+    # 导入转写（R21，v0.8.0 起）：原文快照、图片附件、L1 的 origin 与块 locators、L0 的 omitted
+    import_doc = work / "inputs" / "algorithm.docx"
+    import_doc.write_bytes(_docx_with_image())
+    snapshot = w.call("sources.register", source_id="SRC-COMPAT-DOCX", path=str(import_doc), title="标本算法说明",
+                      snapshot=True)["snapshot"]
+    made["sources"].append("SRC-COMPAT-DOCX")
+    keys = [s["key"] for s in snapshot["segments"]]
+    attached = w.call("sources.attach", source_id="SRC-COMPAT-DOCX", asset_label=snapshot["assets"][0]["label"])
+    made["sources"].append(attached["source_id"])
+    docx_ref = file_ref(app, "SRC-COMPAT-DOCX")
+    w.put({"owner_id": knowledge, "kind": "source", "title": "标本算法说明（登记）", "body_markdown": "标本原件。",
+           "record_reason": "兼容性标本", "sources": [docx_ref],
+           "payload": {"source_ref": docx_ref, "acquisition": "original_link", "completeness": "complete",
+                       "acquired_at": None, "omitted": [{"locators": [keys[-1]], "reason": "标本：致谢"}]}})
+    w.put({"owner_id": knowledge, "kind": "detail", "title": "标本算法的转写", "body_markdown": "",
+           "record_reason": "兼容性标本", "sources": [docx_ref],
+           "payload": {"unit_type": "experiment", "run_ref": None, "evidence_refs": [], "missing_refs": [],
+                       "origin": {"source_ref": docx_ref, "locators": keys[:-1]},
+                       "figures": [{"caption": "标本图", "ref": attached["ref"]}],
+                       "retrieval_description": {"question": "标本", "method": "转写", "key_findings": ["标本"],
+                                                 "applicable": ["标本"], "not_applicable": ["未知"],
+                                                 "limitations": ["未知"]},
+                       "blocks": [{"block_id": "body", "role": "results", "requires_block_ids": [],
+                                   "locators": keys[:1], "markdown": "标本正文。\n\n![标本图](figure:0)"},
+                                  {"block_id": "general", "role": "discussion", "requires_block_ids": [],
+                                   "markdown": "标本观点原话。"}]}})
+    made["transcription"] = {"owner_id": knowledge, "source_id": "SRC-COMPAT-DOCX"}
 
     # 修订、复核、关联决定、检索反馈
     records = w.call("memory.records", owner_id=OWNER, kinds=["narrative"])["items"]

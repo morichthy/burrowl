@@ -14,15 +14,18 @@ apply   （仅用户，R16 D-03）按对象逐个提交（请求 ID 由计划确
 import uuid
 from typing import Any
 
+from ..core import links as syntax
 from ..core.clock import utc_now
 from ..core.errors import BurrowlError
 from ..core.revdoc import RevisionedDoc
 from .memory import policy, provenance, rules
 from .memory.claims import ClaimGraph
+from .memory.links import LinkResolver
 from .memory.reader import Reader, fixed_ref
 from .memory.service import MemoryService
 from .query.assemble import record_text
 from .review import ReviewService
+from .snapshots import SnapshotService
 
 ACTIONS = ("retain", "revise", "resynthesize", "retract", "defer")
 REVIEWABLE = {"planned", "queued", "reviewed"}        # AI 可以写处置的状态
@@ -32,9 +35,25 @@ EDITABLE = {"detail", "narrative", "experience", "overview", "document", "docume
 
 
 class MaintenanceService:
-    def __init__(self, memory: MemoryService, review: ReviewService):
+    def __init__(self, memory: MemoryService, review: ReviewService, snapshots: SnapshotService | None = None):
         self.memory = memory
         self.reviews = review
+        self.snapshots = snapshots
+
+    def _source_changes(self, changed_ids: list[str]) -> dict[str, dict]:
+        """R21 D-09：变化的原件有快照时逐段对比，给出改了、删了、新增的分段；没有快照或未变化的不列。"""
+        out = {}
+        for source_id in changed_ids:
+            if self.snapshots is None or not source_id.startswith("SRC-"):
+                continue
+            try:
+                compared = self.snapshots.compare(source_id)
+            except BurrowlError as exc:
+                out[source_id] = {"status": "unavailable", "reason": exc.code}
+                continue
+            if compared["status"] == "changed":
+                out[source_id] = compared
+        return out
 
     def _doc(self, plan_id: str) -> RevisionedDoc:
         if not plan_id.startswith("MP-") or len(plan_id) != 39:
@@ -44,6 +63,7 @@ class MaintenanceService:
     def plan(self, changed_ids: list[str], *, actor: dict, note: str = "", targets: list[str] | None = None) -> dict:
         """targets：只把这些受影响的记录放进计划（R16 D-01，从所选候选生成计划时用）。"""
         impacted = provenance.impact(self.memory.storage, changed_ids)
+        source_changes = self._source_changes(changed_ids)
         if targets is not None:
             wanted = set(targets)
             impacted["affected"] = [i for i in impacted["affected"] if i["canonical_id"] in wanted]
@@ -57,14 +77,18 @@ class MaintenanceService:
             current = reader.record(fixed_ref(record))
             head = graph.heads.get(record["owner_id"])
             heads[record["owner_id"]] = head["commit_id"] if head else None
-            items.append({"target": fixed_ref(current), "owner_id": record["owner_id"], "kind": record["kind"],
-                          "title": record["title"], "content": record_text(current),
-                          "formal_dependency": item["formal_dependency"], "paths": item["paths"][:3],
-                          "decision": None})
+            row = {"target": fixed_ref(current), "owner_id": record["owner_id"], "kind": record["kind"],
+                   "title": record["title"], "content": record_text(current),
+                   "formal_dependency": item["formal_dependency"], "paths": item["paths"][:3], "decision": None}
+            if touched := _origin_touch(current, source_changes):
+                row["origin_changes"] = touched
+            items.append(row)
         reader.recheck()
         plan = {"plan_id": f"MP-{uuid.uuid4()}", "changed_ids": changed_ids, "note": note, "created_by": actor,
                 "created_at": utc_now(), "basis_heads": heads, "items": items, "applied": {}, "status": "planned",
                 "thread": []}
+        if source_changes:
+            plan["source_changes"] = source_changes
         self._doc(plan["plan_id"]).create(plan)
         return {**plan, "revision": 1}
 
@@ -114,6 +138,65 @@ class MaintenanceService:
                 "created_by": actor, "created_at": utc_now(), "basis_heads": heads, "items": items, "applied": {},
                 "status": "reviewed", "reviewed_by": actor, "purpose": "visibility", "thread": []}
         _event(plan, actor, "reviewed", "处置由程序生成：修订为全库可见，正文不变；预览后执行")
+        self._doc(plan["plan_id"]).create(plan)
+        return {**plan, "revision": 1, "preview": self._preview(plan)}
+
+    # ---------- 引用改写（R21 D-10）：正文中的长编号改为短名链接，机械操作，不需要 AI 起草 ----------
+    def _raw_id_rows(self) -> list[tuple[dict, dict, LinkResolver]]:
+        index = self.memory.owners()
+        rows = []
+        for owner in index.readable():
+            if not owner.persisted:
+                continue
+            snapshot = self.memory.snapshot(owner)
+            resolver = None
+            for record in snapshot.records.values():
+                if record["sensitivity"] == "restricted" or not (found := syntax.raw_identifiers(record)):
+                    continue
+                resolver = resolver or LinkResolver(self.memory.storage, index, owner, snapshot.records, {}, None)
+                items = [{**item, "replacement": resolver.replacement(item), "hint": resolver.suggest(item)}
+                         for item in found]
+                rows.append((record, {"items": items}, resolver))
+        return rows
+
+    def ref_rewrite_candidates(self) -> list[dict]:
+        """正文（L1–L4、文稿）中写了长编号或指纹的记录；replacement 为空的需要 AI 或人工改写。"""
+        return sorted(({"record_id": r["record_id"], "owner_id": r["owner_id"], "kind": r["kind"], "level": r["level"],
+                        "title": r["title"], "updated_at": r["updated_at"], "items": info["items"],
+                        "fixable": sum(bool(i["replacement"]) for i in info["items"])}
+                       for r, info, _ in self._raw_id_rows()), key=lambda c: (c["owner_id"], c["record_id"]))
+
+    def plan_ref_rewrite(self, target_ids: list[str], *, actor: dict, note: str = "") -> dict:
+        """为勾选的记录生成计划：能机械替换的长编号改为短名链接（其余原样保留并在理由中列出），状态 reviewed。"""
+        rows = {r["record_id"]: (r, info) for r, info, _ in self._raw_id_rows()}
+        missing = sorted(set(target_ids) - rows.keys())
+        if not target_ids or missing:
+            raise BurrowlError("INVALID_ARGUMENT", "请从引用改写的候选中选择", {"missing": missing[:20]})
+        reader = Reader(self.memory.storage)
+        items, heads = [], {}
+        for record_id in sorted(set(target_ids)):
+            current, info = rows[record_id]
+            fixable = [i for i in info["items"] if i["replacement"]]
+            if not fixable:
+                continue
+            heads[current["owner_id"]] = self.memory.snapshot(self.memory.owners().get(current["owner_id"])).commit_id
+            draft = rules.draft_from(current)
+            for item in fixable:
+                _replace_at(draft, item["path"], item["text"], item["replacement"])
+            left = [i["text"] for i in info["items"] if not i["replacement"]]
+            reason = "R21：正文中的长编号改为可读的短名链接，其余内容不变" + (
+                f"；以下 {len(left)} 处无法机械替换，保留待改写" if left else "")
+            items.append({"target": fixed_ref(current), "owner_id": current["owner_id"], "kind": current["kind"],
+                          "title": current["title"], "content": record_text(reader.record(fixed_ref(current))),
+                          "formal_dependency": False, "paths": [],
+                          "decision": {"action": "revise", "reason": reason, "draft": draft}})
+        reader.recheck()
+        if not items:
+            raise BurrowlError("INVALID_ARGUMENT", "所选记录中没有能机械替换的长编号，需要 AI 或人工改写")
+        plan = {"plan_id": f"MP-{uuid.uuid4()}", "changed_ids": [], "note": note or "引用改写（R21）",
+                "created_by": actor, "created_at": utc_now(), "basis_heads": heads, "items": items, "applied": {},
+                "status": "reviewed", "reviewed_by": actor, "purpose": "ref_rewrite", "thread": []}
+        _event(plan, actor, "reviewed", "处置由程序生成：正文中的长编号改为短名链接；预览后执行")
         self._doc(plan["plan_id"]).create(plan)
         return {**plan, "revision": 1, "preview": self._preview(plan)}
 
@@ -273,6 +356,32 @@ class MaintenanceService:
         if plan["status"] in {"reviewed", "partial"}:  # R16 D-05：用户确认前看到逐对象预检
             out["preview"] = self._preview(plan)
         return out
+
+
+def _replace_at(draft: dict, path: str, old: str, new: str) -> None:
+    """按 raw_identifiers 给出的字段路径替换文字（/body_markdown、/payload/blocks/i/markdown、/payload/claims/i/statement）。"""
+    parts = path.strip("/").split("/")
+    node: Any = draft
+    for part in parts[:-1]:
+        node = node[int(part)] if isinstance(node, list) else node[part]
+    node[parts[-1]] = node[parts[-1]].replace(old, new)
+
+
+def _origin_touch(record: dict, source_changes: dict[str, dict]) -> dict | None:
+    """转写自变化原件的 L1：它认领的分段中哪些改了、删了，哪些没变（没变的只需把引用改到新登记的原件）。"""
+    origin = record.get("payload", {}).get("origin") if record["kind"] == "detail" else None
+    change = source_changes.get(origin["source_ref"]["target_id"]) if origin else None
+    if not change or change.get("status") != "changed":
+        return None
+    keys = set(origin["locators"]) | {k for b in record["payload"]["blocks"] for k in b.get("locators", [])}
+    diff = change["diff"]
+    changed = {k for c in diff["changed"] for k in c["old_keys"]} & keys
+    removed = {k for c in diff["removed"] for k in c["old_keys"]} & keys
+    return {"source_id": origin["source_ref"]["target_id"], "changed": sorted(changed), "removed": sorted(removed),
+            "unchanged": sorted(keys - changed - removed),
+            "hint": ("认领的分段内容没变：用新 ID 登记新版原件后，只把 origin 与 sources 改指新原件"
+                     if not changed and not removed else
+                     "按计划 source_changes 中对应分段的新内容改写这些块，origin 改指新登记的原件")}
 
 
 def _event(plan: dict, actor: dict | None, kind: str, text: str) -> None:

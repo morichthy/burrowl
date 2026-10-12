@@ -56,6 +56,25 @@ def unfixed_evidence(index: OwnerIndex, owner: Owner, graph: ClaimGraph) -> dict
     return {"runs": runs, "raw_records": raw}
 
 
+UPPER_LEVELS = frozenset({"L2", "L3", "L4"})
+
+
+def unlinked_details(owner: Owner, graph: ClaimGraph) -> list[dict]:
+    """R21 D-08：本对象的 L1 中，没有被任何 L2–L4 记录或文稿（正文链接、展开引用、证据）指向的。只报告。
+
+    上层在写到关键事实、数字、方法时应就近链接 L1；这里列出的条目逐项补链接，或在处置中写明不需要的理由。"""
+    pointed: set[str] = set()
+    for record in graph.records.values():
+        if record.get("level") not in UPPER_LEVELS and record["kind"] not in {"document", "document_section"}:
+            continue
+        refs = [*iter_refs({"sources": record["sources"], "payload": record["payload"]}),
+                *(link["ref"] for link in record.get("links", []) if link.get("ref"))]
+        pointed.update(ref.get("target_id") for ref in refs)
+    return [fixed_ref(record) for record in graph.records.values()
+            if record["owner_id"] == owner.owner_id and record["kind"] == "detail"
+            and record["sensitivity"] != "restricted" and record["record_id"] not in pointed]
+
+
 def prepare(memory: MemoryService, owner_id: str, *, since_commit: str | None = None, trigger: str = "manual") -> dict:
     owner = memory.owners().get(owner_id).require_readable()
     snapshot = memory.snapshot(owner)
@@ -112,7 +131,8 @@ def prepare(memory: MemoryService, owner_id: str, *, since_commit: str | None = 
               "changed": changed, "affected": affected,
               "remaining": deepcopy(latest["payload"]["remaining_refs"]) if latest else [],
               "candidates": candidates, "source_states": states,
-              "unfixed_evidence": unfixed_evidence(memory.owners(), owner, graph), "writes": 0}
+              "unfixed_evidence": unfixed_evidence(memory.owners(), owner, graph),
+              "unlinked_details": unlinked_details(owner, graph), "writes": 0}
     result["basis_hash"] = _basis_hash(result)
     return result
 

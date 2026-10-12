@@ -66,6 +66,7 @@ export function Maintenance() {
     <>
       <MonitorPanel onPlan={setPlanId} />
       <VisibilityPanel onPlan={setPlanId} />
+      <RefRewritePanel onPlan={setPlanId} />
       <PlanPanel planId={planId} setPlanId={setPlanId} />
       <RunsPanel />
       <RootsPanel />
@@ -263,6 +264,88 @@ function VisibilityPanel({ onPlan }: { onPlan: (planId: string) => void }) {
               <div className="hint">
                 更新于 <Time value={r.updated_at} />
               </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </Panel>
+  );
+}
+
+interface RefRewriteCandidate {
+  record_id: string;
+  owner_id: string;
+  kind: string;
+  title: string;
+  fixable: number;
+  items: { path: string; text: string; replacement: string | null; hint: string }[];
+}
+
+// R21 D-10：正文里写了长编号（如 MEM-<uuid>）或指纹的已有记录。能机械替换的改成短名链接，由程序生成计划，
+// 预览后执行，不需要 AI；替换不了的列出来，需要 AI 或人工改写。新提交已直接拒绝这种写法。
+function RefRewritePanel({ onPlan }: { onPlan: (planId: string) => void }) {
+  const candidates = useOp<RefRewriteCandidate[]>("maintenance.ref_rewrite_candidates", {});
+  const generate = useAction<Plan>("maintenance.plan_ref_rewrite");
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const rows = candidates.data ?? [];
+  if (!rows.length && !candidates.error) return null;
+  const fixable = rows.filter((r) => r.fixable > 0);
+  const toggle = (id: string) =>
+    setPicked((now) => {
+      const next = new Set(now);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  return (
+    <Panel title={`引用改写（${rows.length}）`}>
+      <p className="hint">
+        这些记录的正文里写了长编号或指纹，读者看不懂。勾选后生成计划：能确定指向的编号改为可读的短名链接（如
+        <code>[[@短名]]</code>），其余内容不变，预览后执行。标“需要改写”的条目无法机械替换，可以把记录交给 AI 修订。
+      </p>
+      <ErrorBox error={candidates.error ?? generate.error} />
+      <div className="batchbar">
+        <span>已选 {picked.size} 个</span>
+        <button type="button" className="small" onClick={() => setPicked(new Set(fixable.map((r) => r.record_id)))}>
+          全选可替换的
+        </button>
+        <button
+          type="button"
+          className="small primary"
+          disabled={!picked.size || generate.busy}
+          onClick={async () => {
+            const plan = await generate.run({ target_ids: [...picked] });
+            if (plan) {
+              setPicked(new Set());
+              candidates.reload();
+              onPlan(plan.plan_id);
+            }
+          }}
+        >
+          为所选生成改写计划
+        </button>
+      </div>
+      <ul className="claims">
+        {rows.map((r) => (
+          <li key={r.record_id}>
+            <input
+              type="checkbox"
+              aria-label={`选择改写 ${r.title}`}
+              disabled={!r.fixable}
+              checked={picked.has(r.record_id)}
+              onChange={() => toggle(r.record_id)}
+            />
+            <div className="claim-body">
+              <Tag>{label(KINDS, r.kind)}</Tag> <a href={href("memory", r.owner_id, r.record_id)}>{r.title}</a>
+              <ul className="hint">
+                {r.items.map((item, i) => (
+                  <li key={i}>
+                    <code>{item.text.length > 20 ? item.text.slice(0, 20) + "…" : item.text}</code> →{" "}
+                    {item.replacement ? <code>{item.replacement}</code> : <Tag tone="warn">需要改写</Tag>}{" "}
+                    {item.replacement ? null : item.hint}
+                  </li>
+                ))}
+              </ul>
             </div>
           </li>
         ))}

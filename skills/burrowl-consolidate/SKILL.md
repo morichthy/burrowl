@@ -32,6 +32,8 @@ requires_tools: [memory_inspect, memory_document, memory_timeline, memory_contra
    - 在工作清单里维护一张表，列：记录（旧 → 新版本）、受影响章节/概览/认识、实际阅读范围、处置（保留/修订/新增/撤回/暂缓）、理由。
    - 区分"引用旧版仍然适用"和"还没同步"。
    - `memory_consolidate_prepare` 的 `unfixed_evidence` 列出本对象下没有被任何 L1–L4 引用的 Run 和 L0 记录：逐项补写记录并引用；确实没有知识的 Run 用 `runs_discard` 丢弃；L0 不需要时在处置说明里写明理由。
+   - `unlinked_details` 列出没有被任何 L2–L4 或文稿指向的本对象 L1：在概括它的上层记录里就近补 `[[@…]]` 链接，或写明不需要的理由（RECORDING 第 1 节原则 3）。
+   - 转写过外部原件的对象，用 `memory_document(view="coverage", source_id=…)` 查覆盖：未覆盖、偏短的原文段落补写 L1，或在 L0 的 `omitted` 写明理由。
 3. **修订内容与文稿**：
    - 同一内容的演进沿用原记录 ID 修订，新的独立内容才新建；保留失败和适用边界。
    - 先保存被引用的技术内容、经过、经验，再更新概览和受影响章节，最后更新文稿根的 `section_refs`。未变化的内容沿用原修订，不为收口制造全量新版本。
@@ -47,7 +49,8 @@ requires_tools: [memory_inspect, memory_document, memory_timeline, memory_contra
      - **retract**：撤回；
      - **defer**：暂缓，未知或超出范围时使用。
    - 用 `maintenance_review`（带一句 `message` 说明改了什么）记录处置并预检。**执行只能由用户在工作台完成**：告诉用户计划编号，请他在"维护与监测"页预览后执行或退回；之后用 `maintenance_status` 核对结果。它按对象逐个提交，可能部分完成，要如实报告。
-   - 原件内容变了时，修订稿引用的应是用新来源 ID 登记的新版本（RULES 第 9 节：原件不修改，新版本用新 ID）。
+   - 原件内容变了时，修订稿引用的应是用新来源 ID 登记的新版本（RULES 第 9 节：原件不修改，新版本用新 ID；登记时 `snapshot=true`）。
+   - 原件有快照时，计划带 `source_changes`（逐段对比：改了、删了、新增的分段与新内容开头），转写自它的 L1 带 `origin_changes`：认领的分段没变的只需把 `origin` 与 `sources` 改指新原件；改了、删了的按新内容改写对应的块；新增的段落补写新的 L1。
 5. **复核与溯源**：
    - 用 `review_queue(owner_id=…)` 列出未复核、已失效、有争议、依据受阻的结论，写进待复核清单并说明理由。
    - 复核本身由用户在工作台完成。只有符合 RULES 第 4 节的情况才由 AI 代为 `review_submit`。

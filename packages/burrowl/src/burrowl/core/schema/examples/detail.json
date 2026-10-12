@@ -1,6 +1,6 @@
 {
   "kind": "detail",
-  "note": "L1 技术单元：完整正文只放 payload.blocks，body_markdown 必须为空字符串；retrieval_description 是检索用摘要，不是正文。unit_type=experiment 时 run_ref 必须是真实 Run；结果块用 requires_block_ids 声明依赖的定义块。L1 可以写 fact / calculation 类结论并用 block_id 指向结果块；块正文里用 [[概念]] 链接概念库中的概念，handle 是给 [[@handle]] 链接用的可读短名（不填按标题生成，创建后不能改）。",
+  "note": "L1 技术单元：完整正文只放 payload.blocks，body_markdown 必须为空字符串；retrieval_description 是检索用摘要，不是正文。unit_type=experiment 时 run_ref 必须是真实 Run；结果块用 requires_block_ids 声明依赖的定义块。转写外部原件时写 origin={source_ref: 原件的固定引用, locators: [原件分段标签]}（块上可再写 locators），按原文顺序接近原文保留细节，原文中的实验可用 origin 代替 run_ref；不属于实验/方法/推导/分析的内容用 unit_type=general。L1 可以写 fact / calculation 类结论并用 block_id 指向结果块；块正文里用 [[概念]] 链接概念库中的概念，handle 是给 [[@handle]] 链接用的可读短名（不填按标题生成，创建后不能改）。",
   "operation": {
     "op": "put_record",
     "client_key": "new-detail",

@@ -2759,6 +2759,48 @@
   }
  },
  {
+  "name": "maintenance.ref_rewrite_candidates",
+  "group": "maintenance",
+  "effect": "read",
+  "summary": "正文（L1–L4、文稿）里写了长编号（如 MEM-<uuid>）或 64 位指纹的记录，逐处给出可替换的短名链接（replacement）； replacement 为空的需要 AI 或人工改写。新提交会直接拒绝这类写法（UNREADABLE_REF），这里处理已有记录。",
+  "input": {
+   "additionalProperties": false,
+   "description": "正文（L1–L4、文稿）里写了长编号（如 MEM-<uuid>）或 64 位指纹的记录，逐处给出可替换的短名链接（replacement）；\nreplacement 为空的需要 AI 或人工改写。新提交会直接拒绝这类写法（UNREADABLE_REF），这里处理已有记录。",
+   "properties": {},
+   "title": "maintenance_ref_rewrite_candidates_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "maintenance.plan_ref_rewrite",
+  "group": "maintenance",
+  "effect": "user",
+  "summary": "（仅用户）为勾选的记录生成引用改写计划：长编号机械替换为短名链接，其余不变，预览后执行。",
+  "input": {
+   "additionalProperties": false,
+   "description": "（仅用户）为勾选的记录生成引用改写计划：长编号机械替换为短名链接，其余不变，预览后执行。",
+   "properties": {
+    "target_ids": {
+     "items": {
+      "type": "string"
+     },
+     "title": "Target Ids",
+     "type": "array"
+    },
+    "note": {
+     "default": "",
+     "title": "Note",
+     "type": "string"
+    }
+   },
+   "required": [
+    "target_ids"
+   ],
+   "title": "maintenance_plan_ref_rewrite_input",
+   "type": "object"
+  }
+ },
+ {
   "name": "maintenance.plan_visibility",
   "group": "maintenance",
   "effect": "user",
@@ -3632,6 +3674,12 @@
      ],
      "title": "Sensitivity",
      "type": "string"
+    },
+    "snapshot": {
+     "default": false,
+     "description": "导入转写时设为 true：同时保存原文快照（分段文本与指纹），供 L1 的 origin.locators、覆盖报告和原件变化后的逐段对比使用",
+     "title": "Snapshot",
+     "type": "boolean"
     }
    },
    "required": [
@@ -3687,12 +3735,105 @@
      "minItems": 1,
      "title": "Items",
      "type": "array"
+    },
+    "snapshot": {
+     "default": false,
+     "description": "导入转写时设为 true：为每个登记成功的原件保存原文快照；结果中给出分段数，分段列表用 sources_snapshot 读取",
+     "title": "Snapshot",
+     "type": "boolean"
     }
    },
    "required": [
     "items"
    ],
    "title": "sources_register_many_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "sources.snapshot",
+  "group": "sources",
+  "effect": "write",
+  "summary": "原文快照：没有就先生成（只读原件、核对登记指纹）。返回分段目录（key 与字数）、提取出的图片（assets 的 label） 与抽取警告；给 keys 时附这些分段的全文。转写时 L1 的 origin.locators 与块的 locators 写这里的 key； 图片用 sources_attach 复制为附件后再引用。",
+  "input": {
+   "additionalProperties": false,
+   "description": "原文快照：没有就先生成（只读原件、核对登记指纹）。返回分段目录（key 与字数）、提取出的图片（assets 的 label）\n与抽取警告；给 keys 时附这些分段的全文。转写时 L1 的 origin.locators 与块的 locators 写这里的 key；\n图片用 sources_attach 复制为附件后再引用。",
+   "properties": {
+    "source_id": {
+     "description": "已登记的来源 ID（SRC-…）",
+     "title": "Source Id",
+     "type": "string"
+    },
+    "keys": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "要读全文的分段 key（取自返回的 segments）；不给时只返回分段目录",
+     "title": "Keys"
+    },
+    "max_chars": {
+     "default": 20000,
+     "description": "返回全文的字符上限",
+     "maximum": 100000,
+     "minimum": 1000,
+     "title": "Max Chars",
+     "type": "integer"
+    }
+   },
+   "required": [
+    "source_id"
+   ],
+   "title": "sources_snapshot_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "sources.attach",
+  "group": "sources",
+  "effect": "write",
+  "summary": "把原件中的图片复制为数据目录内的受控附件并登记为来源，返回固定引用 ref。 L1 的 payload.figures 写 {caption: 照录原文图注, ref}，块正文用 ![图注](figure:序号) 在原位置引用。 附件随数据目录备份和迁移；同一张图重复附加是幂等的。",
+  "input": {
+   "additionalProperties": false,
+   "description": "把原件中的图片复制为数据目录内的受控附件并登记为来源，返回固定引用 ref。\nL1 的 payload.figures 写 {caption: 照录原文图注, ref}，块正文用 ![图注](figure:序号) 在原位置引用。\n附件随数据目录备份和迁移；同一张图重复附加是幂等的。",
+   "properties": {
+    "source_id": {
+     "description": "原件的来源 ID（SRC-…）",
+     "title": "Source Id",
+     "type": "string"
+    },
+    "asset_label": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "原件中图片的标签（sources_snapshot 返回的 assets[].label）；原件本身就是图片时不写",
+     "title": "Asset Label"
+    },
+    "title": {
+     "default": "",
+     "description": "附件名称；不写时用原件名称 + 图片标签",
+     "title": "Title",
+     "type": "string"
+    }
+   },
+   "required": [
+    "source_id"
+   ],
+   "title": "sources_attach_input",
    "type": "object"
   }
  },
@@ -4541,10 +4682,10 @@
   "name": "memory.document",
   "group": "memory",
   "effect": "read",
-  "summary": "读取研究文稿：完整文稿 / 目录 / 单章上下文包（改写某章用）/ 依据变化影响。",
+  "summary": "读取研究文稿：完整文稿 / 目录 / 单章上下文包（改写某章用）/ 依据变化影响； 以及转写外部原件时的覆盖报告（哪些原文分段没被 L1 认领或明显偏短）与原文展开（R21）。",
   "input": {
    "additionalProperties": false,
-   "description": "读取研究文稿：完整文稿 / 目录 / 单章上下文包（改写某章用）/ 依据变化影响。",
+   "description": "读取研究文稿：完整文稿 / 目录 / 单章上下文包（改写某章用）/ 依据变化影响；\n以及转写外部原件时的覆盖报告（哪些原文分段没被 L1 认领或明显偏短）与原文展开（R21）。",
    "properties": {
     "owner_id": {
      "description": "对象 ID，如 RES-…、PRJ-…、RUN-…",
@@ -4553,12 +4694,14 @@
     },
     "view": {
      "default": "full",
-     "description": "full 完整文稿；outline 目录；section 单章上下文包（改写某章用）；impact 依据变化的影响",
+     "description": "full 完整文稿；outline 目录；section 单章上下文包（改写某章用）；impact 依据变化的影响；coverage 转写原件的覆盖报告（需 source_id）；expansion 按原文顺序展开转写它的 L1 块（需 source_id）",
      "enum": [
       "full",
       "outline",
       "section",
-      "impact"
+      "impact",
+      "coverage",
+      "expansion"
      ],
      "title": "View",
      "type": "string"
@@ -4604,6 +4747,19 @@
      "description": "返回正文的字符上限",
      "title": "Max Chars",
      "type": "integer"
+    },
+    "source_id": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "view=coverage / expansion 时必填：被转写的原件（SRC-…，需已有快照）",
+     "title": "Source Id"
     }
    },
    "required": [
@@ -4647,6 +4803,67 @@
     "index"
    ],
    "title": "memory_figure_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "ui.ref_targets",
+  "group": "ui",
+  "effect": "read",
+  "summary": "工作台显示记录时用：把来源、正文链接与其他固定引用解析为标题与跳转位置（R21 D-11）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "工作台显示记录时用：把来源、正文链接与其他固定引用解析为标题与跳转位置（R21 D-11）。",
+   "properties": {
+    "owner_id": {
+     "description": "对象 ID，如 RES-…、PRJ-…、RUN-…",
+     "title": "Owner Id",
+     "type": "string"
+    },
+    "record_id": {
+     "title": "Record Id",
+     "type": "string"
+    },
+    "revision": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Revision"
+    }
+   },
+   "required": [
+    "owner_id",
+    "record_id"
+   ],
+   "title": "ui_ref_targets_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "ui.transcriptions",
+  "group": "ui",
+  "effect": "read",
+  "summary": "工作台\"原文展开\"页用：本对象转写或登记过的原件，附是否有快照与覆盖计数（R21 D-07）。",
+  "input": {
+   "additionalProperties": false,
+   "description": "工作台\"原文展开\"页用：本对象转写或登记过的原件，附是否有快照与覆盖计数（R21 D-07）。",
+   "properties": {
+    "owner_id": {
+     "description": "对象 ID，如 RES-…、PRJ-…、RUN-…",
+     "title": "Owner Id",
+     "type": "string"
+    }
+   },
+   "required": [
+    "owner_id"
+   ],
+   "title": "ui_transcriptions_input",
    "type": "object"
   }
  },
@@ -4829,10 +5046,10 @@
   "name": "memory.consolidate_prepare",
   "group": "memory",
   "effect": "read",
-  "summary": "阶段巩固的待处理清单：自上次巩固以来的变化、受影响下游与合并/冲突候选。",
+  "summary": "阶段巩固的待处理清单：自上次巩固以来的变化、受影响下游与合并/冲突候选； unfixed_evidence 是没被任何 L1–L4 引用的 Run 与 L0，unlinked_details 是没被任何 L2–L4 或文稿指向的本对象 L1 （逐项补就近链接，或写明不需要的理由）。",
   "input": {
    "additionalProperties": false,
-   "description": "阶段巩固的待处理清单：自上次巩固以来的变化、受影响下游与合并/冲突候选。",
+   "description": "阶段巩固的待处理清单：自上次巩固以来的变化、受影响下游与合并/冲突候选；\nunfixed_evidence 是没被任何 L1–L4 引用的 Run 与 L0，unlinked_details 是没被任何 L2–L4 或文稿指向的本对象 L1\n（逐项补就近链接，或写明不需要的理由）。",
    "properties": {
     "owner_id": {
      "description": "对象 ID，如 RES-…、PRJ-…、RUN-…",
@@ -7289,6 +7506,45 @@
     }
    },
    "title": "system_tool_errors_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "server.info",
+  "group": "server",
+  "effect": "user",
+  "summary": "工作台进程：运行中的版本、已安装的版本（不同表示需要重启才能用上新版本）、进程号、启动时间、网址、日志。",
+  "input": {
+   "additionalProperties": false,
+   "description": "工作台进程：运行中的版本、已安装的版本（不同表示需要重启才能用上新版本）、进程号、启动时间、网址、日志。",
+   "properties": {},
+   "title": "server_info_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "server.stop",
+  "group": "server",
+  "effect": "user",
+  "summary": "停止工作台（处理完当前请求后退出）。AI 客户端里经 stdio 运行的 MCP 是另外的进程，不受影响。",
+  "input": {
+   "additionalProperties": false,
+   "description": "停止工作台（处理完当前请求后退出）。AI 客户端里经 stdio 运行的 MCP 是另外的进程，不受影响。",
+   "properties": {},
+   "title": "server_stop_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "server.restart",
+  "group": "server",
+  "effect": "user",
+  "summary": "重启工作台：新进程加载当前安装的版本，接管同一网址；页面稍后自动恢复。AI 客户端的 MCP 需在客户端里重启。",
+  "input": {
+   "additionalProperties": false,
+   "description": "重启工作台：新进程加载当前安装的版本，接管同一网址；页面稍后自动恢复。AI 客户端的 MCP 需在客户端里重启。",
+   "properties": {},
+   "title": "server_restart_input",
    "type": "object"
   }
  }

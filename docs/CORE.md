@@ -70,9 +70,29 @@ AI 按任务选择 Skill：
 先保存被引用的内容，再保存引用它的；逐条脱离上下文回读
 ```
 
+**L0–L4 是信息分级（R21）**：按内容片段回答的问题落层，不按文档类型套模板。L1 是无损层，保留一切会消失或检索读不到的有用细节（导入时接近原文，交互工作写到可复算）；L2–L4 是压缩层，各自提炼，并在关键处就近链接 L1。拿不准时偏向保全（保留、放 L1、类型用 `general`）。定义失手的兜底：
+
+| 兜底 | 机制 | 适用 |
+|---|---|---|
+| 规则内 | 拿不准就保留、放 L1 | 全部 |
+| 覆盖报告 | 原文快照逐段对比 L1 的 `origin` 与正文，列出未覆盖、明显偏短且未登记省略的段落（只提示） | 导入外部原件 |
+| 检索 | 原件分段本来就进 source 投影，L1 漏掉的细节仍能检到原文 | 导入外部原件 |
+| 收口清单 | `unfixed_evidence`（没被引用的 Run、L0）与 `unlinked_details`（没被上层指向的 L1） | 全部 |
+| 人工 | 工作台"原文展开"页按原文顺序核对，简略处写笔记交给 AI，AI 按 `origin` 只重做对应段落 | 全部 |
+
+```text
+导入外部原件（burrowl-work "导入已有资料"）：
+    sources.register_many(snapshot=true) → 原文快照（.burrowl/snapshots/<SRC>/<sha>.json：分段 key、文本、指纹、图片标签）
+    sources.snapshot(keys) 分批读原文 → 按原文结构写 L1（origin.locators = 分段 key；块上可细到 locators）
+        图片：sources.attach → attachments/<sha256>.<ext>，登记为 SRC-ATT-…，L1 figures 引用、正文 ![图注](figure:N)
+        有意省略：L0 payload.omitted = [{locators, reason}]
+    再写 L2–L4（就近链接 L1）→ memory.document(view=coverage) 核对 → 检索验证
+工作台"原文展开"：memory.document(view=expansion) 按快照顺序拼出认领各段的 L1 块（视图，不是记录）
+```
+
 写作标准见 [skills/RECORDING.md](../skills/RECORDING.md)；字段与示例由 `memory.contract(kind)` 返回，示例经 `tests/service/test_draft_examples.py` 校验。
 
-实现：`core/records.py`、`core/contract.py`、`core/schema/examples/`。
+实现：`core/records.py`、`core/contract.py`、`core/schema/examples/`；导入相关：`index/extract.py`（含 docx）、`core/segments.py`（分段、对比、覆盖，纯函数）、`services/snapshots.py`（快照、附件、覆盖与展开）。
 
 ## 2. 结果怎样保存到本地
 
@@ -92,6 +112,8 @@ AI 组成提交请求：{owner_id, expected_head, request_id, operations:[put_re
     （可先 dry_run 预检）
 保存服务：
     handle：修订沿用原值（改动 → INVALID_TRANSITION）；新建未提供时按标题生成，本对象内冲突追加 -2、-3
+    正文（L1–L4、文稿章节、结论陈述）中新写入的长编号（XXX-<uuid>）或 64 位指纹 → UNREADABLE_REF，
+        hint 给出可直接替换的 [[@短名]]（上一修订已有的不拦，由维护页"引用改写"处理）
     解析正文链接 → links：概念找不到记为 unresolved_concept（不阻塞）；记录/块/结论找不到或有歧义
         → UNRESOLVED_LINK + 候选；修订时原文未变的链接沿用旧固定版本，repin=true 才改指当前版本
     校验结构、领域规则、引用和授权（受限来源、敏感级别不得降低、支持关系不能成环）
@@ -253,8 +275,12 @@ assemble(已选候选)：
       或 maintenance.plan(changed_ids, targets?) 列出受影响记录及其完整正文
 处置：用户把计划交给 AI（queued）→ AI 逐项决定 retain / revise（附草案）/ resynthesize / retract / defer
       → maintenance.review 预检 → 待你确认（reviewed）；用户可附意见退回（回到 queued，处置保留）
+原件有快照时（R21 D-09）：计划附 source_changes（快照与当前原件逐段对比：unchanged / changed / removed / added），
+      转写自它的 L1 附 origin_changes（认领的分段哪些改了、删了；没变的只需改指新登记的原件）
 可见范围补齐（R19 §8）：maintenance.visibility_candidates 列出旧默认存成 owner_only 的知识记录 → 用户勾选 →
       maintenance.plan_visibility 生成处置已写好的计划（改为全库可见、正文不变，直接 reviewed）→ 预览后执行
+引用改写（R21 D-10）：maintenance.ref_rewrite_candidates 列出正文写了长编号的记录 → 用户勾选 →
+      maintenance.plan_ref_rewrite 把能确定指向的编号机械替换为短名链接（直接 reviewed）→ 预览后执行
 提交：只由用户在工作台执行 maintenance.apply，按对象逐个提交（依据版本不一致则拒绝），可能部分完成；
       修订署名为写处置的 AI，修订原因带计划编号；撤回结论的复核署名为执行的用户
 回读：再按 consolidate 流程检查概览、文稿和上下文
@@ -303,9 +329,22 @@ wiki：外部被人修改（漂移）时不覆盖，除非显式 force
 
 ## 11. 数据目录、工作目录与迁移
 
-安装更新读取生成目录中的文件，不读取源码工作树。默认构建生成离线 zip；`packaging/build.py --install` 完整构建后直接安装生成目录。同版本也会同步更新文件，`BUILD_INFO.json` 和安装输出标识实际构建。安装不会替换已有进程加载的 Python 模块，更新后须重启工作台和 MCP，再刷新浏览器。
+安装更新读取生成目录中的文件，不读取源码工作树。默认构建生成离线 zip；`packaging/build.py --install` 完整构建后直接安装生成目录。同版本也会同步更新文件，`BUILD_INFO.json` 和安装输出标识实际构建。安装不会替换已有进程加载的 Python 模块，更新后须重启工作台（首页"重启服务"或 `burrowl restart`）和 MCP，再刷新浏览器。
 
-- **数据目录**存放 burrowl 的全部状态（记忆、会话、Run 登记、配置）；**工作目录**是用户和 AI 放原始数据与代码的地方，原件不复制进数据目录。
+**工作台的运行（R21 D-12–D-15）**
+
+```text
+burrowl start：已在运行 → 给出网址；否则以无窗口后台进程启动（安装包里是 python\burrowl-workbench.exe，
+    开发环境是 pythonw），等它就绪后给出网址。输出写 .burrowl/logs/serve.log
+网址固定：端口与 token 第一次启动时选定，存 .burrowl/server.json；端口被占用时换一个并保存
+burrowl open：start + 打开浏览器（开始菜单"burrowl 工作台"快捷方式就是它）
+burrowl stop：经工作台接口请求正常退出，超时再按进程号结束（先核对进程创建时间，避免误杀复用了 PID 的程序）
+首页"工作台服务"：运行版本 / 已安装版本；重启 = 新进程经 current 联接加载新版本，等旧进程退出后接管同一端口
+    （server.info / server.stop / server.restart，用户操作，不暴露给 MCP）；AI 客户端里 stdio 的 MCP 需在客户端重启
+被强行结束（任务管理器）后 server.json 留下的进程信息，下次 status / start 发现进程不在就清除
+```
+
+- **数据目录**存放 burrowl 的全部状态（记忆、会话、Run 登记、配置）；**工作目录**是用户和 AI 放原始数据与代码的地方，原件不复制进数据目录。导入时进入数据目录的只有原文快照（抽取的文本）和从原件中复制出的图片附件，它们随备份迁移；原件本身随 `burrowl backup` 打包、`restore --map` 重定向。
 - 记录引用原件只经来源登记（SRC- ID + 登记时指纹），从不在记录里写路径。所以原件搬家只需改登记，固定引用不变。
 - 工作目录登记为**工作根**（ROOT-…）；其中的来源记为"根 + 相对路径"。MCP 以 `--work-dir` 启动时，登记该目录下的文件会自动建根。
 

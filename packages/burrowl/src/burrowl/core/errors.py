@@ -8,6 +8,7 @@ CODES: dict[str, tuple[int, int, bool]] = {
     "INVALID_SCHEMA": (400, 2, False),
     "UNRESOLVED_REFERENCE": (400, 2, False),
     "UNRESOLVED_LINK": (400, 2, False),
+    "UNREADABLE_REF": (400, 2, False),
     "NOT_FOUND": (404, 2, False),
     "ACCESS_DENIED": (403, 4, False),
     "PERMISSION_DENIED": (403, 4, False),
@@ -28,7 +29,7 @@ CODES: dict[str, tuple[int, int, bool]] = {
     "INTERNAL_ERROR": (500, 8, False),
 }
 # 调用方可以照着报错改参数重试的错误码（R20 D-10 按它们统计参数错误）
-INPUT_CODES = {"INVALID_ARGUMENT", "INVALID_SCHEMA", "UNRESOLVED_REFERENCE", "UNRESOLVED_LINK"}
+INPUT_CODES = {"INVALID_ARGUMENT", "INVALID_SCHEMA", "UNRESOLVED_REFERENCE", "UNRESOLVED_LINK", "UNREADABLE_REF"}
 
 
 @dataclass

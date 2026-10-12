@@ -1289,6 +1289,24 @@ export declare namespace MaintenanceVisibilityCandidates {
   export interface Args {}
 }
 
+export declare namespace MaintenanceRefRewriteCandidates {
+  /**
+   * 正文（L1–L4、文稿）里写了长编号（如 MEM-<uuid>）或 64 位指纹的记录，逐处给出可替换的短名链接（replacement）；
+   * replacement 为空的需要 AI 或人工改写。新提交会直接拒绝这类写法（UNREADABLE_REF），这里处理已有记录。
+   */
+  export interface Args {}
+}
+
+export declare namespace MaintenancePlanRefRewrite {
+  /**
+   * （仅用户）为勾选的记录生成引用改写计划：长编号机械替换为短名链接，其余不变，预览后执行。
+   */
+  export interface Args {
+    target_ids: string[];
+    note?: string;
+  }
+}
+
 export declare namespace MaintenancePlanVisibility {
   /**
    * （仅用户）为勾选的记录生成可见范围补齐计划：处置已写好（修订为全库可见，正文不变），预览后执行。
@@ -1697,6 +1715,10 @@ export declare namespace SourcesRegister {
      * restricted 的来源不进索引、不能被引用
      */
     sensitivity?: "public" | "internal" | "confidential" | "restricted";
+    /**
+     * 导入转写时设为 true：同时保存原文快照（分段文本与指纹），供 L1 的 origin.locators、覆盖报告和原件变化后的逐段对比使用
+     */
+    snapshot?: boolean;
   }
 }
 
@@ -1736,6 +1758,54 @@ export declare namespace SourcesRegisterMany {
         sensitivity?: "public" | "internal" | "confidential" | "restricted";
       }[]
     ];
+    /**
+     * 导入转写时设为 true：为每个登记成功的原件保存原文快照；结果中给出分段数，分段列表用 sources_snapshot 读取
+     */
+    snapshot?: boolean;
+  }
+}
+
+export declare namespace SourcesSnapshot {
+  /**
+   * 原文快照：没有就先生成（只读原件、核对登记指纹）。返回分段目录（key 与字数）、提取出的图片（assets 的 label）
+   * 与抽取警告；给 keys 时附这些分段的全文。转写时 L1 的 origin.locators 与块的 locators 写这里的 key；
+   * 图片用 sources_attach 复制为附件后再引用。
+   */
+  export interface Args {
+    /**
+     * 已登记的来源 ID（SRC-…）
+     */
+    source_id: string;
+    /**
+     * 要读全文的分段 key（取自返回的 segments）；不给时只返回分段目录
+     */
+    keys?: string[] | null;
+    /**
+     * 返回全文的字符上限
+     */
+    max_chars?: number;
+  }
+}
+
+export declare namespace SourcesAttach {
+  /**
+   * 把原件中的图片复制为数据目录内的受控附件并登记为来源，返回固定引用 ref。
+   * L1 的 payload.figures 写 {caption: 照录原文图注, ref}，块正文用 ![图注](figure:序号) 在原位置引用。
+   * 附件随数据目录备份和迁移；同一张图重复附加是幂等的。
+   */
+  export interface Args {
+    /**
+     * 原件的来源 ID（SRC-…）
+     */
+    source_id: string;
+    /**
+     * 原件中图片的标签（sources_snapshot 返回的 assets[].label）；原件本身就是图片时不写
+     */
+    asset_label?: string | null;
+    /**
+     * 附件名称；不写时用原件名称 + 图片标签
+     */
+    title?: string;
   }
 }
 
@@ -2042,7 +2112,8 @@ export declare namespace MemoryCommit {
 
 export declare namespace MemoryDocument {
   /**
-   * 读取研究文稿：完整文稿 / 目录 / 单章上下文包（改写某章用）/ 依据变化影响。
+   * 读取研究文稿：完整文稿 / 目录 / 单章上下文包（改写某章用）/ 依据变化影响；
+   * 以及转写外部原件时的覆盖报告（哪些原文分段没被 L1 认领或明显偏短）与原文展开（R21）。
    */
   export interface Args {
     /**
@@ -2050,9 +2121,9 @@ export declare namespace MemoryDocument {
      */
     owner_id: string;
     /**
-     * full 完整文稿；outline 目录；section 单章上下文包（改写某章用）；impact 依据变化的影响
+     * full 完整文稿；outline 目录；section 单章上下文包（改写某章用）；impact 依据变化的影响；coverage 转写原件的覆盖报告（需 source_id）；expansion 按原文顺序展开转写它的 L1 块（需 source_id）
      */
-    view?: "full" | "outline" | "section" | "impact";
+    view?: "full" | "outline" | "section" | "impact" | "coverage" | "expansion";
     /**
      * research_process 完整过程稿；research_report 精简报告
      */
@@ -2069,6 +2140,10 @@ export declare namespace MemoryDocument {
      * 返回正文的字符上限
      */
     max_chars?: number;
+    /**
+     * view=coverage / expansion 时必填：被转写的原件（SRC-…，需已有快照）
+     */
+    source_id?: string | null;
   }
 }
 
@@ -2084,6 +2159,32 @@ export declare namespace MemoryFigure {
     record_id: string;
     revision: number;
     index: number;
+  }
+}
+
+export declare namespace UiRefTargets {
+  /**
+   * 工作台显示记录时用：把来源、正文链接与其他固定引用解析为标题与跳转位置（R21 D-11）。
+   */
+  export interface Args {
+    /**
+     * 对象 ID，如 RES-…、PRJ-…、RUN-…
+     */
+    owner_id: string;
+    record_id: string;
+    revision?: number | null;
+  }
+}
+
+export declare namespace UiTranscriptions {
+  /**
+   * 工作台"原文展开"页用：本对象转写或登记过的原件，附是否有快照与覆盖计数（R21 D-07）。
+   */
+  export interface Args {
+    /**
+     * 对象 ID，如 RES-…、PRJ-…、RUN-…
+     */
+    owner_id: string;
   }
 }
 
@@ -2159,7 +2260,9 @@ export declare namespace MemoryExport {
 
 export declare namespace MemoryConsolidatePrepare {
   /**
-   * 阶段巩固的待处理清单：自上次巩固以来的变化、受影响下游与合并/冲突候选。
+   * 阶段巩固的待处理清单：自上次巩固以来的变化、受影响下游与合并/冲突候选；
+   * unfixed_evidence 是没被任何 L1–L4 引用的 Run 与 L0，unlinked_details 是没被任何 L2–L4 或文稿指向的本对象 L1
+   * （逐项补就近链接，或写明不需要的理由）。
    */
   export interface Args {
     /**
@@ -3160,6 +3263,27 @@ export declare namespace SystemToolErrors {
   }
 }
 
+export declare namespace ServerInfo {
+  /**
+   * 工作台进程：运行中的版本、已安装的版本（不同表示需要重启才能用上新版本）、进程号、启动时间、网址、日志。
+   */
+  export interface Args {}
+}
+
+export declare namespace ServerStop {
+  /**
+   * 停止工作台（处理完当前请求后退出）。AI 客户端里经 stdio 运行的 MCP 是另外的进程，不受影响。
+   */
+  export interface Args {}
+}
+
+export declare namespace ServerRestart {
+  /**
+   * 重启工作台：新进程加载当前安装的版本，接管同一网址；页面稍后自动恢复。AI 客户端的 MCP 需在客户端里重启。
+   */
+  export interface Args {}
+}
+
 export interface OpArgs {
   "hub.connectors": HubConnectors.Args;
   "hub.health": HubHealth.Args;
@@ -3200,6 +3324,8 @@ export interface OpArgs {
   "maintenance.plan": MaintenancePlan.Args;
   "maintenance.plan_from_candidates": MaintenancePlanFromCandidates.Args;
   "maintenance.visibility_candidates": MaintenanceVisibilityCandidates.Args;
+  "maintenance.ref_rewrite_candidates": MaintenanceRefRewriteCandidates.Args;
+  "maintenance.plan_ref_rewrite": MaintenancePlanRefRewrite.Args;
   "maintenance.plan_visibility": MaintenancePlanVisibility.Args;
   "maintenance.plans": MaintenancePlans.Args;
   "maintenance.handoff": MaintenanceHandoff.Args;
@@ -3226,6 +3352,8 @@ export interface OpArgs {
   "sources.relocate_root": SourcesRelocateRoot.Args;
   "sources.register": SourcesRegister.Args;
   "sources.register_many": SourcesRegisterMany.Args;
+  "sources.snapshot": SourcesSnapshot.Args;
+  "sources.attach": SourcesAttach.Args;
   "sources.relocate": SourcesRelocate.Args;
   "sources.update": SourcesUpdate.Args;
   "memory.owners": MemoryOwners.Args;
@@ -3240,6 +3368,8 @@ export interface OpArgs {
   "memory.commit": MemoryCommit.Args;
   "memory.document": MemoryDocument.Args;
   "memory.figure": MemoryFigure.Args;
+  "ui.ref_targets": UiRefTargets.Args;
+  "ui.transcriptions": UiTranscriptions.Args;
   "memory.timeline": MemoryTimeline.Args;
   "memory.raw_materials": MemoryRawMaterials.Args;
   "memory.raw_material": MemoryRawMaterial.Args;
@@ -3290,6 +3420,9 @@ export interface OpArgs {
   "system.validate": SystemValidate.Args;
   "system.ops": SystemOps.Args;
   "system.tool_errors": SystemToolErrors.Args;
+  "server.info": ServerInfo.Args;
+  "server.stop": ServerStop.Args;
+  "server.restart": ServerRestart.Args;
 }
 
 export type OpName = keyof OpArgs;
@@ -3334,6 +3467,8 @@ export const OP_EFFECTS: Record<OpName, string> = {
   "maintenance.plan": "write",
   "maintenance.plan_from_candidates": "user",
   "maintenance.visibility_candidates": "read",
+  "maintenance.ref_rewrite_candidates": "read",
+  "maintenance.plan_ref_rewrite": "user",
   "maintenance.plan_visibility": "user",
   "maintenance.plans": "read",
   "maintenance.handoff": "user",
@@ -3360,6 +3495,8 @@ export const OP_EFFECTS: Record<OpName, string> = {
   "sources.relocate_root": "write",
   "sources.register": "write",
   "sources.register_many": "write",
+  "sources.snapshot": "write",
+  "sources.attach": "write",
   "sources.relocate": "write",
   "sources.update": "user",
   "memory.owners": "read",
@@ -3374,6 +3511,8 @@ export const OP_EFFECTS: Record<OpName, string> = {
   "memory.commit": "write",
   "memory.document": "read",
   "memory.figure": "read",
+  "ui.ref_targets": "read",
+  "ui.transcriptions": "read",
   "memory.timeline": "read",
   "memory.raw_materials": "read",
   "memory.raw_material": "read",
@@ -3424,4 +3563,7 @@ export const OP_EFFECTS: Record<OpName, string> = {
   "system.validate": "read",
   "system.ops": "read",
   "system.tool_errors": "read",
+  "server.info": "user",
+  "server.stop": "user",
+  "server.restart": "user",
 };

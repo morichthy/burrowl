@@ -28,6 +28,7 @@ def build_source(builder, tmp_path, monkeypatch):
         (root / directory).mkdir(parents=True)
     (root / "packages/burrowl/pyproject.toml").write_text('[project]\nversion = "0.2.0"\n')
     (root / "runtime/python.exe").write_bytes(b"fake runtime")
+    (root / "runtime/pythonw.exe").write_bytes(b"fake windowless runtime")
     (root / "frontend/dist/index.html").write_text("old frontend")
     for name in ("README.md", "AGENTS.md", "ARCHITECTURE.md"):
         (root / name).write_text("document")
@@ -76,6 +77,8 @@ def test_local_install_rebuilds_frontend_and_does_not_create_zip(builder, build_
     stage = root / "build/burrowl-0.2.0"
     installed.assert_called_once_with(stage, destination)
     assert (stage / "frontend/dist/index.html").read_text() == "rebuilt frontend"
+    # R21 D-13：后台工作台用的无窗口解释器副本，任务管理器里显示为 burrowl-workbench
+    assert (stage / "python/burrowl-workbench.exe").read_bytes() == b"fake windowless runtime"
     assert any(args[0] in ("npm", "npm.cmd") for args in calls)
     assert not (root / "dist").exists()
     info = json.loads((stage / "BUILD_INFO.json").read_text())

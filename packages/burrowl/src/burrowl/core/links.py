@@ -96,6 +96,39 @@ def link_texts(record: dict) -> list[str]:
     return [t for t in texts if t]
 
 
+# R21 D-10：正文里不写服务生成的长编号与指纹，引用用 [[@短名]]；代码与链接内部不检查
+_RAW_ID = re.compile(r"(?<![\w-])([A-Z]{2,5})-[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(?![\w-])")
+_RAW_HASH = re.compile(r"(?<![0-9a-fA-F])[0-9a-fA-F]{64}(?![0-9a-fA-F])")
+RAW_ID_KINDS = frozenset({"detail", "narrative", "experience", "overview", "document", "document_section"})
+
+
+def _text_fields(record: dict) -> list[tuple[str, str]]:
+    """与 link_texts 相同的扫描范围，带字段路径（相对草案）。"""
+    payload = record.get("payload") or {}
+    fields = [("/body_markdown", record.get("body_markdown") or "")]
+    if record.get("kind") in {"detail", "document_section"}:
+        fields.extend((f"/payload/blocks/{i}/markdown", b.get("markdown", ""))
+                      for i, b in enumerate(payload.get("blocks", []))
+                      if record.get("kind") == "detail" or b.get("type") == "prose")
+    fields.extend((f"/payload/claims/{i}/statement", c.get("statement", ""))
+                  for i, c in enumerate(payload.get("claims", []) or []))
+    return [(path, text) for path, text in fields if text]
+
+
+def raw_identifiers(record: dict) -> list[dict]:
+    """正文中出现的长编号（XXX-<uuid>）与 64 位十六进制指纹：[{path, text, prefix}]。只检查 RAW_ID_KINDS。"""
+    if record.get("kind") not in RAW_ID_KINDS:
+        return []
+    found = []
+    for path, text in _text_fields(record):
+        visible = _LINK.sub(lambda m: " " * len(m.group(0)), _blank_code(text))
+        for match in _RAW_ID.finditer(visible):
+            found.append({"path": path, "text": match.group(0), "prefix": match.group(1)})
+        for match in _RAW_HASH.finditer(visible):
+            found.append({"path": path, "text": match.group(0), "prefix": "sha256"})
+    return found
+
+
 def collect(record: dict) -> list[Link]:
     found: dict[str, Link] = {}
     for text in link_texts(record):
