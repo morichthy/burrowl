@@ -1,6 +1,6 @@
 [project]
 name = "burrowl-connector-lightrag"
-version = "0.7.0"
+version = "0.7.1"
 description = "burrowl 知识中枢连接器：LightRAG 图模式（导入 burrowl 整理的图；本地嵌入；查询不调用 LLM）"
 requires-python = ">=3.12"
 dependencies = ["burrowl"]
