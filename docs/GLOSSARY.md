@@ -68,6 +68,8 @@
 | 结论（claim） | 写在记录 `payload.claims` 中、需要复核的一句陈述，带适用范围和证据。L1 只写 fact / calculation，可用 `block_id` 指向结果块；可选 `relation`（主体、谓词、对象） | 记录正文本身不是 claim | `claim_id`、`CLM-…` |
 | 适用范围（scope） | 结论成立的条件和对象范围，写得越具体越好 | "一般情况下"不是范围 | `scope` |
 | 复核 | 对一条结论的判断，绑定当时的记录内容与结论指纹 | 保存、索引、回读都不是复核 | `review.*` |
+| 删除（记录） | 墓碑提交：记录从当前记录中移除，旧修订留在提交历史里，固定引用照常可读，可恢复。只用于不该记的内容，与撤回不同（R22） |
+| 回收站 | 丢弃的 Run（`.burrowl/trash/runs/`）与删除的对象（`.burrowl/trash/owners/`）所在处，可恢复；清空是用户专属的永久删除 |
 | 复核状态 | not-reviewed 未复核；accepted 已确认（需范围与证据）；disputed 有争议；retracted 已撤回；superseded 已被替代 | — | `state` |
 | 已失效（stale） | 复核之后结论或所在记录被修改，原复核不再适用 | 不等于结论错了 | `stale` |
 | 成熟度 | 结论在证据阶梯上的位置：conjecture 设想、preliminary 初步、replicated 重复验证、established 已确立。存在复核记录中；AI 不能登记 established，只能提出升级 | 不是复核状态，也不是主观概率；`knowledge_facets.confidence` 是作者自评，不是成熟度 | `maturity`、`requested_maturity`、`evidence_basis` |

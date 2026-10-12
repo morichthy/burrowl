@@ -59,7 +59,7 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 
 | 操作 | 类型 | 说明 | 参数 |
 |---|---|---|---|
-| `memory.activity` | 只读 | 关键操作记录（只读，按时间倒序）：建立对象、归属确认、保存、复核、Run 结束、发布，每条一行，带可追溯的引用。 检索、阅读、来源登记等不改变资产的操作不在其中。 | `owner_id`: string|null，`kinds`: array|null，`limit`: integer，`before`: string|null |
+| `memory.activity` | 只读 | 关键操作记录（只读，按时间倒序）：建立对象、归属确认、保存、复核、Run 结束、发布、删除与恢复，每条一行，带可追溯的引用。 检索、阅读、来源登记等不改变资产的操作不在其中。 | `owner_id`: string|null，`kinds`: array|null，`limit`: integer，`before`: string|null |
 | `memory.commit` | 写入 | 保存一批记录到一个对象（同一对象内原子提交，要么全写入要么都不写）。dry_run=true 只预检不写入。 草案必须写 kind、title、body_markdown、payload、sources、record_reason；owner_id、sensitivity、discovery、 keywords、provenance_gap、handle 可省略（由服务补上，修订时沿用原值）；修订已有记录时写 change_reason。 payload 结构随 kind 不同，写之前用 memory_contract(kind) 查字段与示例。引用一律写固定引用 （刚保存的记录用回执的 fixed_ref）。出错时 errors 一次列出所有问题，path 指向要改的参数位置。 | `owner_id`*: string，`operations`*: array，`expected_head`*: string|null，`request_id`: string|null，`dry_run`: boolean，`attribution`: object|null |
 | `memory.consolidate_apply` | 写入 | 保存巩固处置（retain/revise/retract/defer…），可与本批实际修订一起提交。 | `owner_id`*: string，`basis`*: object，`decisions`*: array，`reason`*: string，`operations`: array|null，`dry_run`: boolean |
 | `memory.consolidate_prepare` | 只读 | 阶段巩固的待处理清单：自上次巩固以来的变化、受影响下游与合并/冲突候选； unfixed_evidence 是没被任何 L1–L4 引用的 Run 与 L0，unlinked_details 是没被任何 L2–L4 或文稿指向的本对象 L1 （逐项补就近链接，或写明不需要的理由）。 | `owner_id`*: string，`since_commit`: string|null |
@@ -72,11 +72,18 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | `memory.kinds` | 只读 | 全部记录类型：层级、版本、由哪个操作写入、一句话用途。 | 无 |
 | `memory.owner_adopt` | 写入 | 把内容树中已有的文档登记为对象（原件不修改；须给出你看到的字节指纹）。 | `path`*: string，`expected_sha256`*: string |
 | `memory.owner_create` | 写入 | 新建对象（写入业务卡；首次提交记忆时才建立记忆目录）。Run 用 runs_create 建立。 先用 memory_owners 查找：同一目标的继续或子任务沿用已有对象；主题相似只引用；独立交付目标才新建。 core-algorithm 只用于公司文档定义的关键算法，普通脚本/模块/工具不要建算法卡。 knowledge 有两种用途：配置 graph.concept_owner_id 指定的那一个是概念库（只放概念页，建好后把 owner_id 填进该配置）； 其他 knowledge 对象是通用知识对象，承接不属于任何具体研究、项目、工具、数据的知识，按主题复用，主题不同再新建。 | `owner_type`*: string，`slug`*: string，`title`*: string，`description`: string，`keywords`: array|null，`source_document`: string|null，`short_name`: string|null，`sensitivity`: string |
+| `memory.owner_discard` | 写入 | 删除对象到回收站（可用 owner_restore 恢复）：业务卡对象移走整个对象目录（含记录与其下的 Run）， 被采用的文档只移走记忆目录、原件留在原处。 仍被其他对象引用、目录里还有其他对象、或是概念库时拒绝。Run 用 runs_discard。永久删除只能由用户在工作台清空回收站。 | `owner_id`*: string，`reason`*: string，`expected_head`: string|null，`dry_run`: boolean |
+| `memory.owner_empty_trash` | 仅用户（不暴露给 agent） | 永久删除回收站中的全部对象。用户专属，只在工作台与 CLI 提供。 | 无 |
+| `memory.owner_restore` | 写入 | 把回收站中的对象移回原位置并重建检索投影（原位置已被占用时拒绝）。 | `owner_id`*: string |
 | `memory.owner_route` | 只读 | 归属判定（只读）：与 reading_start 第一轮相同的召回和筛选包，附上候选的当前目标、最新检查点与来源重叠证据。 只在需要读历史或需要保存时调用（简单问答、无复用价值的小任务不调用）。不给建议动作，由你判断： 选出暂定对象后用 memory_resume 完整阅读，确认是同一目标再第一次保存（memory_commit 带 attribution）； 不相关就换下一个候选或新建。gaps 有索引缺口时，不要因为"没有候选"就新建对象。不建立阅读会话。 | `task`*: string，`variants`: array|null，`protected_terms`: array|null，`paths`: array|null，`owner_hint`: string|null，`limit`: integer |
+| `memory.owner_trash` | 只读 | 回收站中的对象（原位置、方式、理由、时间、执行者）。 | 无 |
 | `memory.owners` | 只读 | 列出可读对象（按类型分组，带各层记录数）。 | `owner_types`: array|null，`query`: string |
 | `memory.raw_material` | 只读 | 回读一个原始材料（按清单中的 ID；核对固定字节）。 | `owner_id`*: string，`material_id`*: string，`max_chars`: integer |
 | `memory.raw_materials` | 只读 | L0 原始材料清单（不读原件正文）。 | `owner_id`*: string |
 | `memory.records` | 只读 | 对象内的记录目录（按层级，分页；不含正文）。kinds 按类型筛选，query 匹配标题或 ID；kind_counts 是类型筛选前的计数。 | `owner_id`*: string，`levels`: array|null，`kinds`: array|null，`query`: string，`main_only`: boolean，`offset`: integer，`limit`: integer |
+| `memory.records_discard` | 写入 | 删除本来就不该记的记录（测试数据、重复、写错对象）：从当前记录中移除，旧修订留在历史里，可用 records_restore 恢复。 结论错了不要删除，用复核撤回（retracted）保留教训。仍被其他记录引用的记录、目标/检查点/策略记录不能删除， 返回的 blockers 列出引用者；先修订引用者，或把它们一起删除。 | `owner_id`*: string，`record_ids`*: array，`reason`*: string，`expected_head`: string|null，`dry_run`: boolean |
+| `memory.records_discarded` | 只读 | 对象内已删除的记录（标题、层级、理由、时间、执行者），可用 records_restore 恢复。 | `owner_id`*: string |
+| `memory.records_restore` | 写入 | 恢复已删除的记录（与删除前逐字节相同）。它引用的记录或对象已不存在时拒绝。 | `owner_id`*: string，`record_ids`*: array，`expected_head`: string|null，`dry_run`: boolean |
 | `memory.recovery` | 管理 | 检查记忆目录健康状况（写锁、孤立提交、暂存残留）；只报告不修改。 | `owner_id`*: string |
 | `memory.render` | 只读 | 按交换格式把一条记录渲染为 Markdown（YAML 头 + 正文 + 自动生成的反链与关联）。只读。 | `owner_id`*: string，`record_id`*: string |
 | `memory.resume` | 只读 | 续接对象的工作上下文：目标→检查点→最新概览/经过/技术→路线/问题/经验（只读）。 不建立阅读会话；用户查询主题相关知识、找已有经验时默认先 reading_start。 workbench_notes 列出与该对象相关、尚未结束的工作台笔记；queued 的由你用 relations_note_reply 回写。 | `owner_id`*: string |

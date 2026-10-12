@@ -93,6 +93,9 @@ class IndexService:
         self.db.mark_pending(owner_id, head)
         self.sync_owner(owner_id)
 
+    def on_owner_removed(self, owner_id: str) -> None:
+        self.db.drop_owner(owner_id)
+
     def on_access_change(self, target_ids: list[str]) -> list[str]:
         """来源停用、恢复或改敏感级别后，重新投影直接或间接依赖它们的对象，返回这些对象 ID。
 

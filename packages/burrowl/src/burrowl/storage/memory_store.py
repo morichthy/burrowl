@@ -8,6 +8,7 @@
     commits/<COM-id>/manifest.json        本次提交后的全部记录指针、幂等账本、父提交
     commits/<COM-id>/records/<MEM-id>.json  本次变化的完整记录（旧修订留在旧提交里）
     commits/<COM-id>/receipt.json         提交回执
+    （R22）清单的可选字段 removed_records（累积的墓碑）、removed_ids / restored_ids（本次删除 / 恢复）
     request-receipts/<request_id>.json    "无变化"请求的幂等回执
     staging/                              发布前的暂存（崩溃残留由 recovery 检查）
     write.lock                            写锁
@@ -32,6 +33,11 @@ from .owners import Owner
 MANIFEST_FIELDS = {"schema_version", "commit_id", "generation", "owner_id", "record_heads", "request_ledger",
                    "parent_commit_id", "parent_manifest_hash"}
 POINTER_KINDS = ("policy", "goal", "checkpoint")
+
+
+def tombstones(manifest: dict | None) -> dict[str, dict]:
+    """R22 D-01：已删除记录的墓碑（记录 ID → 原指针、理由、时间、执行者）。旧清单没有这个字段，视为空。"""
+    return (manifest or {}).get("removed_records") or {}
 
 
 @dataclass
@@ -96,6 +102,8 @@ class VerifiedRecords:
 
 # prepare(snapshot) → (变化的完整记录列表, 逐条结果)
 Prepare = Callable[[Snapshot], tuple[list[dict], list[dict]]]
+# R22：plan(snapshot) → (要删除的记录 ID → {reason, actor}, 要恢复的记录 ID)；在锁内运行，必须是纯计算
+RemovalPlan = Callable[[Snapshot], tuple[dict[str, dict], list[str]]]
 
 
 class MemoryStore:
@@ -213,6 +221,13 @@ class MemoryStore:
         """读取当前或指定修订；旧修订沿提交链查找（同一次查找复用目录枚举，返回前统一复核父目录）。"""
         scope = ReadScope()
         for manifest in self.iter_manifests(owner, scope=scope):
+            if revision is None and record_id in tombstones(manifest):
+                # R22 D-02：已删除的记录没有"当前修订"；按修订号的固定引用照常沿提交链读取
+                scope.recheck()
+                stone = tombstones(manifest)[record_id]
+                raise BurrowlError("NOT_FOUND", "记录已删除（可恢复）", {
+                    "record_id": record_id, "removed": True, "removed_at": stone.get("removed_at"),
+                    "revision": stone["entry"]["revision"], "action": "按修订号读取旧内容，或用 records_restore 恢复"})
             entry = manifest["record_heads"].get(record_id)
             if entry and (revision is None or entry["revision"] == revision):
                 record = self._record(owner, record_id, entry, scope)
@@ -293,6 +308,49 @@ class MemoryStore:
                           lambda: (prepublish(), self._check_lock(lock_path, lock)))
             return receipt
 
+    def remove(self, owner: Owner, *, expected_head: str | None, request_id: str, request_hash: str,
+               plan: RemovalPlan, actor: dict, prepublish: Callable[[], None] = lambda: None) -> dict:
+        """R22 墓碑提交：删除或恢复记录。锁、幂等、HEAD 比较、暂存回读与发布都与 commit 相同。
+
+        删除把记录从 record_heads 移到 removed_records（原指针原样保存），恢复把原指针放回；
+        不写任何记录文件，旧修订留在原来的提交里。"""
+        safe_segment(request_id)
+        lock_path = self.path(owner, "write.lock")
+        with exclusive_lock(lock_path, f"memory-commit:{owner.owner_id}", clock=self.clock) as lock:
+            snapshot = self.read_snapshot(owner)
+            if prior := self.find_receipt(owner, snapshot, request_id, request_hash):
+                return prior
+            if expected_head != snapshot.commit_id:
+                raise BurrowlError("VERSION_CONFLICT", "对象已更新，请基于当前版本重试",
+                               {"expected_head": expected_head, "current_head": snapshot.head})
+            removing, restoring = plan(snapshot)
+            stones = tombstones(snapshot.manifest)
+            unknown = [rid for rid in removing if rid not in snapshot.records] +                       [rid for rid in restoring if rid not in stones]
+            if unknown or set(removing) & set(restoring):
+                raise BurrowlError("INVALID_ARGUMENT", "要删除的记录必须是当前记录，要恢复的必须是已删除的记录",
+                                   {"record_ids": unknown})
+            changed = bool(removing or restoring)
+            generation = snapshot.generation + (1 if changed else 0)
+            commit_id = self.new_commit_id() if changed else snapshot.commit_id
+            results = ([{"record_id": rid, "status": "removed"} for rid in removing]
+                       + [{"record_id": rid, "status": "restored"} for rid in restoring])
+            now = self.clock()
+            # 删除或恢复不写记录文件，时间与执行者记在回执里（关键操作记录从这里读）
+            receipt = {"request_id": request_id, "owner_id": owner.owner_id, "commit_id": commit_id,
+                       "generation": generation, "save_status": "committed" if changed else "no_change",
+                       "record_results": results, "at": now, "actor": deepcopy(actor)}
+            prepublish()
+            if not changed:
+                self._write_no_change(owner, request_id, request_hash, receipt)
+                return receipt
+            removed = {rid: {"entry": deepcopy(snapshot.manifest["record_heads"][rid]), "removed_at": now,
+                             "removed_in": commit_id, "reason": note["reason"], "actor": deepcopy(note["actor"])}
+                       for rid, note in removing.items()}
+            self._publish(owner, snapshot, [], receipt, request_hash, [],
+                          lambda: (prepublish(), self._check_lock(lock_path, lock)),
+                          removed=removed, restored=list(restoring))
+            return receipt
+
     @staticmethod
     def _check_lock(path: Path, lock: dict) -> None:
         if read_json(path) != lock:
@@ -306,7 +364,8 @@ class MemoryStore:
         write_json_atomic(self.path(owner, f"request-receipts/{request_id}.json"), envelope)
 
     def _publish(self, owner: Owner, snapshot: Snapshot, changed: list[dict], receipt: dict, request_hash: str,
-                 checks: list, prepublish: Callable[[], None]) -> None:
+                 checks: list, prepublish: Callable[[], None], *, removed: dict[str, dict] | None = None,
+                 restored: list[str] | None = None) -> None:
         commit_id, generation = receipt["commit_id"], receipt["generation"]
         safe_segment(commit_id)
         staging = self.path(owner, f"staging/{receipt['request_id']}-{new_id('S')[2:].replace('-', '')}")
@@ -314,8 +373,16 @@ class MemoryStore:
         (staging / "records").mkdir()
         heads = deepcopy((snapshot.manifest or {}).get("record_heads", {}))
         pointers = deepcopy((snapshot.manifest or {}).get("pointers", dict.fromkeys(POINTER_KINDS)))
+        stones = deepcopy(tombstones(snapshot.manifest))
+        for rid, stone in (removed or {}).items():  # R22：删除 = 指针移入墓碑；恢复 = 原指针放回
+            heads.pop(rid)
+            stones[rid] = stone
+        for rid in restored or []:
+            heads[rid] = stones.pop(rid)["entry"]
         for record in changed:
             rid = safe_segment(record["record_id"])
+            if rid in stones:  # 已删除的记录只能先恢复，不能被普通提交改写（R22 D-05）
+                raise BurrowlError("INVALID_ARGUMENT", "该记录已删除，先用 records_restore 恢复再修改", {"record_id": rid})
             write_new_json(staging / "records" / f"{rid}.json", record, self.fault)
             heads[rid] = {"commit_id": commit_id, "path": f"commits/{commit_id}/records/{rid}.json",
                           "revision": record["revision"], "record_hash": record["record_hash"]}
@@ -329,6 +396,9 @@ class MemoryStore:
                     "generation": generation, "owner_id": owner.owner_id, "record_heads": heads,
                     "pointers": pointers, "request_ledger": ledger,
                     "changed_ids": [r["record_id"] for r in changed], "source_checks": checks}
+        if stones or removed or restored:  # 只在用到时写入，旧数据目录的清单格式不变
+            manifest |= {"removed_records": stones, "removed_ids": sorted(removed or {}),
+                         "restored_ids": sorted(restored or [])}
         write_new_json(staging / "receipt.json", receipt, self.fault)
         write_new_json(staging / "manifest.json", manifest, self.fault)
         # 发布前回读暂存字节：写入"成功"但内容有误的文件绝不能进入 HEAD。

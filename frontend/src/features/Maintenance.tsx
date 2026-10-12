@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAction, useOp } from "../api";
 import { KINDS, label } from "../labels";
 import { Empty, ErrorBox, href, Loading, Markdown, Panel, Tag, Time } from "../ui";
+import { OwnerTrashPanel } from "./Deletion";
 
 interface Observation {
   at: string;
@@ -69,6 +70,7 @@ export function Maintenance() {
       <RefRewritePanel onPlan={setPlanId} />
       <PlanPanel planId={planId} setPlanId={setPlanId} />
       <RunsPanel />
+      <OwnerTrashPanel />
       <RootsPanel />
       <SourcesPanel />
     </>

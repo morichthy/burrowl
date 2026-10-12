@@ -73,8 +73,8 @@ core         记录模型与校验、契约说明、哈希、原子写与锁、�
 | 模块 | 职责与代码入口 | 变化时检查的关联 |
 |---|---|---|
 | CORE 记录契约 | `core/records.py`（校验与领域规则）、`core/schema/`（memory.schema.json 与草案示例）、`core/contract.py`（给 AI 的契约说明；字段的 required / optional / conditional 由 schema 与默认值表生成，R20）、`core/links.py`（链接语法与 handle 生成） | 所有读写记录的服务、`memory.contract`、草案示例测试、前端类型、Skill 与 RECORDING；契约只做增量，已有指纹必须不变（`tests/service/test_links.py`）；契约标注与服务行为一致（`tests/service/test_ai_fields.py`） |
-| STORE 规范存储 | `storage/memory_store.py`（提交、CAS、幂等、暂存回读、恢复；`read_head` 只读 HEAD、提交清单与指定指针记录；`VerifiedRecords` 已校验记录缓存）、`storage/owners.py`（对象发现、业务卡、核心算法准入；对象发现不进入 `runs/`，`RunLocator` 按编号与位置找 Run）、`storage/sources.py`（来源登记）、`core/atomic.py`（锁） | 所有服务；备份恢复；validate |
-| MEM 记忆服务 | `services/memory/`：service（提交与读取过滤、handle；可见范围默认值见 policy）、vocabulary（两层关系词表与 warning，R19）、links（链接解析与重新固定）、concepts（概念库约束与术语扩展）、claims（结论、复核图、成熟度与派生统计）、documents（文稿）、history、raw_materials、provenance（影响与血缘）、associations、consolidation、export | REVIEW、QUERY、READ、HUB 的读取者；工作台记忆页；work 与 consolidate Skill |
+| STORE 规范存储 | `storage/memory_store.py`（提交、CAS、幂等、暂存回读、恢复；墓碑提交 `remove` 与 `tombstones`，R22；`read_head` 只读 HEAD、提交清单与指定指针记录；`VerifiedRecords` 已校验记录缓存）、`storage/owners.py`（对象发现、业务卡、核心算法准入；对象发现不进入 `runs/`，`RunLocator` 按编号与位置找 Run）、`storage/sources.py`（来源登记）、`core/atomic.py`（锁） | 所有服务；备份恢复；validate |
+| MEM 记忆服务 | `services/memory/`：service（提交与读取过滤、handle；可见范围默认值见 policy）、removal（删除与恢复记录、对象回收站，R22）、vocabulary（两层关系词表与 warning，R19）、links（链接解析与重新固定）、concepts（概念库约束与术语扩展）、claims（结论、复核图、成熟度与派生统计）、documents（文稿）、history、raw_materials、provenance（影响与血缘）、associations、consolidation、export | REVIEW、QUERY、READ、HUB 的读取者；工作台记忆页；work 与 consolidate Skill |
 | REVIEW 复核 | `services/review.py`、`services/memory/claims.py` | 检索的复核类别、正式用途、中枢发布策略、复核页 |
 | IDX 检索 | `index/`（db、projections（含上下文信封）、graph（图投影）、fusion、query_plan、rerank、conditions、extract、embed、late（后切分分组）、model_store）、`services/indexing.py`（同步、图路线、关联候选、缺口） | QUERY、READ 的召回；关系图页；模型安装；索引重建；发现可见性语义；评估脚本 `tools/eval_retrieval.py`、`tools/eval_recall_models.py` |
 | RUN 执行证据 | `services/runs.py`（建立、登记、执行、显式查找、丢弃与回收站）、`storage/owners.py` 的 `RunLocator`（R14：按编号与位置查找，上级按目录位置） | 引用解析、时间线与原始材料、关键操作记录、归属判定、收口的 `unfixed_evidence`、`system.validate`、关系图的 Run 节点；`tests/service/test_run_evidence.py` |
@@ -106,6 +106,8 @@ core         记录模型与校验、契约说明、哈希、原子写与锁、�
 | 已校验记录缓存 | 无独立权威：`MemoryStore.verified`，进程内，键为（记忆目录, 记录文件, record_hash） | 派生状态，进程退出即丢失，丢了只是变慢；有条目上限。HEAD 与提交清单每次重读并做路径检查，只有清单仍指向同一指纹才命中，所以其他进程的新提交自然可见。首次读取后磁盘上的记录被篡改，普通读取在重启前发现不了；recovery 与 `system.validate` 用 `fresh=True` 逐条重读校验 |
 | 筛选结果复用 | 无独立权威：`ReadingService.reuse`，进程内，键为召回的全部输入（查询计划、语料、范围、过滤、条件、筛选与重排配置、整份配置、重排模型目录） | 派生状态，进程退出即丢失，丢了只是重新召回；10 分钟时限、8 条上限。命中还要求 `IndexService.search_state` 的指纹相同：就绪对象集合、这些对象的全部索引水位行、嵌入模型指纹与投影版本，检索只读就绪对象的索引，所以这些相同则召回结果相同。未就绪对象（如索引同步失败的对象）不进入结果，缺口每次现算。新建或采用的对象立即建投影，所以新建后召回会重新计算 |
 | Run 登记 | 业务卡 `run.json`，在 `<上级对象目录>/runs/<编号小写>/` 或顶层 `runs/<编号小写>/`；上级按目录位置判断 | 不是对象：不进对象列表、不保存记录、不建检索投影，关系图的 Run 节点由引用它的对象投影。丢弃的 Run 在 `.burrowl/trash/runs/`（可恢复，不进备份包），清空回收站是用户专属操作 |
+| 已删除的记录 | 提交清单的 `removed_records`（R22 墓碑：原指针、理由、时间、执行者；`removed_ids` / `restored_ids` 为本次变化） | 删除与恢复都是新提交，旧修订不动；只在用到时写入这些字段，旧清单格式不变 |
+| 对象回收站 | `.burrowl/trash/owners/<编号>/`（`item/` 是移走的目录，`discard.json` 是说明）与只追加的 `.burrowl/trash/owners.log.jsonl`（R22） | 移走前核对写锁与 HEAD；被采用文档只移记忆目录；清空回收站是用户专属的永久删除；投影删除失败由 `index.reconcile` 补删 |
 | 检索投影 | `.burrowl/index/index.sqlite3`：每个 (Owner, 投影, 通道) 的水位绑定 HEAD、投影版本和模型指纹；图投影（corpus=graph）与关联候选也在这里 | 可删除重建；结构版本不符时整库清空重建；pending/stale 的投影如实报告。边由声明它的对象负责，另一端缺失时查询排除并计入悬空数 |
 | 概念库 | 配置 `graph.concept_owner_id` 指定的那一个 knowledge 对象（`knowledge/<slug>/knowledge.json`）；其他 knowledge 对象是通用知识对象 | 概念页是普通 wiki_page 记录；名称唯一性只在概念库内检查；未配置时概念链接都记为未解析 |
 | 成熟度 | review 记录的 `maturity` 等字段 | 不写进结论或记录正文；随复核失效；派生统计不持久化 |

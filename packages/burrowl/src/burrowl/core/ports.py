@@ -11,6 +11,9 @@ class IndexSink(Protocol):
     def status(self, owner_id: str) -> dict[str, Any]:
         """返回 {"index_status": "indexed|pending|failed|not_configured", "details": {...}}。"""
 
+    def on_owner_removed(self, owner_id: str) -> None:
+        """对象移入回收站后调用（R22 D-08）：删除它的全部派生投影。"""
+
 
 class NullIndex:
     """未配置检索时使用：如实报告 not_configured，而不是假装已索引。"""
@@ -20,3 +23,6 @@ class NullIndex:
 
     def status(self, owner_id: str) -> dict[str, Any]:
         return {"index_status": "not_configured", "details": {}}
+
+    def on_owner_removed(self, owner_id: str) -> None:
+        return None

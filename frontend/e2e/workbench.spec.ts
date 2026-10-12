@@ -269,3 +269,31 @@ test("维护计划（R16）：勾选候选生成计划 → 交给 AI → AI 写�
   await page.getByRole("button", { name: "执行" }).click();
   await expect(page.locator(".plan-detail").getByText("已执行")).toBeVisible();
 });
+
+test("删除与恢复（R22）：记录删除后可恢复；对象移入回收站后在维护页恢复", async ({ page }) => {
+  await page.goto("#/memory/RES-VENV-DEMO");
+  const row = page.getByRole("row", { name: /虚拟环境验证概览/ });
+  await expect(row).toBeVisible();
+  await row.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "删除所选（1）" }).click();
+  await page.getByLabel("删除理由").fill("端到端测试");
+  await page.getByRole("button", { name: "删除 1 条记录" }).click();
+  await expect(row).toHaveCount(0);
+  await page.getByText("已删除的记录（1）").click();
+  await page.getByRole("button", { name: "恢复" }).click();
+  // 恢复完成后"已删除的记录"消失、记录回到列表；之后的对象预检才基于恢复后的 HEAD
+  await expect(page.getByText(/已删除的记录/)).toHaveCount(0);
+  await expect(page.getByRole("row", { name: /虚拟环境验证概览/ })).toBeVisible();
+
+  await page.getByRole("button", { name: "删除对象" }).click();
+  await page.getByLabel("删除理由").fill("端到端测试");
+  await page.getByRole("button", { name: "移入回收站" }).click();
+  await expect(page).toHaveURL(/#\/memory$/);
+  await expect(page.getByText("RES-VENV-DEMO")).toHaveCount(0);
+  await page.goto("#/maintenance");
+  const trash = page.locator("section.panel").filter({ has: page.getByRole("heading", { name: "已删除的对象（1）" }) });
+  await trash.getByRole("button", { name: "恢复" }).click();
+  await expect(page.getByRole("heading", { name: "已删除的对象（0）" })).toBeVisible();
+  await page.goto("#/memory");
+  await expect(page.getByText("RES-VENV-DEMO")).toBeVisible();
+});

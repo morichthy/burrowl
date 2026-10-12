@@ -15,12 +15,13 @@ from ...core.errors import BurrowlError, rebase, schema_error
 from ...core.hashing import canonical_hash, sha256_bytes
 from ...core.ports import IndexSink, NullIndex
 from ...core.records import content_hash, record_hash, validate_commit_request, validate_record
-from ...storage.memory_store import Snapshot
+from ...storage.memory_store import Snapshot, tombstones
 from ...storage.owners import SENSITIVITY_RANK, Owner, OwnerIndex
 from . import concepts, policy, rules, vocabulary
 from .claims import ClaimGraph, blocked_records
 from .context import RefResolver, Storage
 from .links import LinkResolver
+from .removal import Removal
 
 SUPPORT_RELATIONS = {"supports", "input"}
 
@@ -65,6 +66,7 @@ class MemoryService:
         self.claim_lookup_factory = claim_lookup_factory
         # 概念库对象 ID 的读取函数（来自配置 graph.concept_owner_id，R12 D-12）；None 表示未配置
         self.concept_owner = concept_owner or (lambda: None)
+        self.removal = Removal(self)  # R22：删除与恢复记录、对象回收站
 
     # ---------- 读取 ----------
     def owners(self) -> OwnerIndex:
@@ -285,6 +287,9 @@ class MemoryService:
                 rid = operation["record_id"]
                 old = snapshot.records.get(rid)
                 if not old:
+                    if rid in tombstones(snapshot.manifest):  # R22：已删除的记录要先恢复
+                        raise BurrowlError("NOT_FOUND", "要修订的记录已删除；先用 records_restore 恢复",
+                                           {"record_id": rid, "removed": True})
                     raise BurrowlError("NOT_FOUND", "要修订的记录不属于此对象", {"record_id": rid})
                 if old["revision"] != operation["expected_revision"]:
                     raise BurrowlError("VERSION_CONFLICT", "记录修订已经变化",

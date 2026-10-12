@@ -7,7 +7,7 @@ from ...core.errors import BurrowlError
 from ...core.hashing import canonical_hash, sha256_file
 from ...core.records import require_ref
 from ...storage.layout import Workspace
-from ...storage.memory_store import MemoryStore
+from ...storage.memory_store import MemoryStore, tombstones
 from ...storage.owners import SENSITIVITY_RANK, Owner, OwnerIndex, OwnerRegistry
 from ...storage.sources import SourceRegistry
 
@@ -50,13 +50,17 @@ class RefResolver:
         return self._cache[key]
 
     def _record_owner(self, record_id: str) -> tuple[Owner, Any]:
-        matches = []
+        matches, removed = [], False
         for owner in self.index.owners:
             if not owner.persisted:
                 continue
             snapshot = self.storage.store.read_snapshot(owner)
             if record_id in snapshot.records:
                 matches.append((owner, snapshot))
+            removed = removed or record_id in tombstones(snapshot.manifest)
+        if not matches and removed:  # R22 D-02：已删除的记录不能被新引用
+            raise BurrowlError("UNRESOLVED_REFERENCE", "引用的记录已删除；需要时先用 records_restore 恢复",
+                               {"target_id": record_id, "removed": True})
         if len(matches) != 1:
             raise BurrowlError("UNRESOLVED_REFERENCE", "记录引用不存在或身份重复", {"target_id": record_id})
         return matches[0]

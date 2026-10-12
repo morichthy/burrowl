@@ -11,7 +11,7 @@
 | 接口 | `tests/interfaces/` | HTTP 安全与路由、MCP（进程内与 stdio 真实拉起）、操作经组合根的完整链路 | `uv run pytest tests/interfaces` |
 | 连接器 | `tests/connectors/` | WeKnora 适配器（模拟 v0.8 REST）与同步引擎的端到端；LightRAG 连接器（假实现的合约测试，装了 lightrag-hku 时再跑真实 1.5.7） | `uv run pytest tests/connectors` |
 | 前端组件 | `frontend/src/**/*.test.tsx` | 页面行为与发给后端的参数（模拟 fetch） | `npm --prefix frontend test` |
-| 浏览器端到端 | `frontend/e2e/` | 真实后端 + 构建产物 + 系统 Edge：阅读会话双向交互、复核后过滤、中枢发布、维护与原始材料、工作台笔记从交给 AI 到执行方案、维护计划从勾选候选到执行 | `npm --prefix frontend run e2e` |
+| 浏览器端到端 | `frontend/e2e/` | 真实后端 + 构建产物 + 系统 Edge：阅读会话双向交互、复核后过滤、中枢发布、维护与原始材料、工作台笔记从交给 AI 到执行方案、维护计划从勾选候选到执行、删除与恢复记录和对象 | `npm --prefix frontend run e2e` |
 | 打包 | `packaging/build.py` 与一次真实离线安装 | 中文和空格路径、版本切换、MCP 登记与拉起 | 见下文"不能省略的检查" |
 
 带标记的测试默认跳过：
@@ -45,6 +45,7 @@
 - 提交的 CAS、幂等、暂存回读、锁清理（包括并发清理不能移走新锁）。
 - 已校验记录缓存：命中与重读等价且返回独立副本、其他进程的新提交可见、完整性检查绕过缓存、容量有界；提交与 inspect 不重读未变化对象的记录（`tests/service/test_record_cache.py`）。
 - Run 作为执行证据（R14）：扫描不读 Run 卡、按编号与位置定位、受限独立 Run 的材料仍受限、拒绝向 Run 提交与把 Run 放进检索范围、关系图 Run 节点来自引用、丢弃与恢复；全局关键操作记录与 `runs.search` 的惰性读取结果与全量读取一致（含"最早结束、最后改名"），且不读全部 Run 卡（`tests/service/test_run_evidence.py`）。
+- 删除与恢复（R22）：墓碑提交后当前快照与检索中没有、按修订号仍可读、恢复逐字节相同；被引用与指针记录的护栏、一起删除与一起恢复；不能新引用或改写已删除的记录；对象回收站的护栏（外部引用、嵌套对象、概念库、HEAD）、被采用文档的原件保留、投影删除与重建、关键操作记录（`tests/service/test_deletion.py`）。
 - 操作内对象列表复用：保存中的普通读取只扫描一次；写业务卡后作废；发布前复核与读取回源仍重新扫描，操作开始后业务卡被改照样报 STALE_BASIS（`tests/service/test_owner_scan_scope.py`）。
 - 维护计划交给 AI（R16）：候选成计划只含所选记录、候选标为 planned；未写处置不能执行；退回保留处置并记下意见；执行后修订署名为 AI、原因带计划编号；`maintenance_apply` 不在 MCP 工具中。
 - 工作台笔记（R15）：每个状态只由一方推进（AI 只能回写 queued）；方案的步骤类型、步数、同对象多次提交与过期 HEAD 被拒绝，预演不写入；执行时 HEAD 变化不写入并退回，中途失败如实列出已写入步骤；编号在清除后不复用、旧列表格式可读。用户专属的笔记操作不出现在 MCP 工具中。

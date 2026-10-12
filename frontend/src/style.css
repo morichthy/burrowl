@@ -401,3 +401,9 @@ input.narrow { min-width: 0; width: 64px; }
 .plan-draft { background: var(--panel-2); border-left: 3px solid var(--warn); border-radius: 0 6px 6px 0; padding: 6px 10px; }
 .source-state { display: flex; gap: 6px; align-items: center; white-space: nowrap; }
 .source-state + .hint { white-space: nowrap; }
+
+/* R22 删除确认与已删除的记录 */
+.confirm-box { border: 1px solid color-mix(in srgb, var(--bad) 35%, transparent); border-radius: var(--radius-sm); padding: 10px 12px; margin: 8px 0; background: var(--panel); }
+.confirm-box .toolbar input { flex: 1; min-width: 200px; }
+details.discarded { margin-top: 12px; }
+details.discarded summary { cursor: pointer; color: var(--muted); }

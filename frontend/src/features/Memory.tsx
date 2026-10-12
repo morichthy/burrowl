@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useAction, useOp } from "../api";
 import { KINDS, label, LEVELS, OWNER_TYPES } from "../labels";
 import { Empty, ErrorBox, href, type LinkTargets, linkify, Loading, Markdown, Panel, ReviewBadge, Tag, Time, useDebounced } from "../ui";
+import { DiscardedRecords, DiscardOwner, DiscardRecords } from "./Deletion";
 import type { QueueItem } from "./Review";
 
 interface OwnerSummary {
@@ -150,6 +151,15 @@ export function OwnerView({ ownerId }: { ownerId: string }) {
   const toggleKind = (kind: string) => setKinds((now) => (now.includes(kind) ? now.filter((k) => k !== kind) : [...now, kind]));
   const badges = useClaimBadges(ownerId);
   const owner = records.data?.owner;
+  // R22：勾选记录后可一起删除（一起删除的记录之间互相引用不算阻碍）
+  const [selected, setSelected] = useState<string[]>([]);
+  const [removals, setRemovals] = useState(0);
+  const toggleSelected = (id: string) => setSelected((now) => (now.includes(id) ? now.filter((x) => x !== id) : [...now, id]));
+  const afterRemoval = () => {
+    setSelected([]);
+    setRemovals((n) => n + 1);
+    records.reload();
+  };
   return (
     <>
       <p>
@@ -161,6 +171,7 @@ export function OwnerView({ ownerId }: { ownerId: string }) {
           <>
             {owner ? <Tag>{label(OWNER_TYPES, owner.owner_type)}</Tag> : null}
             {records.data?.head ? <Tag>第 {records.data.head.generation} 次提交</Tag> : null}
+            <DiscardOwner ownerId={ownerId} />
           </>
         }
       >
@@ -188,6 +199,7 @@ export function OwnerView({ ownerId }: { ownerId: string }) {
                 <input type="checkbox" checked={!mainOnly} onChange={() => setMainOnly(!mainOnly)} /> 显示目标、检查点、复核等工作流记录
               </label>
               <span className="spacer" />
+              <DiscardRecords ownerId={ownerId} recordIds={selected} label={`删除所选（${selected.length}）`} onDone={afterRemoval} />
               <ExportButton ownerId={ownerId} recordIds={records.data?.items.map((r) => r.record_id)} />
             </div>
             {kindOptions.length ? (
@@ -211,6 +223,7 @@ export function OwnerView({ ownerId }: { ownerId: string }) {
             <table className="table">
               <thead>
                 <tr>
+                  <th aria-label="选择" />
                   <th>层级</th>
                   <th>标题</th>
                   <th>类型</th>
@@ -221,6 +234,9 @@ export function OwnerView({ ownerId }: { ownerId: string }) {
               <tbody>
                 {records.data?.items.map((r) => (
                   <tr key={r.record_id}>
+                    <td>
+                      <input type="checkbox" aria-label={`选择 ${r.title}`} checked={selected.includes(r.record_id)} onChange={() => toggleSelected(r.record_id)} />
+                    </td>
                     <td>{r.level ? <span className={`level ${r.level}`}>{r.level}</span> : "—"}</td>
                     <td>
                       <a href={href("memory", ownerId, r.record_id)}>{r.title}</a>
@@ -239,6 +255,7 @@ export function OwnerView({ ownerId }: { ownerId: string }) {
                 ))}
               </tbody>
             </table>
+            <DiscardedRecords key={removals} ownerId={ownerId} onRestored={records.reload} />
           </>
         ) : null}
         {tab === "document" ? <DocumentView ownerId={ownerId} /> : null}
@@ -412,6 +429,9 @@ export function RecordView({ ownerId, recordId }: { ownerId: string; recordId: s
                 <Tag>修订 {r.revision}</Tag>
               )}
               {handle ? <Tag>@{handle}</Tag> : null}
+              {revision == null ? (
+                <DiscardRecords ownerId={ownerId} recordIds={[recordId]} label="删除记录" onDone={() => (window.location.hash = href("memory", ownerId))} />
+              ) : null}
               <button type="button" className="small" onClick={() => setExported(!exported)}>
                 {exported ? "返回正文" : "导出视图"}
               </button>

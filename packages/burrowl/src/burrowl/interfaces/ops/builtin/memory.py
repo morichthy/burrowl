@@ -124,11 +124,11 @@ def records(ctx: Ctx, owner_id: OwnerId,
 
 @op("memory.activity")
 def activity_list(ctx: Ctx, owner_id: Annotated[str | None, Field(description="只看这个对象（含其 Run）")] = None,
-                  kinds: Annotated[list[Literal["owner", "attribution", "save", "review", "run", "publish"]] | None,
+                  kinds: Annotated[list[Literal["owner", "attribution", "save", "review", "run", "publish", "remove"]] | None,
                                    Field(description="只看这些类型；默认全部")] = None,
                   limit: Annotated[int, Field(ge=1, le=200)] = 50,
                   before: Annotated[str | None, Field(description="上一页返回的 next_before")] = None) -> dict:
-    """关键操作记录（只读，按时间倒序）：建立对象、归属确认、保存、复核、Run 结束、发布，每条一行，带可追溯的引用。
+    """关键操作记录（只读，按时间倒序）：建立对象、归属确认、保存、复核、Run 结束、发布、删除与恢复，每条一行，带可追溯的引用。
     检索、阅读、来源登记等不改变资产的操作不在其中。"""
     return activity.ActivityLog(ctx.app.storage, ctx.app.hub.state).list(owner_id=owner_id, kinds=kinds,
                                                                        limit=limit, before=before)
@@ -330,3 +330,71 @@ def feedback(ctx: Ctx, owner_id: OwnerId, query_id: str,
 def recovery_inspect(ctx: Ctx, owner_id: OwnerId) -> dict:
     """检查记忆目录健康状况（写锁、孤立提交、暂存残留）；只报告不修改。"""
     return recovery.inspect(ctx.app.storage.store, ctx.app.storage.owners.scan().get(owner_id))
+
+
+# ---------- 删除与恢复（R22）----------
+RecordIds = Annotated[list[str], Field(description="记录 ID（MEM-…）；一次可以删除或恢复多条，它们之间互相引用不算阻碍",
+                                       min_length=1)]
+Head = Annotated[str | None, Field(description="预检时看到的对象 HEAD（dry_run 返回的 head）；给出时不一致就拒绝")]
+
+
+@op("memory.records_discard", effect="write")
+def records_discard(ctx: Ctx, owner_id: OwnerId, record_ids: RecordIds,
+                    reason: Annotated[str, Field(description="为什么删除，例如：测试数据、重复记录、写错对象")],
+                    expected_head: Head = None,
+                    dry_run: Annotated[bool, Field(description="true 只报告能否删除与阻碍，不写入")] = False) -> dict:
+    """删除本来就不该记的记录（测试数据、重复、写错对象）：从当前记录中移除，旧修订留在历史里，可用 records_restore 恢复。
+
+    结论错了不要删除，用复核撤回（retracted）保留教训。仍被其他记录引用的记录、目标/检查点/策略记录不能删除，
+    返回的 blockers 列出引用者；先修订引用者，或把它们一起删除。"""
+    result = ctx.app.memory.removal.discard_records(owner_id, record_ids, reason=reason, actor=ctx.actor,
+                                                    expected_head=expected_head, dry_run=dry_run)
+    return result if dry_run else activity.with_activity(result, [activity.removal_line(result)])
+
+
+@op("memory.records_restore", effect="write")
+def records_restore(ctx: Ctx, owner_id: OwnerId, record_ids: RecordIds, expected_head: Head = None,
+                    dry_run: Annotated[bool, Field(description="true 只报告能否恢复，不写入")] = False) -> dict:
+    """恢复已删除的记录（与删除前逐字节相同）。它引用的记录或对象已不存在时拒绝。"""
+    result = ctx.app.memory.removal.restore_records(owner_id, record_ids, actor=ctx.actor,
+                                                    expected_head=expected_head, dry_run=dry_run)
+    return result if dry_run else activity.with_activity(result, [activity.removal_line(result)])
+
+
+@op("memory.records_discarded")
+def records_discarded(ctx: Ctx, owner_id: OwnerId) -> list:
+    """对象内已删除的记录（标题、层级、理由、时间、执行者），可用 records_restore 恢复。"""
+    return ctx.app.memory.removal.discarded_records(owner_id)
+
+
+@op("memory.owner_discard", effect="write")
+def owner_discard(ctx: Ctx, owner_id: OwnerId,
+                  reason: Annotated[str, Field(description="为什么删除，例如：误建、测试对象、与另一对象重复")],
+                  expected_head: Head = None,
+                  dry_run: Annotated[bool, Field(description="true 只报告影响与阻碍，不移动任何文件")] = False) -> dict:
+    """删除对象到回收站（可用 owner_restore 恢复）：业务卡对象移走整个对象目录（含记录与其下的 Run），
+    被采用的文档只移走记忆目录、原件留在原处。
+
+    仍被其他对象引用、目录里还有其他对象、或是概念库时拒绝。Run 用 runs_discard。永久删除只能由用户在工作台清空回收站。"""
+    result = ctx.app.memory.removal.discard_owner(owner_id, reason=reason, actor=ctx.actor,
+                                                  expected_head=expected_head, dry_run=dry_run)
+    return result if dry_run else activity.with_activity(result, [f"删除对象 {result['owner_id']}（移入回收站）：{reason}"])
+
+
+@op("memory.owner_trash")
+def owner_trash(ctx: Ctx) -> list:
+    """回收站中的对象（原位置、方式、理由、时间、执行者）。"""
+    return ctx.app.memory.removal.trash()
+
+
+@op("memory.owner_restore", effect="write")
+def owner_restore(ctx: Ctx, owner_id: OwnerId) -> dict:
+    """把回收站中的对象移回原位置并重建检索投影（原位置已被占用时拒绝）。"""
+    result = ctx.app.memory.removal.restore_owner(owner_id, actor=ctx.actor)
+    return activity.with_activity(result, [f"恢复对象 {result['owner_id']}"])
+
+
+@op("memory.owner_empty_trash", effect="user")
+def owner_empty_trash(ctx: Ctx) -> dict:
+    """永久删除回收站中的全部对象。用户专属，只在工作台与 CLI 提供。"""
+    return ctx.app.memory.removal.empty_trash(actor=ctx.actor)

@@ -461,6 +461,7 @@ describe("维护页的 Run（R14）", () => {
     };
     handlers["runs.restore"] = () => ({ status: "restored" });
     handlers["runs.empty_trash"] = () => ({ removed: ["run-9"] });
+    handlers["memory.owner_trash"] = () => [];
     vi.stubGlobal("prompt", vi.fn(() => "无可复用内容"));
     vi.stubGlobal("confirm", vi.fn(() => true));
     render(<Maintenance />);

@@ -1985,7 +1985,7 @@ export declare namespace MemoryRecords {
 
 export declare namespace MemoryActivity {
   /**
-   * 关键操作记录（只读，按时间倒序）：建立对象、归属确认、保存、复核、Run 结束、发布，每条一行，带可追溯的引用。
+   * 关键操作记录（只读，按时间倒序）：建立对象、归属确认、保存、复核、Run 结束、发布、删除与恢复，每条一行，带可追溯的引用。
    * 检索、阅读、来源登记等不改变资产的操作不在其中。
    */
   export interface Args {
@@ -1996,7 +1996,7 @@ export declare namespace MemoryActivity {
     /**
      * 只看这些类型；默认全部
      */
-    kinds?: ("owner" | "attribution" | "save" | "review" | "run" | "publish")[] | null;
+    kinds?: ("owner" | "attribution" | "save" | "review" | "run" | "publish" | "remove")[] | null;
     limit?: number;
     /**
      * 上一页返回的 next_before
@@ -2392,6 +2392,125 @@ export declare namespace MemoryRecovery {
      */
     owner_id: string;
   }
+}
+
+export declare namespace MemoryRecordsDiscard {
+  /**
+   * 删除本来就不该记的记录（测试数据、重复、写错对象）：从当前记录中移除，旧修订留在历史里，可用 records_restore 恢复。
+   */
+  export interface Args {
+    /**
+     * 对象 ID，如 RES-…、PRJ-…、RUN-…
+     */
+    owner_id: string;
+    /**
+     * 记录 ID（MEM-…）；一次可以删除或恢复多条，它们之间互相引用不算阻碍
+     *
+     * @minItems 1
+     */
+    record_ids: [string, ...string[]];
+    /**
+     * 为什么删除，例如：测试数据、重复记录、写错对象
+     */
+    reason: string;
+    /**
+     * 预检时看到的对象 HEAD（dry_run 返回的 head）；给出时不一致就拒绝
+     */
+    expected_head?: string | null;
+    /**
+     * true 只报告能否删除与阻碍，不写入
+     */
+    dry_run?: boolean;
+  }
+}
+
+export declare namespace MemoryRecordsRestore {
+  /**
+   * 恢复已删除的记录（与删除前逐字节相同）。它引用的记录或对象已不存在时拒绝。
+   */
+  export interface Args {
+    /**
+     * 对象 ID，如 RES-…、PRJ-…、RUN-…
+     */
+    owner_id: string;
+    /**
+     * 记录 ID（MEM-…）；一次可以删除或恢复多条，它们之间互相引用不算阻碍
+     *
+     * @minItems 1
+     */
+    record_ids: [string, ...string[]];
+    /**
+     * 预检时看到的对象 HEAD（dry_run 返回的 head）；给出时不一致就拒绝
+     */
+    expected_head?: string | null;
+    /**
+     * true 只报告能否恢复，不写入
+     */
+    dry_run?: boolean;
+  }
+}
+
+export declare namespace MemoryRecordsDiscarded {
+  /**
+   * 对象内已删除的记录（标题、层级、理由、时间、执行者），可用 records_restore 恢复。
+   */
+  export interface Args {
+    /**
+     * 对象 ID，如 RES-…、PRJ-…、RUN-…
+     */
+    owner_id: string;
+  }
+}
+
+export declare namespace MemoryOwnerDiscard {
+  /**
+   * 删除对象到回收站（可用 owner_restore 恢复）：业务卡对象移走整个对象目录（含记录与其下的 Run），
+   * 被采用的文档只移走记忆目录、原件留在原处。
+   */
+  export interface Args {
+    /**
+     * 对象 ID，如 RES-…、PRJ-…、RUN-…
+     */
+    owner_id: string;
+    /**
+     * 为什么删除，例如：误建、测试对象、与另一对象重复
+     */
+    reason: string;
+    /**
+     * 预检时看到的对象 HEAD（dry_run 返回的 head）；给出时不一致就拒绝
+     */
+    expected_head?: string | null;
+    /**
+     * true 只报告影响与阻碍，不移动任何文件
+     */
+    dry_run?: boolean;
+  }
+}
+
+export declare namespace MemoryOwnerTrash {
+  /**
+   * 回收站中的对象（原位置、方式、理由、时间、执行者）。
+   */
+  export interface Args {}
+}
+
+export declare namespace MemoryOwnerRestore {
+  /**
+   * 把回收站中的对象移回原位置并重建检索投影（原位置已被占用时拒绝）。
+   */
+  export interface Args {
+    /**
+     * 对象 ID，如 RES-…、PRJ-…、RUN-…
+     */
+    owner_id: string;
+  }
+}
+
+export declare namespace MemoryOwnerEmptyTrash {
+  /**
+   * 永久删除回收站中的全部对象。用户专属，只在工作台与 CLI 提供。
+   */
+  export interface Args {}
 }
 
 export declare namespace QuerySearch {
@@ -3381,6 +3500,13 @@ export interface OpArgs {
   "memory.summary_save": MemorySummarySave.Args;
   "memory.feedback": MemoryFeedback.Args;
   "memory.recovery": MemoryRecovery.Args;
+  "memory.records_discard": MemoryRecordsDiscard.Args;
+  "memory.records_restore": MemoryRecordsRestore.Args;
+  "memory.records_discarded": MemoryRecordsDiscarded.Args;
+  "memory.owner_discard": MemoryOwnerDiscard.Args;
+  "memory.owner_trash": MemoryOwnerTrash.Args;
+  "memory.owner_restore": MemoryOwnerRestore.Args;
+  "memory.owner_empty_trash": MemoryOwnerEmptyTrash.Args;
   "query.search": QuerySearch.Args;
   "query.page": QueryPage.Args;
   "query.cancel": QueryCancel.Args;
@@ -3524,6 +3650,13 @@ export const OP_EFFECTS: Record<OpName, string> = {
   "memory.summary_save": "write",
   "memory.feedback": "write",
   "memory.recovery": "admin",
+  "memory.records_discard": "write",
+  "memory.records_restore": "write",
+  "memory.records_discarded": "read",
+  "memory.owner_discard": "write",
+  "memory.owner_trash": "read",
+  "memory.owner_restore": "write",
+  "memory.owner_empty_trash": "user",
   "query.search": "read",
   "query.page": "read",
   "query.cancel": "read",

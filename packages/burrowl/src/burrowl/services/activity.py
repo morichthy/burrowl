@@ -7,6 +7,7 @@
     review    复核状态变化               ← kind=review 的记录
     run       Run 完成 / 失败 / 放弃     ← Run 业务卡 status 与 ended_at
     publish   发布到知识中枢             ← 中枢执行记录（hub_state.runs）
+    remove    删除 / 恢复记录与对象（R22）← 墓碑提交的 removed_ids / restored_ids 与回执；对象回收站日志
 
 检索、阅读、归属判定调用、来源登记、索引补齐都不记。
 各来源按时间倒序惰性产出，再归并；读取量随返回条数增长，而不是随全部历史增长
@@ -22,8 +23,9 @@ from ..core.errors import BurrowlError
 from ..storage.hub_state import HubState
 from ..storage.owners import Owner, OwnerIndex
 from .memory.context import Storage
+from .memory.removal import trash_log
 
-KINDS = ("owner", "attribution", "save", "review", "run", "publish")
+KINDS = ("owner", "attribution", "save", "review", "run", "publish", "remove")
 RUN_DONE = {"succeeded": "完成", "failed": "失败", "abandoned": "放弃"}
 REVIEW_STATE = {"accepted": "确认", "disputed": "标为有争议", "retracted": "撤回", "superseded": "标为被替代",
                 "not-reviewed": "恢复为未复核"}
@@ -114,9 +116,32 @@ def run_lines(storage: Storage, run_id: str) -> list[str]:
     return [line] if line else []
 
 
-def with_activity(result: dict, lines: list[str]) -> dict:
+def with_activity(result: dict, lines: list[str | None]) -> dict:
     """把 activity 行附到写操作的返回值上（没有关键操作时不加字段）。"""
+    lines = [line for line in lines if line]
     return result | {"activity": lines} if lines and isinstance(result, dict) else result
+
+
+def removal_summary(owner_id: str, removed: list, restored: list) -> str:
+    """一次墓碑提交的一行摘要（R22 D-10）。"""
+    parts = ([f"删除 {len(removed)} 条记录"] if removed else []) + ([f"恢复 {len(restored)} 条记录"] if restored else [])
+    return f"{owner_id} " + "，".join(parts)
+
+
+def removal_line(result: dict) -> str | None:
+    if result.get("save_status") != "committed":
+        return None
+    statuses = [r["status"] for r in result["record_results"]]
+    return removal_summary(result["owner_id"], [s for s in statuses if s == "removed"],
+                           [s for s in statuses if s == "restored"])
+
+
+TRASH_EVENT = {"discard": "删除对象（移入回收站）", "restore": "恢复对象", "purge": "永久删除对象"}
+
+
+def trash_summary(event: dict) -> str:
+    tail = f"：{event['reason']}" if event.get("reason") else ""
+    return f"{TRASH_EVENT.get(event['event'], event['event'])} {event['owner_id']}「{event.get('title', '')}」{tail}"
 
 
 def owner_line(owner: Owner, adopted: bool = False) -> str:
@@ -160,6 +185,8 @@ class ActivityLog:
             streams.append(self._all_runs_stream(registry))
         if self.hub_state is not None and "publish" in wanted and owner_id is None:
             streams.append(self._publish_stream())
+        if "remove" in wanted:  # 回收站里的对象不在对象列表中，按日志单独列出
+            streams.append(self._trash_stream(owner_id))
         merged = heapq.merge(*streams, key=_sort_key, reverse=True)
         if before:
             merged = (e for e in merged if _cursor(e) < before)
@@ -179,7 +206,7 @@ class ActivityLog:
                                "owner_id": owner.owner_id, "summary": owner_line(owner, adopted),
                                "ref": {"kind": "owner", "owner_id": owner.owner_id}})
         commits = self._commit_stream(owner, wanted) if owner.persisted and wanted & {"attribution", "save",
-                                                                                         "review"} else iter(())
+                                                                                         "review", "remove"} else iter(())
         return heapq.merge(commits, iter(events), key=_sort_key, reverse=True)
 
     @staticmethod
@@ -214,6 +241,15 @@ class ActivityLog:
     def _commit_stream(self, owner: Owner, wanted: set[str]) -> Iterator[dict]:
         store = self.storage.store
         for manifest in store.iter_manifests(owner):
+            if manifest.get("removed_ids") or manifest.get("restored_ids"):  # R22 墓碑提交：不写记录
+                receipt = store.read_receipt(owner, manifest["commit_id"])
+                if "remove" in wanted:
+                    yield {"at": receipt.get("at"), "kind": "remove", "actor": actor_label(receipt.get("actor")),
+                           "owner_id": owner.owner_id, "ref": {"kind": "commit", "owner_id": owner.owner_id,
+                                                               "commit_id": manifest["commit_id"]},
+                           "summary": removal_summary(owner.owner_id, manifest.get("removed_ids") or [],
+                                                      manifest.get("restored_ids") or [])}
+                continue
             records = store.commit_records(owner, manifest)
             if not records:
                 continue
@@ -224,6 +260,12 @@ class ActivityLog:
                                        receipt.get("attribution")):
                 if event["kind"] in wanted:
                     yield event
+
+    def _trash_stream(self, owner_id: str | None) -> Iterator[dict]:
+        rows = [{"at": e["at"], "kind": "remove", "actor": actor_label(e.get("actor")), "owner_id": e["owner_id"],
+                 "summary": trash_summary(e), "ref": {"kind": "owner_trash", "owner_id": e["owner_id"]}}
+                for e in trash_log(self.storage) if owner_id is None or e["owner_id"] == owner_id]
+        yield from sorted(rows, key=_sort_key, reverse=True)
 
     def _publish_stream(self) -> Iterator[dict]:
         rows = [{"at": run["finished_at"], "kind": "publish", "actor": "用户", "owner_id": None,

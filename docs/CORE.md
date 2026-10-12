@@ -136,7 +136,31 @@ AI 组成提交请求：{owner_id, expected_head, request_id, operations:[put_re
 - 报错结构 `{code, message, details, errors[], retryable}`：`errors` 一次列出全部问题，每项的 `path` 从工具参数的根算起（如 `/operations/0/draft/title`），`expected` 给允许的值或字段，`details.hint` 给下一步。
 - 意外异常返回 `INTERNAL_ERROR`（异常类型、一句摘要、`incident_id`），完整堆栈只写入数据目录的 `.burrowl/logs/errors.jsonl`。被拒绝的调用只记工具名、错误码和出错路径（不记参数内容），`system.tool_errors` 按工具汇总，用来发现哪些工具的说明需要改。
 
-实现：`services/memory/service.py`、`storage/memory_store.py`、`core/atomic.py`。
+**删除与恢复（R22）**
+
+删除只用于本来就不该记的内容（测试数据、重复、写错对象）；结论错了用复核撤回，保留教训。
+
+```text
+删除记录 records_discard(owner_id, record_ids, reason, [expected_head], [dry_run])
+    护栏：指针记录（policy / goal / checkpoint）不能删；其他记录的当前修订经 sources、payload、links
+          引用这些记录或其中的结论时拒绝（INVALID_TRANSITION，列出引用者）；一起删除的记录互相引用不算
+    墓碑提交：record_heads 移除该记录，清单的 removed_records 保存原指针、理由、时间、执行者
+    之后：当前快照、检索、文稿、续接、关系图、发布都没有它；按修订号的固定引用照常可读；
+          不带修订号读取 → NOT_FOUND（removed=true）；新引用它 → UNRESOLVED_REFERENCE；普通提交不能改写它
+恢复记录 records_restore：原指针放回，记录逐字节不变；它引用的记录、结论、对象必须仍存在（一起恢复的视为存在）
+
+删除对象 owner_discard(owner_id, reason, [expected_head], [dry_run])
+    护栏：其他对象的当前记录引用本对象、其中的记录或结论、其下的 Run、目录内已登记的来源；
+          目录里还有其他对象；配置的概念库 → 拒绝
+    业务卡对象：整个对象目录移到 .burrowl/trash/owners/<编号>/item/；被采用文档：只移走记忆目录，原件留在原处
+    之后：检索投影立即删除；知识中枢在下次发布计划中按 on_retract 删除或标记
+恢复对象 owner_restore：原位置未被占用时移回并重建投影
+清空回收站 owner_empty_trash：永久删除，仅限用户（工作台"维护与监测"，或 burrowl call）
+```
+
+删除与恢复进入关键操作记录：记录来自墓碑提交，对象来自回收站日志 `.burrowl/trash/owners.log.jsonl`。
+
+实现：`services/memory/service.py`、`services/memory/removal.py`、`storage/memory_store.py`、`core/atomic.py`。
 
 ## 3. 检索与召回
 
