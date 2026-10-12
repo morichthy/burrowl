@@ -177,3 +177,41 @@ def test_write_results_cap_warnings(app, monkeypatch):
     monkeypatch.setattr(spec, "fn", lambda ctx, **kwargs: {"status": "updated", "warnings": many})
     result = call(_ctx(app), "runs.update", {"run_id": "RUN-x", "fields": {"title": "t"}})
     assert len(result["warnings"]) == 10 and result["warnings_truncated"] == 5
+
+
+def test_mcp_time_fields_null_ok_and_bad_format_explained_in_message(app):
+    """acquired_at 等时间字段：null 可以提交；带时区的写法保存为 UTC（Z）；只写日期时经 MCP 返回的顶层 message
+    就指出字段与正确写法，契约也写明格式（不必去翻错误日志）。"""
+    server = mcp_module.build_server(app, skills_dir=SKILLS)
+    operation = json.loads((Path(__file__).resolve().parents[2] / "packages/burrowl/src/burrowl/core/schema"
+                            / "examples/source.json").read_text(encoding="utf-8"))["operation"]
+    owner = operation["draft"].get("owner_id") or OWNER
+
+    async def scenario():
+        async with Client(server) as client:
+            head = app.memory.inspect(owner)["head"]["commit_id"]
+            assert operation["draft"]["payload"]["acquired_at"] is None
+            ok = await client.call_tool("memory_commit", {"owner_id": owner, "expected_head": head, "dry_run": True,
+                                                           "operations": [operation]})
+            assert not ok.is_error, ok
+            dated = json.loads(json.dumps(operation))
+            dated["draft"]["payload"]["acquired_at"] = "2026-10-13"
+            bad = await client.call_tool("memory_commit", {"owner_id": owner, "expected_head": head, "dry_run": True,
+                                                            "operations": [dated]})
+            assert bad.is_error
+            problem = _problem(bad)
+            path = "/operations/0/draft/payload/acquired_at"
+            assert path in problem["message"] and "带时区" in problem["message"]
+            assert problem["errors"][0]["path"] == path and "2026-10-13T16:00:00+08:00" in problem["errors"][0]["expected"]
+            contract = json.loads("".join(b.text for b in (await client.call_tool(
+                "memory_contract", {"kind": "source"})).content))
+            assert "带时区" in contract["payload_fields"]["acquired_at"]
+            zoned = json.loads(json.dumps(operation))
+            zoned["draft"]["payload"]["acquired_at"] = "2026-10-13T16:00:00+08:00"
+            saved = await client.call_tool("memory_commit", {"owner_id": owner, "expected_head": head,
+                                                              "operations": [zoned]})
+            assert not saved.is_error, saved
+            receipt = json.loads("".join(b.text for b in saved.content))
+            record = app.memory.inspect(owner, record_id=receipt["record_results"][0]["record_id"])["record"]
+            assert record["payload"]["acquired_at"] == "2026-10-13T08:00:00Z"     # 保存时统一换算为 UTC
+    anyio.run(scenario)

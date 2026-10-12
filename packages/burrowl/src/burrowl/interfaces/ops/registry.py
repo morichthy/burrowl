@@ -19,7 +19,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, ValidationError, create_model
 
 from ...app import App
-from ...core.errors import BurrowlError
+from ...core.errors import BurrowlError, headline
 from ...core.jsonschema import validate
 from ...storage.owners import OwnerRegistry
 from . import errorlog
@@ -146,7 +146,7 @@ def check_arguments(spec: OpSpec, arguments: dict) -> BaseModel:
         errors += [{**e, "code": "INVALID_ARGUMENT", "path": f"/{field}{e['path']}"}
                    for e in validate(value, shape.schema, shape.defs)]
     if errors:
-        raise BurrowlError("INVALID_ARGUMENT", f"参数不符合要求（{len(errors)} 处）", {"op": spec.name}, errors)
+        raise BurrowlError("INVALID_ARGUMENT", headline("参数不符合要求", errors), {"op": spec.name}, errors)
     return parsed
 
 

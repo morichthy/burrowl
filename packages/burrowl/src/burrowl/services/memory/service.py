@@ -11,7 +11,7 @@ from typing import Any
 from ...core import contract as record_contract
 from ...core import links as link_syntax
 from ...core.clock import Clock, utc_now
-from ...core.errors import BurrowlError, rebase, schema_error
+from ...core.errors import BurrowlError, headline, rebase, schema_error
 from ...core.hashing import canonical_hash, sha256_bytes
 from ...core.ports import IndexSink, NullIndex
 from ...core.records import content_hash, record_hash, validate_commit_request, validate_record
@@ -242,7 +242,7 @@ class MemoryService:
                              "message": error["message"] + (f"：{note}" if note else "")})
         hint = (f"字段要求与示例用 memory_contract(\"{kind}\") 查询" if isinstance(kind, str)
                 else "kind 写记录类型，用 memory_kinds 查看可用类型")
-        return BurrowlError(errors[0].get("code", "INVALID_SCHEMA"), f"第 {position + 1} 条草案没有通过校验",
+        return BurrowlError(errors[0].get("code", "INVALID_SCHEMA"), headline(f"第 {position + 1} 条草案没有通过校验", detailed),
                             {"kind": kind, "hint": hint}, errors=detailed)
 
     @staticmethod

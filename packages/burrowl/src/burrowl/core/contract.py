@@ -9,6 +9,7 @@ from functools import cache
 from importlib.resources import files
 from typing import Any
 
+from .clock import TIME_RULE, is_time_key
 from .errors import BurrowlError
 from .records import LEVELS, SERVER_FIELDS
 from .schema import current_versions, defs
@@ -52,7 +53,9 @@ COMMON_NOTES = {
     "change_reason": "为什么改（修订说明）",
 }
 PAYLOAD_DEFAULTED = {"missing_refs"}  # records.normalize_draft 补 []
-PAYLOAD_LEGEND = "payload_fields 中标“（可选）”的可以不写，其余都必须写（列表可为空列表，可为 null 的写 null）"
+TIME_FORMAT = "带时区的时间（如 2026-10-13T16:00:00+08:00 或 2026-10-13T08:00:00Z，保存时换算为 UTC）"
+PAYLOAD_LEGEND = ("payload_fields 中标“（可选）”的可以不写，其余都必须写（列表可为空列表，可为 null 的写 null）；"
+                  "名称以 _at 结尾的字段与 valid_from / valid_until 都是时间：" + TIME_RULE + "，不能只写日期或不带时区")
 WRITE_WITH = ("memory_commit 的 operations 中：新建 {op:'put_record', client_key, draft}；"
               "修订 {op:'put_record', record_id, expected_revision（当前修订号，memory_inspect 可见）, draft（完整的新内容）}。"
               "client_key 与 record_id 只能二选一；同批新记录之间用 {client_key: 'x'} 引用")
@@ -86,12 +89,19 @@ def _describe(schema: dict, all_defs: dict, depth: int) -> Any:
         return {"列表，元素": item, **({"至少": least} if least else {})}
     if kind == "object" and "properties" in schema:
         required = set(schema.get("required", []))
-        return {(k if k in required else f"{k}（可选）"): _describe(v, all_defs, depth - 1)
+        return {(k if k in required else f"{k}（可选）"): _time(k, _describe(v, all_defs, depth - 1))
                 for k, v in schema["properties"].items()}
     if isinstance(kind, list):
         return " 或 ".join(kind)
     text = kind or "任意"
     return f"{text}（非空）" if schema.get("minLength") else text
+
+
+def _time(name: str, text: Any) -> Any:
+    """时间字段的写法（records.normalize_draft 换算、validate 检查）在说明里直接写出来，不让 AI 只看到 string。"""
+    if is_time_key(name) and isinstance(text, str):
+        return text.replace("string（非空）", TIME_FORMAT).replace("string", TIME_FORMAT)
+    return text
 
 
 @cache

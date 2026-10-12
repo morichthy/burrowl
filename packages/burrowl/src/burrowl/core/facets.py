@@ -1,7 +1,7 @@
 """可选的知识分面（knowledge_facets）领域校验。保存分类不等于复核。"""
 import math
 
-from .clock import is_utc, parse_utc
+from .clock import TIME_RULE, is_utc, parse_utc
 from .hashing import is_sha256
 
 Errors = list[tuple[str, str]]
@@ -31,7 +31,7 @@ def validate_knowledge_facets(record: dict) -> Errors:
         for name in ("valid_from", "valid_until"):
             raw = value[name]
             if raw is not None and not is_utc(raw):
-                add(path + "/" + name, "适用时间必须是以 Z 结尾的 RFC3339 UTC 时间")
+                add(path + "/" + name, f"适用时间：{TIME_RULE}；收到 {raw!r}")
                 raw = None
             ends.append(parse_utc(raw) if raw else None)
         if all(ends) and ends[0] >= ends[1]:

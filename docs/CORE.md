@@ -131,9 +131,9 @@ AI 组成提交请求：{owner_id, expected_head, request_id, operations:[put_re
 
 **AI 填写的字段与报错（R20）**
 
-- 服务能推导的草案字段可以省略：`owner_id` 取提交的对象（写了别的对象才报错）；`sensitivity` 新记录为 internal、修订沿用原值；`discovery` 按类型取默认、修订沿用；`keywords`、`provenance_gap`、`handle` 也有默认。`memory_contract(kind)` 的 `draft_fields` 把每个字段标为 required / optional / conditional（`change_reason` 修订时写），由 schema 的 required 与默认值表生成，并逐类记录用测试核对"标 required 的省略后确实失败、标 optional 的省略后确实通过"。
+- 服务能推导的草案字段可以省略：`owner_id` 取提交的对象（写了别的对象才报错）；`sensitivity` 新记录为 internal、修订沿用原值；`discovery` 按类型取默认、修订沿用；`keywords`、`provenance_gap`、`handle` 也有默认。时间字段（名称以 `_at` 结尾，以及 `valid_from` / `valid_until`）写带时区的 RFC3339 时间或 null，保存前统一换算为以 Z 结尾的 UTC（字符串顺序即时间顺序，同一时刻只有一种写法、不影响指纹）；只写日期或不带时区的拒绝。契约的字段说明里直接写出这种格式。`memory_contract(kind)` 的 `draft_fields` 把每个字段标为 required / optional / conditional（`change_reason` 修订时写），由 schema 的 required 与默认值表生成，并逐类记录用测试核对"标 required 的省略后确实失败、标 optional 的省略后确实通过"。
 - 工具参数只在操作注册表（`registry.call`）校验一次，HTTP、MCP、CLI 共用。AI 直接编写的结构化参数（提交操作、归属说明、关联 payload、阅读判断、扩展锚点、维护处置、工作台方案等）在工具的参数 schema 中声明字段；记录相关的结构直接取自记录契约。复杂参数附经校验的示例。
-- 报错结构 `{code, message, details, errors[], retryable}`：`errors` 一次列出全部问题，每项的 `path` 从工具参数的根算起（如 `/operations/0/draft/title`），`expected` 给允许的值或字段，`details.hint` 给下一步。
+- 报错结构 `{code, message, details, errors[], retryable}`：顶层 `message` 直接写出第一处错误的路径与原因（有的客户端只显示它）；`errors` 一次列出全部问题，每项的 `path` 从工具参数的根算起（如 `/operations/0/draft/title`），`expected` 给允许的值或字段，`details.hint` 给下一步。
 - 意外异常返回 `INTERNAL_ERROR`（异常类型、一句摘要、`incident_id`），完整堆栈只写入数据目录的 `.burrowl/logs/errors.jsonl`。被拒绝的调用只记工具名、错误码和出错路径（不记参数内容），`system.tool_errors` 按工具汇总，用来发现哪些工具的说明需要改。
 
 **删除与恢复（R22）**

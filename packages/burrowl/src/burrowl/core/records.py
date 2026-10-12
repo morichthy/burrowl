@@ -9,7 +9,7 @@ import re
 from collections.abc import Callable
 from typing import Any
 
-from .clock import is_utc
+from .clock import TIME_EXAMPLES, TIME_RULE, is_time_key, is_utc, to_utc
 from .errors import BurrowlError, schema_error
 from .facets import validate_knowledge_facets
 from .hashing import canonical_hash, is_sha256
@@ -128,7 +128,8 @@ def _reference_errors(record: dict, resolver: Resolver | None) -> list[dict]:
                 check_ref(value, path)
             for key, item in value.items():
                 if key.endswith("_at") and item is not None and not is_utc(item):
-                    errors.append(schema_error(pointer(path, key), "时间必须是以 Z 结尾的 RFC3339 UTC 时间"))
+                    errors.append(schema_error(pointer(path, key), f"{TIME_RULE}；收到 {item!r}",
+                                               expected=[*TIME_EXAMPLES, None]))
                 walk(item, pointer(path, key))
         elif isinstance(value, list):
             for index, item in enumerate(value):
@@ -276,7 +277,16 @@ def normalize_draft(draft: dict) -> dict:
         record["keywords"] = list(dict.fromkeys(record["keywords"]))
     if isinstance(record.get("payload"), dict):
         record["payload"].setdefault("missing_refs", [])
-    return record
+    return _zoned_to_utc(record)
+
+
+def _zoned_to_utc(value: Any) -> Any:
+    """时间字段里带时区的写法换算为 UTC（服务能推导的不让 AI 操心，R20）；在校验与指纹之前进行。"""
+    if isinstance(value, dict):
+        return {k: to_utc(v) if is_time_key(k) else _zoned_to_utc(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_zoned_to_utc(v) for v in value]
+    return value
 
 
 def validate_record(draft: dict, *, resolver: Resolver | None = None, read_source: SourceReader | None = None,
