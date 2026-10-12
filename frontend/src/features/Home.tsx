@@ -228,7 +228,7 @@ function ServerCard() {
           停止服务
         </button>
       </div>
-      <p className="hint">任务管理器里的进程名是 burrowl-workbench（开发环境为 pythonw），也可以在那里直接结束。</p>
+      <p className="hint">任务管理器“进程”页里显示为“burrowl 工作台”（详细信息页为 burrowl-workbench.exe；开发环境是 pythonw，显示为 Python），也可以在那里直接结束。</p>
     </Panel>
   );
 }

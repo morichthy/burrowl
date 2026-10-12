@@ -86,8 +86,6 @@ nav .brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 14p
 nav .brand:hover { text-decoration: none; }
 nav .brand small { display: block; font-weight: 500; font-size: 11px; color: var(--muted); letter-spacing: 0.06em; }
 nav .logo { width: 32px; height: 32px; flex: none; }
-nav .logo rect { fill: var(--accent); }
-nav .logo path { fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .nav-group { display: flex; flex-direction: column; gap: 1px; }
 .nav-group + .nav-group { border-top: 1px solid var(--line); padding-top: 8px; }
 .nav-group:last-child { margin-top: auto; }

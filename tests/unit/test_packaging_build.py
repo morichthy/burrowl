@@ -34,10 +34,13 @@ def build_source(builder, tmp_path, monkeypatch):
         (root / name).write_text("document")
     for name in ("burrowl.cmd", "setup.cmd", "setup.ps1"):
         (root / "packaging" / name).write_text("installation script")
+    (root / "packaging/burrowl.ico").write_bytes(b"fake icon")
     monkeypatch.setattr(builder, "ROOT", root)
     monkeypatch.setattr(builder, "BUILD", root / "build")
     monkeypatch.setattr(builder, "DIST", root / "dist")
     monkeypatch.setattr(builder, "standalone_python", lambda: root / "runtime")
+    # 假的 exe 没有资源段；换图标与版本信息由 test_packaging_winres 用真实解释器验证
+    monkeypatch.setattr(builder, "brand_workbench", Mock())
     calls = []
 
     def fake_run(*args, cwd=None):
@@ -79,6 +82,8 @@ def test_local_install_rebuilds_frontend_and_does_not_create_zip(builder, build_
     assert (stage / "frontend/dist/index.html").read_text() == "rebuilt frontend"
     # R21 D-13：后台工作台用的无窗口解释器副本，任务管理器里显示为 burrowl-workbench
     assert (stage / "python/burrowl-workbench.exe").read_bytes() == b"fake windowless runtime"
+    builder.brand_workbench.assert_called_once_with(stage / "python/burrowl-workbench.exe", "0.2.0")
+    assert (stage / "burrowl.ico").read_bytes() == b"fake icon"
     assert any(args[0] in ("npm", "npm.cmd") for args in calls)
     assert not (root / "dist").exists()
     info = json.loads((stage / "BUILD_INFO.json").read_text())

@@ -187,6 +187,8 @@ if (-not $NoShortcut) {
     $link.Arguments = "open"
     $link.WorkingDirectory = $Root
     $link.WindowStyle = 7
+    $icon = Join-Path $dest "burrowl.ico"
+    if (Test-Path -LiteralPath $icon) { $link.IconLocation = "$icon,0" }
     $link.Description = "打开 burrowl 工作台（没在运行时先在后台启动）"
     $link.Save()
     Write-Host "已在开始菜单建立快捷方式“burrowl 工作台”（-NoShortcut 可不建）"

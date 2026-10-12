@@ -105,10 +105,7 @@ export function App() {
     <div className="app">
       <nav>
         <a className="brand" href="#/">
-          <svg className="logo" viewBox="0 0 32 32" aria-hidden="true">
-            <rect width="32" height="32" rx="9" />
-            <path d="M8 22c0-5 3.6-9 8-9s8 4 8 9M13 22v-3.5a3 3 0 0 1 6 0V22" />
-          </svg>
+          <img className="logo" src="./favicon.svg" alt="" />
           <span>
             研发工作台
             <small>burrowl</small>

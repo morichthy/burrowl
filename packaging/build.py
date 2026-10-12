@@ -6,6 +6,7 @@
     skills/  docs/     工作流 Skill 与文档
     models/            （可选 --with-models）嵌入与重排模型
     burrowl.cmd            启动器
+    burrowl.ico            图标（开始菜单快捷方式用；python/burrowl-workbench.exe 内也换成了这个图标）
     setup.cmd / setup.ps1   安装到指定或上次记下的安装根目录，可切换/回滚
     BUILD_INFO.json        版本、Git 提交、未提交修改状态与 UTC 构建时间
 
@@ -55,6 +56,22 @@ def standalone_python() -> Path:
     if not candidates():
         run("uv", "python", "install", PY_VERSION)
     return candidates()[-1]
+
+
+def brand_workbench(exe: Path, ver: str) -> None:
+    """给后台工作台的 exe 换图标与版本信息（见 packaging/winres.py）。"""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import winres  # noqa: PLC0415 - 只在 Windows 构建时需要
+
+    winres.brand(exe, ROOT / "packaging/burrowl.ico", ver, {
+        "FileDescription": "burrowl 工作台",
+        "ProductName": "burrowl",
+        "FileVersion": ver,
+        "ProductVersion": ver,
+        "InternalName": "burrowl-workbench",
+        "OriginalFilename": "burrowl-workbench.exe",
+        "Comments": f"CPython {PY_VERSION} 的 pythonw.exe 改名副本，运行 burrowl 工作台后台服务",
+    })
 
 
 def parse_options(argv: list[str] | None = None) -> argparse.Namespace:
@@ -112,8 +129,10 @@ def main(argv: list[str] | None = None) -> None:
     shutil.copytree(standalone_python(), stage / "python", ignore=shutil.ignore_patterns("__pycache__"))
     (stage / "python/Lib/EXTERNALLY-MANAGED").unlink(missing_ok=True)
     python = stage / "python/python.exe"
-    # 后台工作台用的无窗口解释器副本（R21 D-13）：任务管理器里按 burrowl-workbench 找到并可直接结束
+    # 后台工作台用的无窗口解释器副本（R21 D-13）：任务管理器里按 burrowl-workbench 找到并可直接结束；
+    # 换上 burrowl 图标与版本信息，"进程"页显示"burrowl 工作台"而不是"Python"
     shutil.copy2(stage / "python/pythonw.exe", stage / "python/burrowl-workbench.exe")
+    brand_workbench(stage / "python/burrowl-workbench.exe", ver)
 
     # 2. 本项目的包与全部依赖（版本与 uv.lock 一致）
     wheels = BUILD / "wheels"
@@ -163,6 +182,7 @@ def main(argv: list[str] | None = None) -> None:
 
     # 5. 启动器与安装脚本
     # Windows 脚本统一 CRLF；.cmd 必须是纯 ASCII（cmd 按控制台代码页读）；.ps1 加 BOM（PowerShell 5.1 才按 UTF-8 读）。
+    shutil.copy2(ROOT / "packaging/burrowl.ico", stage / "burrowl.ico")  # 开始菜单快捷方式的图标
     for name in ("burrowl.cmd", "setup.cmd", "setup.ps1"):
         text = (ROOT / "packaging" / name).read_text(encoding="utf-8-sig").replace("\r\n", "\n").replace("\n", "\r\n")
         data = text.encode("ascii") if name.endswith(".cmd") else b"\xef\xbb\xbf" + text.encode("utf-8")
