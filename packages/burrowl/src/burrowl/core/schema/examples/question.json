@@ -5,13 +5,11 @@
     "op": "put_record",
     "client_key": "new-question",
     "draft": {
-      "owner_id": "RES-FLOATING-POINT-SUMMATION",
       "kind": "question",
       "title": "成对求和在抵消输入上是否更稳健",
       "keywords": [],
       "body_markdown": "",
       "record_reason": "记录未决问题",
-      "sensitivity": "internal",
       "sources": [
         {
           "target_kind": "record",

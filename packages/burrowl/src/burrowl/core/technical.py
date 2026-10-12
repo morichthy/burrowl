@@ -38,15 +38,15 @@ def block_errors(blocks: list[dict]) -> Errors:
     for position, block in enumerate(blocks):
         key = block["block_id"]
         if "#" in key or key.strip() != key or not key:
-            errors.append((f"/blocks/{position}/block_id", "Block identity cannot contain # or surrounding whitespace"))
+            errors.append((f"/blocks/{position}/block_id", "block_id 不能含 #，首尾不能有空白"))
         if key in ids:
-            errors.append((f"/blocks/{position}/block_id", "Duplicate technical block identity"))
+            errors.append((f"/blocks/{position}/block_id", "block_id 重复"))
         ids.add(key)
         if len(block["requires_block_ids"]) != len(set(block["requires_block_ids"])):
-            errors.append((f"/blocks/{position}/requires_block_ids", "Duplicate prerequisite block identity"))
+            errors.append((f"/blocks/{position}/requires_block_ids", "requires_block_ids 中有重复"))
     for position, block in enumerate(blocks):
         if set(block["requires_block_ids"]) - ids:
-            errors.append((f"/blocks/{position}/requires_block_ids", "Required technical block is missing"))
+            errors.append((f"/blocks/{position}/requires_block_ids", "requires_block_ids 指向的块不存在"))
     graph = {b["block_id"]: b["requires_block_ids"] for b in blocks}
     visited: set[str] = set()
     active: set[str] = set()
@@ -58,7 +58,7 @@ def block_errors(blocks: list[dict]) -> Errors:
                 active.discard(node)
                 visited.add(node)
             elif node in active:
-                return [*errors, ("/blocks", "Technical block prerequisite cycle")]
+                return [*errors, ("/blocks", "块之间的依赖形成了环")]
             elif node not in visited and node in graph:
                 active.add(node)
                 stack.append((node, True))
@@ -102,11 +102,11 @@ def render_full(record: dict, block_ids: list[str] | None = None) -> str:
 def fixed_ref_errors(ref: dict, path: str, *, record_only: bool = False) -> Errors:
     errors: Errors = []
     if record_only and (ref.get("target_kind") != "record" or not str(ref.get("target_id", "")).startswith("MEM-")):
-        errors.append((path, "A fixed MEM record reference is required"))
+        errors.append((path, "必须是对 MEM 记录的固定引用"))
     if not is_sha256(ref.get("sha256")):
-        errors.append((path + "/sha256", "A fixed SHA-256 is required"))
+        errors.append((path + "/sha256", "必须写固定的 SHA-256"))
     if ref.get("target_kind") == "record" and (type(ref.get("revision")) is not int or ref["revision"] < 1):
-        errors.append((path + "/revision", "A positive fixed revision is required"))
+        errors.append((path + "/revision", "必须写固定修订号（正整数）"))
     return errors
 
 
@@ -115,24 +115,24 @@ def validate_unit(record: dict) -> Errors:
     errors = block_errors(payload["blocks"])
     for key, value in payload["retrieval_description"].items():
         if any(not text.strip() for text in (value if isinstance(value, list) else [value])):
-            errors.append(("/retrieval_description/" + key, "Describe the condition or explicitly state that it is unknown"))
+            errors.append(("/retrieval_description/" + key, "写出具体条件，或明确写“未知”"))
     for position, block in enumerate(payload["blocks"]):
         if not block["markdown"].strip():
-            errors.append((f"/blocks/{position}/markdown", "A complete technical block cannot be blank"))
+            errors.append((f"/blocks/{position}/markdown", "技术块正文不能为空"))
         for match in re.finditer(r"!\[[^\]]*\]\(figure:(\d+)\)", block["markdown"]):
             if int(match[1]) >= len(payload["figures"]):
-                errors.append((f"/blocks/{position}/markdown", "Inline figure index is not registered in this unit"))
+                errors.append((f"/blocks/{position}/markdown", "正文引用的图号没有登记在本单元的 figures 中"))
     run = payload["run_ref"]
     if payload["unit_type"] == "experiment" and run is None:
-        errors.append(("/run_ref", "An experiment needs an actual fixed Run"))
+        errors.append(("/run_ref", "experiment 类型必须用 run_ref 引用实际执行过的 Run"))
     if run is not None:
         if run["target_kind"] != "owner" or not run["target_id"].startswith("RUN-"):
-            errors.append(("/run_ref", "run_ref must identify a RUN owner"))
+            errors.append(("/run_ref", "run_ref 必须指向 RUN- 对象"))
         errors.extend(fixed_ref_errors(run, "/run_ref"))
     for position, ref in enumerate(payload["evidence_refs"]):
         errors.extend(fixed_ref_errors(ref, f"/evidence_refs/{position}"))
     if not payload["evidence_refs"] and run is None and not record["sources"] and not record.get("provenance_gap"):
-        errors.append(("/evidence_refs", "A non-executed unit needs provenance or an explicit gap"))
+        errors.append(("/evidence_refs", "非实验单元需要 evidence_refs、sources，或在 provenance_gap 说明缺口"))
     return errors
 
 
@@ -144,15 +144,15 @@ def validate_watches(watches: list[dict]) -> Errors:
         path = f"/watch_refs/{position}"
         identity = (watch["watch_type"], watch.get("record_id") or watch.get("owner_id"))
         if identity in seen:
-            errors.append((path, "Duplicate change watch"))
+            errors.append((path, "变化监视重复"))
         seen.add(identity)
         if watch["watch_type"] == "revision":
             if not watch["record_id"].startswith("MEM-") or watch["baseline_revision"] < 1:
-                errors.append((path, "Revision watch needs a MEM identity and positive baseline revision"))
+                errors.append((path, "修订监视需要 MEM- 记录 ID 和正整数的基线修订号"))
             if not is_sha256(watch["baseline_record_hash"]):
-                errors.append((path + "/baseline_record_hash", "Revision watch needs the observed record hash"))
+                errors.append((path + "/baseline_record_hash", "修订监视需要观察时的 record_hash"))
         elif len(watch["baseline_unit_ids"]) != len(set(watch["baseline_unit_ids"])):
-            errors.append((path + "/baseline_unit_ids", "Duplicate observed technical unit identity"))
+            errors.append((path + "/baseline_unit_ids", "观察的技术单元 ID 重复"))
     return errors
 
 
@@ -169,13 +169,13 @@ def _section_errors(payload: dict, resolver: Resolver | None) -> Errors:
         errors.extend(bad)
         identity = (ref["target_id"], ref["revision"])
         if identity in seen:
-            errors.append((f"/blocks/{position}/ref", "Duplicate unit in one section; combine its selected blocks"))
+            errors.append((f"/blocks/{position}/ref", "同一章节重复收录同一单元；把所选块合并到一处"))
         seen.add(identity)
         if bad or not resolver:
             continue
         target = resolver(ref)
         if not isinstance(target, dict) or target.get("kind") != "detail":
-            errors.append((f"/blocks/{position}/ref", "Unit block must reference a detail record"))
+            errors.append((f"/blocks/{position}/ref", "unit 块必须引用 detail 记录"))
             continue
         try:
             select_blocks(target, block.get("block_ids"))
@@ -194,21 +194,21 @@ def _document_errors(payload: dict, resolver: Resolver | None) -> Errors:
         bad = fixed_ref_errors(ref, path, record_only=True)
         errors.extend(bad)
         if ref["target_id"] in seen:
-            errors.append((path, "Duplicate document section"))
+            errors.append((path, "文稿章节重复"))
         seen.add(ref["target_id"])
         if bad or not resolver:
             continue
         target = resolver(ref)
         if not isinstance(target, dict) or target.get("kind") != "document_section":
-            errors.append((path, "Section reference must resolve to a document_section record"))
+            errors.append((path, "章节引用必须指向 document_section 记录"))
             continue
         section = target["payload"]
         if section["section_key"] in keys:
-            errors.append((path, "Duplicate stable section key"))
+            errors.append((path, "section_key 重复"))
         keys.add(section["section_key"])
         synthesis = synthesis or section["role"] in {"discussion", "conclusion"}
         if synthesis and section["role"] == "experiment":
-            errors.append((path, "Experiment sections must precede discussion and conclusion"))
+            errors.append((path, "实验章节必须排在讨论和结论之前"))
     for position, ref in enumerate(payload["common_refs"]):
         errors.extend(fixed_ref_errors(ref, f"/common_refs/{position}"))
     return errors
@@ -220,7 +220,7 @@ def validate_composition(record: dict, resolver: Resolver | None = None) -> Erro
     required = ("section_key", "title") if record["kind"] == "document_section" else ("purpose", "audience", "scope")
     for key in required:
         if not payload[key].strip():
-            errors.append(("/" + key, "Authored document metadata cannot be blank"))
+            errors.append(("/" + key, "文稿元数据不能为空"))
     if record["kind"] == "document_section":
         errors.extend(_section_errors(payload, resolver))
     else:

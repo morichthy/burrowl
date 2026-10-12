@@ -83,7 +83,7 @@ AI 按任务选择 Skill：
   - **外壳**：所有类型共用，包括身份、所属对象、类型和层级、标题、正文 `body_markdown`、来源 `sources`、修订信息。程序据此统一处理保存、版本、权限和检索。
   - **payload**：随类型变化，存放程序需要读取或校验的结构化字段，例如 L1 的技术块和检索说明、L3 的适用与禁用条件、association 的两个端点，以及各层的结论 `claims`。
   - 给人读的完整内容写在正文里（L1 写在 blocks 里），不要只放在 payload 中。
-- 固定引用在任何位置都是同一种格式，可以出现在 `sources`、结论的依据和关联的端点等处；引用中的 `relation` 说明这条引用的用途。各类型的具体字段由 `memory.contract(kind)` 给出。
+- 固定引用在任何位置都是同一种格式，可以出现在 `sources`、结论的依据和关联的端点等处；引用中的 `relation` 说明这条引用的用途。各类型的具体字段由 `memory_contract(kind)` 给出。
 - 外壳还有两个服务端维护的字段：`handle`（本对象内的可读短名，创建后不可改，不进内容指纹）和 `links`（正文链接的解析结果，进内容指纹；没有链接时省略）。契约只做增量，已有记录的指纹不变。
 - 记录中的引用、链接、结论、关联怎样变成关系图的点和线，见 [R12 设计稿 §4.1 的直观示例](design/R12_KNOWLEDGE_GRAPH_RETRIEVAL.md#直观示例一条记录会变成哪些点和线)和第 5 节。
 
@@ -106,6 +106,13 @@ AI 组成提交请求：{owner_id, expected_head, request_id, operations:[put_re
 
 - 读取时（inspect、resume、导出、总结材料），依据链上有受限或不可用来源的记录会被隐去，并在 `omitted` 中说明原因。
 - AI 不直接编辑存储文件。
+
+**AI 填写的字段与报错（R20）**
+
+- 服务能推导的草案字段可以省略：`owner_id` 取提交的对象（写了别的对象才报错）；`sensitivity` 新记录为 internal、修订沿用原值；`discovery` 按类型取默认、修订沿用；`keywords`、`provenance_gap`、`handle` 也有默认。`memory_contract(kind)` 的 `draft_fields` 把每个字段标为 required / optional / conditional（`change_reason` 修订时写），由 schema 的 required 与默认值表生成，并逐类记录用测试核对"标 required 的省略后确实失败、标 optional 的省略后确实通过"。
+- 工具参数只在操作注册表（`registry.call`）校验一次，HTTP、MCP、CLI 共用。AI 直接编写的结构化参数（提交操作、归属说明、关联 payload、阅读判断、扩展锚点、维护处置、工作台方案等）在工具的参数 schema 中声明字段；记录相关的结构直接取自记录契约。复杂参数附经校验的示例。
+- 报错结构 `{code, message, details, errors[], retryable}`：`errors` 一次列出全部问题，每项的 `path` 从工具参数的根算起（如 `/operations/0/draft/title`），`expected` 给允许的值或字段，`details.hint` 给下一步。
+- 意外异常返回 `INTERNAL_ERROR`（异常类型、一句摘要、`incident_id`），完整堆栈只写入数据目录的 `.burrowl/logs/errors.jsonl`。被拒绝的调用只记工具名、错误码和出错路径（不记参数内容），`system.tool_errors` 按工具汇总，用来发现哪些工具的说明需要改。
 
 实现：`services/memory/service.py`、`storage/memory_store.py`、`core/atomic.py`。
 

@@ -1,6 +1,8 @@
 """记录契约说明：把 JSON Schema 整理成 AI 易读的字段表，并附经校验的示例草案。
 
 供 memory.contract 使用。字段表只展开到 AI 写草案需要的深度；完整约束仍以 memory.schema.json 为准。
+R20 D-02：每个草案字段标为 required / optional / conditional 三类之一（服务端字段另列，不要写），
+由 schema 的 required 加下面的默认值表生成，一致性由 tests/service/test_contract_fill.py 锁住。
 """
 import json
 from functools import cache
@@ -8,18 +10,30 @@ from importlib.resources import files
 from typing import Any
 
 from .errors import BurrowlError
-from .records import LEVELS
+from .records import LEVELS, SERVER_FIELDS
 from .schema import current_versions, defs
 
 # 由专用操作生成、不应由 AI 直接 put_record 的类型及其入口
-INTERNAL_KINDS = {"review": "review.submit / review.batch", "policy": "memory.commit 的 set_policy 操作",
-                  "consolidation": "memory.consolidate_apply", "feedback": "memory.feedback",
+INTERNAL_KINDS = {"review": "review_submit / review_batch", "policy": "memory_commit 的 set_policy 操作",
+                  "consolidation": "memory_consolidate_apply", "feedback": "memory_feedback",
                   "representation": "（保留类型，当前检索不使用）"}
-# 系统自动维护、草案里不要填写的字段
-SYSTEM_FIELDS = {"record_id", "created_at", "created_by", "revision", "previous_revision", "updated_at",
-                 "updated_by", "change_reason", "record_hash", "content_hash", "level", "schema_version", "links"}
+# 服务端维护、草案里不要写的字段（SERVER_FIELDS 写了会被拒绝；level / schema_version 由类型决定）
+SYSTEM_FIELDS = SERVER_FIELDS | {"level", "schema_version"}
+# 省略时服务端补的值：schema 里必填、但 AI 可以不写（service.prepare、records.normalize_draft 负责补）
+DEFAULTED = {
+    "owner_id": "取提交的 owner_id",
+    "discovery": "按记录类型取默认（知识记录全库可见，工作状态只在本对象可见）；修订时沿用原值",
+    "sensitivity": "新记录为 internal；修订时沿用原值",
+    "keywords": "[]",
+    "provenance_gap": "null",
+    "handle": "按标题生成",
+}
+# 视情况必须写的字段：说明什么时候要写
+CONDITIONAL = {
+    "change_reason": "修订已有记录时写为什么改（重新激活、状态转换时必填，否则取 record_reason）；新建时不写",
+}
 COMMON_NOTES = {
-    "owner_id": "必须与提交请求的 owner_id 相同（一次提交只写一个对象）",
+    "owner_id": "可以省略；写了就必须与提交请求的 owner_id 相同（一次提交只写一个对象）",
     "title": "能单独看懂的标题",
     "keywords": "检索关键词；技术名词同时给中文和英文，型号和数值原样保留",
     "body_markdown": "正文（Markdown，可用 $...$ 公式）。L1 detail、document、document_section 必须为空字符串。"
@@ -28,21 +42,27 @@ COMMON_NOTES = {
     "handle": "可选。记录在本对象内的可读短名，供 [[@handle]] 链接使用；不填时按标题自动生成，创建后不可修改。"
               "不能含空格和 / # | [ ] @ !",
     "record_reason": "为什么保存这一条",
-    "sensitivity": "public / internal（默认）/ confidential / restricted；restricted 不进索引、不发布、不被引用",
+    "sensitivity": "public / internal / confidential / restricted；restricted 不进索引、不发布、不被引用",
     "sources": "本条依据的固定引用列表（见 Ref）；正文里的编号或 ID 要与这里对应",
-    "provenance_gap": "依据缺口的说明；没有缺口填 null",
+    "provenance_gap": "依据缺口的说明；没有缺口不写（即 null）",
     "discovery": ("一般不写：知识记录（L1–L4、关联、概念页）默认 workspace_summary（全库检索可见），目标、检查点、"
                   "路线、问题等工作状态默认 owner_only（只在指定该对象时可见）；对象策略显式设置时以对象为准；"
                   "修订时不写则沿用原值。只有需要保密时才写 owner_only"),
     "payload": "各类型自己的结构化字段，见 payload_fields",
+    "change_reason": "为什么改（修订说明）",
 }
+PAYLOAD_DEFAULTED = {"missing_refs"}  # records.normalize_draft 补 []
+PAYLOAD_LEGEND = "payload_fields 中标“（可选）”的可以不写，其余都必须写（列表可为空列表，可为 null 的写 null）"
+WRITE_WITH = ("memory_commit 的 operations 中：新建 {op:'put_record', client_key, draft}；"
+              "修订 {op:'put_record', record_id, expected_revision（当前修订号，memory_inspect 可见）, draft（完整的新内容）}。"
+              "client_key 与 record_id 只能二选一；同批新记录之间用 {client_key: 'x'} 引用")
 REF_NOTE = ("Ref = {target_kind: record|file|owner|claim, target_id, revision, sha256, locator, relation}。"
-            "record：revision 与 sha256 取被引记录的 revision 与 record_hash（memory.inspect 可见）；"
-            "file：revision=null，sha256 取 sources.list 中登记的指纹；owner（如 Run）：sha256 为业务卡指纹。"
+            "record：revision 与 sha256 取被引记录的 revision 与 record_hash（memory_inspect 可见）；"
+            "file：revision=null，sha256 取 sources_list 中登记的指纹；owner（如 Run）：sha256 为业务卡指纹。"
             "relation 按判断问题选，按写在哪里只用这几个："
             "结论与 L2 阶段的 evidence_refs → supports（能证明）/ contradicts（是反例）/ input（作为输入的数据）；"
             "sources 与其他固定引用 → 以上三个或 references（只是参考）。"
-            "\"值得放在一起看\"用 relations.decide 写关联（related_to / same_problem / same_failure_mode / analogous_to），"
+            "\"值得放在一起看\"用 relations_decide 写关联（related_to / same_problem / same_failure_mode / analogous_to），"
             "不是证据；\"A 会影响 B\"写成结论。其他关系名仍可读取，但提交时会返回 warning。")
 
 
@@ -80,24 +100,71 @@ def _example(kind: str) -> dict | None:
     return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
 
 
-def contract(kind: str) -> dict[str, Any]:
+def _draft_schema(kind: str) -> dict:
     versions = current_versions()
     if kind not in versions:
         raise BurrowlError("INVALID_ARGUMENT", "未知的记录类型", {"kind": kind, "kinds": sorted(versions)})
-    all_defs = defs()
     camel = "".join(p.title() for p in kind.split("_"))
-    draft = all_defs[f"{camel}DraftV{versions[kind]}"]
-    payload = draft["properties"]["payload"]
+    return defs()[f"{camel}DraftV{versions[kind]}"]
+
+
+def fill(name: str, required: set[str]) -> str:
+    """一个草案顶层字段对 AI 而言是否必须写：required / optional / conditional。"""
+    if name in CONDITIONAL:
+        return "conditional"
+    return "required" if name in required and name not in DEFAULTED else "optional"
+
+
+def draft_fields(kind: str) -> dict[str, dict]:
+    draft = _draft_schema(kind)
     required = set(draft.get("required", []))
-    fields = {name: {"required": name in required, "note": COMMON_NOTES.get(name, "")}
-              for name in draft["properties"] if name not in SYSTEM_FIELDS}
+    fields = {}
+    for name in draft["properties"]:
+        if name in SYSTEM_FIELDS:
+            continue
+        entry = {"fill": fill(name, required), "note": CONDITIONAL.get(name) or COMMON_NOTES.get(name, "")}
+        if name in DEFAULTED:
+            entry["default"] = DEFAULTED[name]
+        fields[name] = entry
+    return fields
+
+
+def field_notes(kind: str) -> dict[str, str]:
+    """报错时给缺失字段附的说明；未知类型返回空表。"""
+    try:
+        return {name: entry["note"] for name, entry in draft_fields(kind).items() if entry["note"]}
+    except BurrowlError:
+        return {}
+
+
+def _payload_fields(draft: dict, all_defs: dict) -> Any:
+    described = _describe(draft["properties"]["payload"], all_defs, depth=3)
+    if isinstance(described, dict):
+        described = {(f"{k}（可选）" if k in PAYLOAD_DEFAULTED else k): v for k, v in described.items()}
+    return described
+
+
+def contract(kind: str) -> dict[str, Any]:
+    versions = current_versions()
+    draft = _draft_schema(kind)
+    all_defs = defs()
     example = _example(kind)
     return {"kind": kind, "level": LEVELS.get(kind), "schema_version": versions[kind],
-            "write_with": INTERNAL_KINDS.get(kind, "memory.commit：{op:'put_record', client_key, draft}"),
+            "write_with": INTERNAL_KINDS.get(kind, WRITE_WITH),
             "guidance": example["note"] if example else "",
-            "draft_fields": fields, "payload_fields": _describe(payload, all_defs, depth=3),
+            "draft_fields": draft_fields(kind), "do_not_write": sorted(SYSTEM_FIELDS & set(draft["properties"])),
+            "payload_legend": PAYLOAD_LEGEND,
+            "payload_fields": _payload_fields(draft, all_defs),
             "ref": REF_NOTE, "example_operation": example["operation"] if example else None,
-            "see_also": "docs/RECORDING.md（逐层写作要求）"}
+            "see_also": "skills/RECORDING.md（逐层写作要求）"}
+
+
+def example_operation(kind: str) -> dict:
+    """契约示例中的提交操作（经 tests/service/test_draft_examples.py 校验）。"""
+    example = _example(kind)
+    if example is None:
+        raise BurrowlError("NOT_FOUND", "该类型没有示例草案", {"kind": kind})
+    return json.loads(json.dumps(example["operation"]))
 
 
 def kinds() -> list[dict[str, Any]]:

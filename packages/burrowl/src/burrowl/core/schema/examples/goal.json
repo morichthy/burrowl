@@ -5,13 +5,11 @@
     "op": "put_record",
     "client_key": "new-goal",
     "draft": {
-      "owner_id": "RES-FLOATING-POINT-SUMMATION",
       "kind": "goal",
       "title": "扩展到随机输入的求和误差研究",
       "keywords": [],
       "body_markdown": "",
       "record_reason": "登记扩展研究目标",
-      "sensitivity": "internal",
       "sources": [
         {
           "target_kind": "record",

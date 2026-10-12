@@ -23,7 +23,7 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | 操作 | 类型 | 说明 | 参数 |
 |---|---|---|---|
 | `hub.apply` | 管理 | 执行发布。逐条记录结果，单条失败不影响其他条目。 | `connector_id`*: string，`plan_hash`*: string，`force_wiki`: boolean |
-| `hub.candidates_pull` | 写入 | 把外部工具发现的关系线索拉回为关联候选（origin=tool:<连接器>，只写派生的候选表，不写记录）。 之后用 relations.candidates 查看并判断。 | `connector_id`*: string，`limit`: integer |
+| `hub.candidates_pull` | 写入 | 把外部工具发现的关系线索拉回为关联候选（origin=tool:<连接器>，只写派生的候选表，不写记录）。 之后用 relations_candidates 查看并判断。 | `connector_id`*: string，`limit`: integer |
 | `hub.connectors` | 只读 | 已配置的连接器、发布策略与已发布条目数。 | 无 |
 | `hub.health` | 只读 | 测试连接：服务版本、兼容性、能力、密钥是否已设置（不返回密钥）。 | `connector_id`*: string |
 | `hub.plan` | 只读 | 预览发布：按策略（默认只发已复核的 L4/L3 与成稿文档）列出新增/更新/删除，返回 plan_hash。 | `connector_id`*: string |
@@ -36,7 +36,7 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 |---|---|---|---|
 | `index.gaps` | 只读 | 确定性缺口：缺 L4 概览、技术单元缺检索说明、L1 块过长、结果块没声明依赖、未解析的概念链接、 没有入边的概念页、有未处理反例的结论、待确认的成熟度升级。内容是否充分仍需阅读判断。 | 无 |
 | `index.reconcile` | 管理 | 按当前 HEAD 补齐检索投影（不改记忆）；sources=true 同时更新来源文件投影。 | `owner_id`: string|null，`force`: boolean，`sources`: boolean |
-| `index.search` | 只读 | 直接检索投影（调试/诊断用；正式查询请用 query.search，它会回到固定版本核对）。 | `query`*: string，`corpus`: string，`owner_ids`: array|null，`levels`: array|null，`review_filter`: string，`group`: string，`limit`: integer |
+| `index.search` | 只读 | 直接检索投影（调试/诊断用；正式查询请用 query_search，它会回到固定版本核对）。 | `query`*: string，`corpus`: string，`owner_ids`: array|null，`levels`: array|null，`review_filter`: string，`group`: string，`limit`: integer |
 | `index.status` | 只读 | 某对象各投影/通道的就绪状态（stale 表示落后于当前 HEAD）。 | `owner_id`*: string |
 
 ## maintenance
@@ -58,10 +58,10 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | 操作 | 类型 | 说明 | 参数 |
 |---|---|---|---|
 | `memory.activity` | 只读 | 关键操作记录（只读，按时间倒序）：建立对象、归属确认、保存、复核、Run 结束、发布，每条一行，带可追溯的引用。 检索、阅读、来源登记等不改变资产的操作不在其中。 | `owner_id`: string|null，`kinds`: array|null，`limit`: integer，`before`: string|null |
-| `memory.commit` | 写入 | 保存一批记录（同一对象内原子提交）。dry_run=true 只预检不写入。 | `owner_id`*: string，`operations`*: array，`expected_head`*: string|null，`request_id`: string|null，`dry_run`: boolean，`attribution`: object|null |
+| `memory.commit` | 写入 | 保存一批记录到一个对象（同一对象内原子提交，要么全写入要么都不写）。dry_run=true 只预检不写入。 草案必须写 kind、title、body_markdown、payload、sources、record_reason；owner_id、sensitivity、discovery、 keywords、provenance_gap、handle 可省略（由服务补上，修订时沿用原值）；修订已有记录时写 change_reason。 payload 结构随 kind 不同，写之前用 memory_contract(kind) 查字段与示例。引用一律写固定引用 （刚保存的记录用回执的 fixed_ref）。出错时 errors 一次列出所有问题，path 指向要改的参数位置。 | `owner_id`*: string，`operations`*: array，`expected_head`*: string|null，`request_id`: string|null，`dry_run`: boolean，`attribution`: object|null |
 | `memory.consolidate_apply` | 写入 | 保存巩固处置（retain/revise/retract/defer…），可与本批实际修订一起提交。 | `owner_id`*: string，`basis`*: object，`decisions`*: array，`reason`*: string，`operations`: array|null，`dry_run`: boolean |
 | `memory.consolidate_prepare` | 只读 | 阶段巩固的待处理清单：自上次巩固以来的变化、受影响下游与合并/冲突候选。 | `owner_id`*: string，`since_commit`: string|null |
-| `memory.contract` | 只读 | 某类记录的草案契约：必填字段、payload 结构、写作要点和一份经校验的示例草案。写草案前先调用。 | `kind`*: string |
+| `memory.contract` | 只读 | 某类记录的草案契约：每个字段是 required / optional / conditional（以及省略时的默认值）、不要写的服务端字段、 payload 结构、写作要点和一份经校验的示例草案。写 memory_commit / memory_summary_save 的草案前先调用。 | `kind`*: string |
 | `memory.document` | 只读 | 读取研究文稿：完整文稿 / 目录 / 单章上下文包（改写某章用）/ 依据变化影响。 | `owner_id`*: string，`view`: string，`document_type`: string，`document_id`: string|null，`section_id`: string|null，`max_chars`: integer |
 | `memory.export` | 只读 | 导出对象的记忆（不产生新记录、不复制原件）。 | `owner_id`*: string，`fmt`: string，`record_ids`: array|null，`exclude_ids`: array|null，`include_raw_materials`: boolean |
 | `memory.feedback` | 写入 | 记录检索结果的使用反馈（采用次数不是复核）。label=outcome 时 adopted_in 须指向实际应用它的 Run 或记录。 | `owner_id`*: string，`query_id`*: string，`target`*: object，`label`*: string，`note`: string，`adopted_in`: object|null，`request_id`: string|null |
@@ -69,7 +69,7 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | `memory.inspect` | 只读 | 读取对象的当前快照，或某条记录的当前/指定修订（含完整正文与固定引用）。 | `owner_id`*: string，`record_id`: string|null，`revision`: integer|null |
 | `memory.kinds` | 只读 | 全部记录类型：层级、版本、由哪个操作写入、一句话用途。 | 无 |
 | `memory.owner_adopt` | 写入 | 把内容树中已有的文档登记为对象（原件不修改；须给出你看到的字节指纹）。 | `path`*: string，`expected_sha256`*: string |
-| `memory.owner_create` | 写入 | 新建对象（写入业务卡；首次提交记忆时才建立记忆目录）。Run 用 runs.create 建立。 先用 memory.owners 查找：同一目标的继续或子任务沿用已有对象；主题相似只引用；独立交付目标才新建。 core-algorithm 只用于公司文档定义的关键算法，普通脚本/模块/工具不要建算法卡。 knowledge 有两种用途：配置 graph.concept_owner_id 指定的那一个是概念库（只放概念页，建好后把 owner_id 填进该配置）； 其他 knowledge 对象是通用知识对象，承接不属于任何具体研究、项目、工具、数据的知识，按主题复用，主题不同再新建。 | `owner_type`*: string，`slug`*: string，`title`*: string，`description`: string，`keywords`: array|null，`source_document`: string|null，`short_name`: string|null，`sensitivity`: string |
+| `memory.owner_create` | 写入 | 新建对象（写入业务卡；首次提交记忆时才建立记忆目录）。Run 用 runs_create 建立。 先用 memory_owners 查找：同一目标的继续或子任务沿用已有对象；主题相似只引用；独立交付目标才新建。 core-algorithm 只用于公司文档定义的关键算法，普通脚本/模块/工具不要建算法卡。 knowledge 有两种用途：配置 graph.concept_owner_id 指定的那一个是概念库（只放概念页，建好后把 owner_id 填进该配置）； 其他 knowledge 对象是通用知识对象，承接不属于任何具体研究、项目、工具、数据的知识，按主题复用，主题不同再新建。 | `owner_type`*: string，`slug`*: string，`title`*: string，`description`: string，`keywords`: array|null，`source_document`: string|null，`short_name`: string|null，`sensitivity`: string |
 | `memory.owner_route` | 只读 | 归属判定（只读）：与 reading_start 第一轮相同的召回和筛选包，附上候选的当前目标、最新检查点与来源重叠证据。 只在需要读历史或需要保存时调用（简单问答、无复用价值的小任务不调用）。不给建议动作，由你判断： 选出暂定对象后用 memory_resume 完整阅读，确认是同一目标再第一次保存（memory_commit 带 attribution）； 不相关就换下一个候选或新建。gaps 有索引缺口时，不要因为"没有候选"就新建对象。不建立阅读会话。 | `task`*: string，`variants`: array|null，`protected_terms`: array|null，`paths`: array|null，`owner_hint`: string|null，`limit`: integer |
 | `memory.owners` | 只读 | 列出可读对象（按类型分组，带各层记录数）。 | `owner_types`: array|null，`query`: string |
 | `memory.raw_material` | 只读 | 回读一个原始材料（按清单中的 ID；核对固定字节）。 | `owner_id`*: string，`material_id`*: string，`max_chars`: integer |
@@ -79,7 +79,7 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | `memory.render` | 只读 | 按交换格式把一条记录渲染为 Markdown（YAML 头 + 正文 + 自动生成的反链与关联）。只读。 | `owner_id`*: string，`record_id`*: string |
 | `memory.resume` | 只读 | 续接对象的工作上下文：目标→检查点→最新概览/经过/技术→路线/问题/经验（只读）。 不建立阅读会话；用户查询主题相关知识、找已有经验时默认先 reading_start。 workbench_notes 列出与该对象相关、尚未结束的工作台笔记；queued 的由你用 relations_note_reply 回写。 | `owner_id`*: string |
 | `memory.summary_materials` | 只读 | 跨对象总结的固定材料包（不生成总结）。 | `owner_ids`*: array，`exclude_ids`: array|null |
-| `memory.summary_save` | 写入 | 把写好的总结保存为本对象的 L3/L4；依据对象有新提交则拒绝。 | `owner_id`*: string，`draft`*: object，`basis_heads`*: object，`record_id`: string|null，`expected_revision`: integer|null，`dry_run`: boolean |
+| `memory.summary_save` | 写入 | 把写好的跨对象总结保存为本对象的 L3（experience）或 L4（overview）。依据对象在准备材料后有新提交则拒绝， 不用旧材料覆盖新结果。修订已有总结时给 record_id、expected_revision，并在草案中写 change_reason。 | `owner_id`*: string，`draft`*: object，`basis_heads`*: object，`record_id`: string|null，`expected_revision`: integer|null，`dry_run`: boolean |
 | `memory.timeline` | 只读 | 研究时间线：全部记录的全部修订与关联 Run（不含正文）。 | `owner_id`*: string，`offset`: integer，`limit`: integer |
 
 ## monitor
@@ -161,7 +161,7 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 
 | 操作 | 类型 | 说明 | 参数 |
 |---|---|---|---|
-| `review.batch` | 写入 | 批量复核（逐条串行；单条失败不影响其他）。每项字段同 review.submit。 | `items`*: array，`dry_run`: boolean |
+| `review.batch` | 写入 | 批量复核（逐条串行；单条失败不影响其他）。每项字段同 review_submit。 | `items`*: array，`dry_run`: boolean |
 | `review.history` | 只读 | 一条结论的复核历史。 | `claim_id`*: string |
 | `review.queue` | 只读 | 待复核队列：默认列出未复核、已失效、有争议、被上游阻断、有升级提议的结论； 每项带有效成熟度与派生统计（支持数按原始来源去重，"用得多"不等于"对"）。 | `states`: array|null，`owner_id`: string|null，`query`: string，`limit`: integer，`offset`: integer |
 | `review.submit` | 写入 | 复核一条结论。accepted 需要适用范围与支持性证据；superseded 需要替代结论。dry_run 只预检。 成熟度与复核状态分开：可以在 not-reviewed 时登记 conjecture/preliminary；established 必须 accepted。 | `target_claim_id`*: string，`state`*: string，`reason`*: string，`scope`: string|null，`evidence_refs`: array|null，`replacement_claim_id`: string|null，`maturity`: string|null，`evidence_basis`: string|null，`requested_maturity`: string|null，`dry_run`: boolean |
@@ -170,8 +170,8 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 
 | 操作 | 类型 | 说明 | 参数 |
 |---|---|---|---|
-| `runs.create` | 写入 | 新建 Run（一次实际执行的证据：输入、程序、输出与失败）。给 owner_id 时放在该对象目录下，否则是独立 Run。 Run 不保存记忆记录、不进检索；执行得到的知识写进上级对象或合适的知识对象的记录，并引用该 Run。 一次性小任务默认不建 Run，只有执行结果要被记录引用时才建；没有知识的 Run 用 runs.discard 丢弃。 | `title`*: string，`owner_id`: string|null，`question`: string，`keywords`: array|null |
-| `runs.discard` | 写入 | 丢弃没有知识的 Run：当前没有任何记录引用时，把整个 Run 目录移入回收站（可用 runs.restore 恢复）。 失败本身有教训时不要丢弃，写成记录并引用它。被记录引用的 Run 不能丢弃。 | `run_id`*: string，`reason`*: string |
+| `runs.create` | 写入 | 新建 Run（一次实际执行的证据：输入、程序、输出与失败）。给 owner_id 时放在该对象目录下，否则是独立 Run。 Run 不保存记忆记录、不进检索；执行得到的知识写进上级对象或合适的知识对象的记录，并引用该 Run。 一次性小任务默认不建 Run，只有执行结果要被记录引用时才建；没有知识的 Run 用 runs_discard 丢弃。 | `title`*: string，`owner_id`: string|null，`question`: string，`keywords`: array|null |
+| `runs.discard` | 写入 | 丢弃没有知识的 Run：当前没有任何记录引用时，把整个 Run 目录移入回收站（可用 runs_restore 恢复）。 失败本身有教训时不要丢弃，写成记录并引用它。被记录引用的 Run 不能丢弃。 | `run_id`*: string，`reason`*: string |
 | `runs.empty_trash` | 仅用户（不暴露给 agent） | 永久删除回收站中的全部 Run。用户专属，只在工作台与 CLI 提供。 | 无 |
 | `runs.execute` | 写入 | 前台运行 Python 脚本并登记输入、输出与日志（失败也登记）。参数可用 {input0}、{output_dir} 占位。 | `run_id`*: string，`script`*: string，`inputs`: array|null，`args`: array|null，`timeout_seconds`: number，`preview`: boolean |
 | `runs.register` | 写入 | 登记已有文件为 Run 的输入/产物（固定字节指纹，可回滚）。 | `run_id`*: string，`inputs`: array|null，`artifacts`: array|null，`preview`: boolean |
@@ -187,7 +187,7 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 |---|---|---|---|
 | `sources.add_root` | 写入 | 登记一个工作根。通常不必手动调用：登记本次工作目录里的文件时会自动建根。 | `path`*: string，`title`: string |
 | `sources.list` | 只读 | 已登记的来源文件（file 引用的唯一授权入口），附当前解析出的位置 location。 | 无 |
-| `sources.register` | 写入 | 登记一个来源文件并记录当前字节指纹：L0 原件的唯一授权入口。原件留在原处，不复制、不修改。 工作目录里的文件自动记为"工作根 + 相对路径"，迁移时随根重定向。 同一 ID 重复登记同一文件是幂等的；内容变了请用新 ID；文件搬家用 sources.relocate / sources.relocate_root。 | `source_id`*: string，`path`*: string，`title`: string，`sensitivity`: string |
+| `sources.register` | 写入 | 登记一个来源文件并记录当前字节指纹：L0 原件的唯一授权入口。原件留在原处，不复制、不修改。 工作目录里的文件自动记为"工作根 + 相对路径"，迁移时随根重定向。 同一 ID 重复登记同一文件是幂等的；内容变了请用新 ID；文件搬家用 sources_relocate / sources_relocate_root。 | `source_id`*: string，`path`*: string，`title`: string，`sensitivity`: string |
 | `sources.register_many` | 写入 | 批量登记来源（导入已有资料时使用）。 | `items`*: array |
 | `sources.relocate` | 写入 | 原件搬家：新位置的字节必须与登记时一致，旧路径记入 relocated_from，已有固定引用继续有效。 | `source_id`*: string，`new_path`*: string |
 | `sources.relocate_root` | 写入 | 工作目录整体搬家：逐个核对新位置下已登记文件的指纹，全部一致才改根的位置；已有固定引用不变。 | `root_id`*: string，`new_path`*: string，`allow_missing`: boolean |
@@ -201,6 +201,7 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | `system.capabilities` | 只读 | 当前能力与降级情况（向量模型、重排模型、连接器）。 | 无 |
 | `system.guide` | 只读 | 读取 burrowl 工作流说明全文（与 Skill 文件相同）。客户端没有加载 burrowl Skill 时，用它代替 Skill。 | `name`*: string |
 | `system.ops` | 只读 | 全部操作的目录（名称、分组、读写类型、说明、参数 schema）。 | `groups`: array|null |
+| `system.tool_errors` | 只读 | 最近被拒绝的工具调用与内部错误，按工具汇总（R20 D-10）：参数错误（input）、其他拒绝（other）、内部错误（internal） 的次数和最常出错的参数路径，以及最近的内部错误 incident_id。参数错误多的工具，说明说明或示例需要改；不含参数内容。 | `limit`: integer |
 | `system.validate` | 只读 | 全工作区只读校验：提交链与指纹、写锁与残留、来源文件是否变化或缺失、索引是否落后。不修复。 | 无 |
 
 ## wiki

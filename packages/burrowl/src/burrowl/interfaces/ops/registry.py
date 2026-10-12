@@ -5,6 +5,10 @@
 
 参数模型由函数签名自动生成（pydantic）；结果必须可 JSON 序列化。
 外部包可通过入口点 `burrowl.ops` 提供额外的注册模块（例如知识中枢连接器）。
+
+参数只在 call() 这一处校验（R20 D-08）：MCP 适配层不预校验，HTTP/CLI 同样经过这里。
+结构化参数的字段由 shapes.Shape 声明并按同一份 schema 校验；所有参数错误一次列全，中文、带完整路径（D-05）。
+意外异常转为 INTERNAL_ERROR，堆栈只写日志（D-06）；被拒绝的调用记下错误码与路径用于统计（D-10）。
 """
 import inspect
 from collections.abc import Callable
@@ -16,7 +20,10 @@ from pydantic import BaseModel, ConfigDict, ValidationError, create_model
 
 from ...app import App
 from ...core.errors import BurrowlError
+from ...core.jsonschema import validate
 from ...storage.owners import OwnerRegistry
+from . import errorlog
+from .shapes import Shape, shape_of
 
 # user：只给人在工作台/CLI 使用（如批准全文补偿、改判），不暴露为 MCP 工具，agent 不能替用户批准。
 Effect = Literal["read", "write", "admin", "user"]
@@ -40,6 +47,7 @@ class OpSpec:
     summary: str
     fn: Callable[..., Any]
     model: type[BaseModel]
+    shapes: dict[str, Shape]
 
     @property
     def tool_name(self) -> str:
@@ -68,8 +76,10 @@ def op(name: str, *, effect: Effect = "read") -> Callable[[Callable], Callable]:
         if name in REGISTRY:
             raise ValueError(f"duplicate op: {name}")
         summary = " ".join((fn.__doc__ or name).strip().split())
+        shapes = {p.name: shape for p in list(inspect.signature(fn).parameters.values())[1:]
+                  if (shape := shape_of(p.annotation)) is not None}
         REGISTRY[name] = OpSpec(name=name, group=name.split(".", 1)[0], effect=effect, summary=summary,
-                                fn=fn, model=_model(name, fn))
+                                fn=fn, model=_model(name, fn), shapes=shapes)
         return fn
     return register
 
@@ -84,20 +94,79 @@ def jsonable(value: Any) -> Any:
     return value
 
 
+MAX_WARNINGS = 10  # R20 D-06：写操作结果里的 warnings 最多列这么多条，其余只计数
+
+
+def _cap_warnings(result: Any) -> Any:
+    if isinstance(result, dict) and isinstance(result.get("warnings"), list) and len(result["warnings"]) > MAX_WARNINGS:
+        result = {**result, "warnings": result["warnings"][:MAX_WARNINGS],
+                  "warnings_truncated": len(result["warnings"]) - MAX_WARNINGS}
+    return result
+
+
+_PY_TYPES = {"string": "字符串", "int": "整数", "float": "数值", "bool": "布尔值", "dict": "对象", "list": "列表",
+             "model": "对象"}
+
+
+def _argument_error(error: dict, spec: OpSpec) -> dict:
+    """pydantic 的参数错误译成中文；能给出允许值时放进 expected。"""
+    path = "/" + "/".join(map(str, error["loc"]))
+    kind, ctx_info, where = error["type"], error.get("ctx") or {}, ".".join(map(str, error["loc"]))
+    extra: dict[str, Any] = {}
+    if kind == "missing":
+        message = f"缺少必填参数 {where}"
+    elif kind == "extra_forbidden":
+        message = f"未知参数 {where}（可能拼错）"
+        extra["expected"] = sorted(spec.model.model_fields)
+    elif kind in {"literal_error", "enum"}:
+        message = f"取值 {error.get('input')!r} 不在允许范围：{ctx_info.get('expected', '')}"
+    elif kind.endswith("_type") or kind.endswith("_parsing"):
+        expected = _PY_TYPES.get(kind.split("_")[0], kind.split("_")[0])
+        message = f"类型不对：应为{expected}，实际是 {type(error.get('input')).__name__}"
+    elif kind == "string_pattern_mismatch":
+        message = f"格式不对：应匹配 {ctx_info.get('pattern')}"
+    else:
+        message = f"取值不符合要求（{error['msg']}）"
+    return {"code": "INVALID_ARGUMENT", "path": path, "message": message, **extra}
+
+
+def check_arguments(spec: OpSpec, arguments: dict) -> BaseModel:
+    """按参数模型与结构化参数的形状校验；所有错误收集后一次抛出。"""
+    errors: list[dict] = []
+    parsed = None
+    try:
+        parsed = spec.model.model_validate(arguments)
+    except ValidationError as exc:
+        errors = [_argument_error(e, spec) for e in exc.errors()]
+    flagged = {e["path"].split("/")[1] for e in errors}
+    for field, shape in spec.shapes.items():
+        value = arguments.get(field)
+        if value is None or field in flagged:
+            continue
+        errors += [{**e, "code": "INVALID_ARGUMENT", "path": f"/{field}{e['path']}"}
+                   for e in validate(value, shape.schema, shape.defs)]
+    if errors:
+        raise BurrowlError("INVALID_ARGUMENT", f"参数不符合要求（{len(errors)} 处）", {"op": spec.name}, errors)
+    return parsed
+
+
 def call(ctx: Ctx, name: str, arguments: dict | None) -> Any:
-    """校验参数后执行；参数错误统一转换为 INVALID_ARGUMENT。"""
+    """校验参数后执行。业务错误原样抛出（被拒绝的调用记入错误日志）；意外异常转为 INTERNAL_ERROR。"""
     spec = load().get(name)
     if spec is None:
         raise BurrowlError("NOT_FOUND", "未知操作", {"op": name})
+    root = getattr(ctx.app, "root", None)
     try:
-        parsed = spec.model.model_validate(arguments or {})
-    except ValidationError as exc:
-        raise BurrowlError("INVALID_ARGUMENT", "参数不符合要求", {"op": name},
-                       [{"code": "INVALID_ARGUMENT", "path": "/" + "/".join(map(str, e["loc"])), "message": e["msg"]}
-                        for e in exc.errors()]) from exc
-    values = {field: getattr(parsed, field) for field in spec.model.model_fields}
-    with OwnerRegistry.request_scope():  # 一次操作只扫描一次对象目录
-        return jsonable(spec.fn(ctx, **values))
+        parsed = check_arguments(spec, arguments or {})
+        values = {field: getattr(parsed, field) for field in spec.model.model_fields}
+        with OwnerRegistry.request_scope():  # 一次操作只扫描一次对象目录
+            result = jsonable(spec.fn(ctx, **values))
+        return _cap_warnings(result) if spec.effect == "write" else result  # 诊断类读操作（validate）完整列出
+    except BurrowlError as exc:
+        errorlog.rejected(root, name, ctx.channel, exc)
+        raise
+    except Exception as exc:  # noqa: BLE001 - R20 D-06：意外异常不能带着堆栈或空消息到调用方
+        raise errorlog.internal(root, name, ctx.channel, exc) from exc
 
 
 _LOADED = False

@@ -5,7 +5,7 @@
 import uuid
 
 from ..core.config import Budget
-from ..core.errors import BurrowlError
+from ..core.errors import BurrowlError, rebase, schema_error
 from .memory.claims import blocked_records
 from .memory.reader import Reader, fixed_ref
 from .memory.service import MemoryService
@@ -87,14 +87,31 @@ def save_summary(memory: MemoryService, owner_id: str, draft: dict, *, actor: di
                  record_id: str | None = None, expected_revision: int | None = None, request_id: str | None = None,
                  dry_run: bool = False) -> dict:
     """把 AI/人写好的总结保存为单一对象的 L3/L4；依据对象有新提交时拒绝（不用旧材料覆盖新结果）。"""
-    if draft.get("kind") not in {"experience", "overview"} or draft.get("owner_id") != owner_id:
-        raise BurrowlError("INVALID_ARGUMENT", "总结只能保存为本对象的 experience（L3）或 overview（L4）")
+    draft = dict(draft)
+    written = draft.setdefault("owner_id", owner_id)  # R20 D-01：可以省略，写了必须是本对象
+    errors = []
+    if draft.get("kind") not in {"experience", "overview"}:
+        errors.append(schema_error("/draft/kind", "总结只能保存为 experience（L3）或 overview（L4）",
+                                   expected=["experience", "overview"]))
+    if written != owner_id:
+        errors.append(schema_error("/draft/owner_id", f"草案写的是 {written}，总结只能保存到本对象 {owner_id}；"
+                                                      "owner_id 可以省略", expected=[owner_id]))
     if record_id and not str(draft.get("change_reason", "")).strip():
-        raise BurrowlError("INVALID_ARGUMENT", "修订已有解释必须说明 change_reason")
+        errors.append(schema_error("/draft/change_reason", "修订已有总结必须写 change_reason（为什么改）"))
+    if (record_id is None) != (expected_revision is None):
+        errors.append(schema_error("/expected_revision", "修订时 record_id 与 expected_revision（当前修订号）要一起给；新建时都不给"))
+    if errors:
+        raise BurrowlError("INVALID_ARGUMENT", "总结草案不符合要求", {"hint": f"字段与示例用 memory_contract(\"{draft.get('kind') or 'overview'}\") 查询"},
+                           errors=errors)
     operation: dict = {"op": "put_record", "draft": draft}
     operation |= {"record_id": record_id, "expected_revision": expected_revision} if record_id else {"client_key": "summary"}
     owner = memory.owners().get(owner_id)
     head = memory.snapshot(owner).commit_id if owner.persisted else None
-    return memory.commit({"schema_version": 3, "request_id": request_id or str(uuid.uuid4()), "actor": actor,
-                          "owner_id": owner_id, "expected_head": head, "operations": [operation], "dry_run": dry_run},
-                         basis_heads={k: v for k, v in basis_heads.items() if k != owner_id} or None)
+    try:
+        return memory.commit({"schema_version": 3, "request_id": request_id or str(uuid.uuid4()), "actor": actor,
+                              "owner_id": owner_id, "expected_head": head, "operations": [operation],
+                              "dry_run": dry_run},
+                             basis_heads={k: v for k, v in basis_heads.items() if k != owner_id} or None)
+    except BurrowlError as exc:  # 内部请求的路径换成本工具参数的路径
+        exc.errors = rebase(exc.errors, "/operations/0/draft", "/draft")
+        raise

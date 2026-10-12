@@ -56,4 +56,5 @@ def _check(warnings: list[dict], path: str, ref: Any, allowed: tuple[str, ...]) 
 def _warning(path: str, relation: str, allowed: tuple[str, ...], message: str) -> dict:
     return {"code": "RELATION_NOT_RECOMMENDED", "path": path, "relation": relation, "recommended": list(allowed),
             "message": f"关系名 {relation} 不在此处的推荐范围（{'、'.join(allowed)}）。{message}；确有理由保留时，"
-                       "在 record_reason 或 change_reason 中写明"}
+                       "在 record_reason 或 change_reason 中写明",
+            "action": "改用推荐的关系名修订该记录，或在 record_reason / change_reason 写明保留理由"}

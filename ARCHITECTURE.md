@@ -71,7 +71,7 @@ core         记录模型与校验、契约说明、哈希、原子写与锁、�
 
 | 模块 | 职责与代码入口 | 变化时检查的关联 |
 |---|---|---|
-| CORE 记录契约 | `core/records.py`（校验与领域规则）、`core/schema/`（memory.schema.json 与草案示例）、`core/contract.py`（给 AI 的契约说明）、`core/links.py`（链接语法与 handle 生成） | 所有读写记录的服务、`memory.contract`、草案示例测试、前端类型、Skill 与 RECORDING；契约只做增量，已有指纹必须不变（`tests/service/test_links.py`） |
+| CORE 记录契约 | `core/records.py`（校验与领域规则）、`core/schema/`（memory.schema.json 与草案示例）、`core/contract.py`（给 AI 的契约说明；字段的 required / optional / conditional 由 schema 与默认值表生成，R20）、`core/links.py`（链接语法与 handle 生成） | 所有读写记录的服务、`memory.contract`、草案示例测试、前端类型、Skill 与 RECORDING；契约只做增量，已有指纹必须不变（`tests/service/test_links.py`）；契约标注与服务行为一致（`tests/service/test_ai_fields.py`） |
 | STORE 规范存储 | `storage/memory_store.py`（提交、CAS、幂等、暂存回读、恢复；`read_head` 只读 HEAD、提交清单与指定指针记录；`VerifiedRecords` 已校验记录缓存）、`storage/owners.py`（对象发现、业务卡、核心算法准入；对象发现不进入 `runs/`，`RunLocator` 按编号与位置找 Run）、`storage/sources.py`（来源登记）、`core/atomic.py`（锁） | 所有服务；备份恢复；validate |
 | MEM 记忆服务 | `services/memory/`：service（提交与读取过滤、handle；可见范围默认值见 policy）、vocabulary（两层关系词表与 warning，R19）、links（链接解析与重新固定）、concepts（概念库约束与术语扩展）、claims（结论、复核图、成熟度与派生统计）、documents（文稿）、history、raw_materials、provenance（影响与血缘）、associations、consolidation、export | REVIEW、QUERY、READ、HUB 的读取者；工作台记忆页；work 与 consolidate Skill |
 | REVIEW 复核 | `services/review.py`、`services/memory/claims.py` | 检索的复核类别、正式用途、中枢发布策略、复核页 |
@@ -86,7 +86,7 @@ core         记录模型与校验、契约说明、哈希、原子写与锁、�
 | NOTE 工作台笔记 | `services/notes.py`（R15：用户交给 AI 的待办；状态转换、AI 方案的预演与预览、用户执行时核对依据 HEAD 后按方案写入） | 关系图页笔记面板、首页状态卡与导航计数；`memory.resume` 的 `workbench_notes`；RULES 第 8 节、work 与 consolidate Skill；方案步骤依赖 `memory.commit` 与 `relations.decide` 的参数和 dry_run |
 | CFG 配置 | `core/config.py`（BurrowlConfig）、`services/config.py`（CAS 与影响提示）、`storage/config_store.py`、`storage/secrets.py` | 所有读取默认值的服务；设置页；MCP 工具组 |
 | PORT 可移植包 | `portable/bundle.py`（burrowl-bundle 备份、校验、恢复） | 数据目录布局变化；排除规则 |
-| APP 入口 | `interfaces/`（ops 注册表、api、mcp、cli）、`app.py`、`frontend/` | 同一操作在 HTTP/MCP/CLI/前端的一致性；生成类型；effect 分类 |
+| APP 入口 | `interfaces/`（ops 注册表、api、mcp、cli）、`app.py`、`frontend/`；`interfaces/ops/shapes.py`（结构化参数的形状：发布给 AI 与校验用同一份 schema）、`interfaces/ops/errorlog.py`（错误日志）。参数只在 `registry.call` 校验，MCP 适配层关闭 SDK 的预校验（R20） | 同一操作在 HTTP/MCP/CLI/前端的一致性；生成类型；effect 分类；参数说明与形状（`tests/interfaces/test_tool_errors.py`）；MCP SDK 升级后重跑该测试（关闭预校验依赖 SDK 内部的工具注册对象） |
 | GUIDE 规则与说明 | `skills/`（RULES、RECORDING、4 个 Skill）、六份必读文档 | 所描述能力的代码与契约；`burrowl skills check` |
 | QA 测试与交付 | `tests/`、`frontend/src/**/*.test.tsx`、`frontend/e2e/`、`packaging/` | 见 [TESTING](docs/TESTING.md) |
 
@@ -115,6 +115,7 @@ core         记录模型与校验、契约说明、哈希、原子写与锁、�
 | 交换包 | 数据目录的 `exports/<名称>/`（manifest、vault、graph），由 `exchange.export` 生成 | 派生数据，可以删除重建；不进备份包；在其中的修改不会回到 burrowl |
 | 外部中枢内容 | WeKnora 等；LightRAG 的暂存表、构建目录与嵌入缓存在连接器 `options.path` 下 | 派生副本，可以由本地重新发布；LightRAG 每次有修改或删除时整体重建，切换成功前旧构建照常可查 |
 | 工作台偏好 | `.burrowl/workbench/view.json`（关系图视图） | 本机偏好，不是研究记录 |
+| 错误日志 | `.burrowl/logs/errors.jsonl`（R20）：意外异常的堆栈与 incident_id；被拒绝调用的工具名、渠道、错误码与出错路径 | 派生诊断数据，可以删除；不记参数内容；超过 2 MB 轮转一份；不进备份包；写失败不影响操作本身 |
 | 检索与图投影的访问一致性 | 投影时隐去读取会被拒的记录；来源停用或改敏感级别时由 `IndexService.on_access_change` 重新投影依赖者（投影新鲜度不含来源登记，E9） | 读取被拒的记录不能出现在检索结果和关系图中 |
 | 工作台笔记 | `.burrowl/workbench/notes.json`（R15：笔记、往来、待确认方案与执行结果） | 用户交给 AI 的待办，不是研究记录；随备份带走；每个状态只由一方推进，读改写在同一把锁内；写入记忆只经用户执行方案 |
 | 当前任务上下文 | 任务的 Markdown 工作清单，由 AI 编辑 | 不是后台同步的状态；检查点保存交接时点 |
@@ -205,3 +206,4 @@ handle 分配和正文链接解析发生在第 1 步（`MemoryService.prepare`�
   - 实测（每对象 6 条记录，假向量，本机）：提交 N=20 约 0.31 s、N=50 约 0.61 s；inspect N=20 约 0.08 s、N=50 约 0.21 s。就绪判断 50 个对象约 0.25 s（R13 §8）。
   - 关键操作记录每次请求都要为每个对象读最新提交，对象很多时需要可重建的派生缓存。
 - 第二台物理机安装与真实业务验收尚未进行。
+- MCP 适配层通过 SDK 内部的工具注册对象关闭参数预校验（R20 D-08），SDK 升级后可能失效，由 `tests/interfaces/test_tool_errors.py` 检测。宿主是否把 `errors` 列表完整交给模型由宿主决定。

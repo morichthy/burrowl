@@ -5,13 +5,11 @@
     "op": "put_record",
     "client_key": "new-document_section",
     "draft": {
-      "owner_id": "RES-FLOATING-POINT-SUMMATION",
       "kind": "document_section",
       "title": "方法：精确基准",
       "keywords": [],
       "body_markdown": "",
       "record_reason": "为文稿组织方法章节",
-      "sensitivity": "internal",
       "sources": [
         {
           "target_kind": "record",

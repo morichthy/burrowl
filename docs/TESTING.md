@@ -68,6 +68,11 @@
 **记录契约与链接**
 
 - 契约只做增量：浮点样例全部记录的 content_hash、record_hash、结论指纹不变（`tests/service/test_links.py`）。
+
+**AI 填写的字段与报错（R20）**
+
+- 契约标注与服务行为一致：每类记录逐字段省略，标 required 的失败且路径指向该字段，标 optional 的通过；服务端字段写了被拒。草案 `owner_id`、`sensitivity` 可省略，修订沿用原值；错误一次列全、路径从参数根算起、带字段说明与 `memory_contract` 提示；总结保存与关联的路径换成各自参数（`tests/service/test_ai_fields.py`）。
+- Skill 提到的工具每个参数都有说明、结构化参数声明了字段、说明里用 MCP 工具名、形状与示例通过校验；顶层与嵌套参数的错误一次列全；MCP 不预校验（类型错误也返回统一结构）、JSON 字符串参数照常解析；意外异常只返回 `incident_id`，堆栈在日志里；被拒绝调用的统计不含参数内容（`tests/interfaces/test_tool_errors.py`）。
 - 真源兼容：每次全量测试都用当前代码读取 `tests/fixtures/compat/` 下所有历史标本，检查四项：
   1. 沿提交链逐条校验全部修订的身份与指纹；
   2. Run（含回收站）、来源登记、阅读会话、工作台笔记、配置都能加载，工作根能重定向；

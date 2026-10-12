@@ -12,6 +12,9 @@ export declare namespace HubHealth {
    * 测试连接：服务版本、兼容性、能力、密钥是否已设置（不返回密钥）。
    */
   export interface Args {
+    /**
+     * 连接器 ID（hub_connectors 列出）
+     */
     connector_id: string;
   }
 }
@@ -21,6 +24,9 @@ export declare namespace HubPlan {
    * 预览发布：按策略（默认只发已复核的 L4/L3 与成稿文档）列出新增/更新/删除，返回 plan_hash。
    */
   export interface Args {
+    /**
+     * 连接器 ID（hub_connectors 列出）
+     */
     connector_id: string;
   }
 }
@@ -30,9 +36,12 @@ export declare namespace HubApply {
    * 执行发布。逐条记录结果，单条失败不影响其他条目。
    */
   export interface Args {
+    /**
+     * 连接器 ID（hub_connectors 列出）
+     */
     connector_id: string;
     /**
-     * hub.plan 返回的 plan_hash；数据变化后需重新预览
+     * hub_plan 返回的 plan_hash；数据变化后需重新预览
      */
     plan_hash: string;
     /**
@@ -47,7 +56,13 @@ export declare namespace HubStatus {
    * 发布状态：各状态计数、失败/漂移条目、最近几次执行；refresh 时轮询外部解析进度。
    */
   export interface Args {
+    /**
+     * 连接器 ID（hub_connectors 列出）
+     */
     connector_id: string;
+    /**
+     * true 时先轮询外部解析进度再返回
+     */
     refresh?: boolean;
   }
 }
@@ -57,9 +72,18 @@ export declare namespace HubSearch {
    * 在外部知识中枢检索；命中能对上本地条目时附 fixed_ref 与按本地当前状态计算的复核类别。
    */
   export interface Args {
+    /**
+     * 检索文本
+     */
     query: string;
+    /**
+     * 只查这些连接器；不给时查全部
+     */
     connector_ids?: string[] | null;
     limit?: number;
+    /**
+     * all（默认，带复核徽标）/ reviewed_only / exclude_unsafe / unreviewed_only
+     */
     review_filter?: "all" | "reviewed_only" | "exclude_unsafe" | "unreviewed_only";
   }
 }
@@ -69,6 +93,9 @@ export declare namespace WikiList {
    * 列出外部 Wiki 页面（authored_here 表示由本项目发布）。
    */
   export interface Args {
+    /**
+     * 连接器 ID（hub_connectors 列出）
+     */
     connector_id: string;
     query?: string;
     limit?: number;
@@ -80,6 +107,9 @@ export declare namespace WikiRead {
    * 读取一页外部 Wiki（含外部自动生成的页面）。
    */
   export interface Args {
+    /**
+     * 连接器 ID（hub_connectors 列出）
+     */
     connector_id: string;
     slug: string;
   }
@@ -90,6 +120,9 @@ export declare namespace WikiConfigure {
    * 按配置 wiki.mode 开启/关闭外部自动 Wiki（auto/both 开启）。
    */
   export interface Args {
+    /**
+     * 连接器 ID（hub_connectors 列出）
+     */
     connector_id: string;
   }
 }
@@ -97,9 +130,12 @@ export declare namespace WikiConfigure {
 export declare namespace HubCandidatesPull {
   /**
    * 把外部工具发现的关系线索拉回为关联候选（origin=tool:<连接器>，只写派生的候选表，不写记录）。
-   * 之后用 relations.candidates 查看并判断。
+   * 之后用 relations_candidates 查看并判断。
    */
   export interface Args {
+    /**
+     * 连接器 ID（hub_connectors 列出）
+     */
     connector_id: string;
     limit?: number;
   }
@@ -140,6 +176,9 @@ export declare namespace ReviewQueue {
    * 每项带有效成熟度与派生统计（支持数按原始来源去重，"用得多"不等于"对"）。
    */
   export interface Args {
+    /**
+     * 只看这些状态；不给时列出未复核、已失效、有争议、被上游阻断、有升级提议的
+     */
     states?:
       | (
           | "not-reviewed"
@@ -152,7 +191,13 @@ export declare namespace ReviewQueue {
           | "superseded"
         )[]
       | null;
+    /**
+     * 只看该对象的结论
+     */
     owner_id?: string | null;
+    /**
+     * 按结论陈述或 ID 匹配
+     */
     query?: string;
     limit?: number;
     offset?: number;
@@ -165,15 +210,61 @@ export declare namespace ReviewSubmit {
    * 成熟度与复核状态分开：可以在 not-reviewed 时登记 conjecture/preliminary；established 必须 accepted。
    */
   export interface Args {
+    /**
+     * 要复核的结论 ID（CLM-…）
+     */
     target_claim_id: string;
+    /**
+     * accepted 在 scope 内成立；disputed 有争议；retracted 撤回；superseded 被替代；not-reviewed 未复核
+     */
     state: "accepted" | "disputed" | "retracted" | "superseded" | "not-reviewed";
+    /**
+     * 复核理由；AI 代用户登记时写明“用户在对话中确认：…（时间）”
+     */
     reason: string;
+    /**
+     * 在什么范围内成立（accepted 必填）
+     */
     scope?: string | null;
+    /**
+     * 支持或反驳的固定引用列表（accepted 必填）。固定引用 {target_kind, target_id, revision, sha256, locator, relation}，不能只写 ID。记录：revision 与 sha256 取 memory_inspect 的 revision 与 record_hash，或提交回执的 fixed_ref；文件：revision 写 null，sha256 取 sources_list 的指纹
+     */
     evidence_refs?:
       | {
-          [k: string]: unknown;
+          target_kind: "owner" | "record" | "claim" | "file";
+          target_id: string;
+          revision: number | null;
+          sha256: string | null;
+          locator: string;
+          relation:
+            | "supports"
+            | "input"
+            | "contradicts"
+            | "background"
+            | "derived_from"
+            | "refines"
+            | "same_problem"
+            | "same_failure_mode"
+            | "prerequisite"
+            | "analogous_to"
+            | "used_in"
+            | "references"
+            | "same_entity"
+            | "mentions"
+            | "depends_on"
+            | "supersedes"
+            | "contains"
+            | "precedes"
+            | "member_of"
+            | "similar_structure"
+            | "related_to"
+            | "subject_of"
+            | "object_of";
         }[]
       | null;
+    /**
+     * superseded 必填：替代它的结论 ID
+     */
     replacement_claim_id?: string | null;
     /**
      * 成熟度：conjecture 有推理无数据；preliminary 至少一次 Run 或小样本支持；replicated 多份独立依据都成立；established 只能由人或授权流程登记（AI 改用 requested_maturity）
@@ -187,18 +278,110 @@ export declare namespace ReviewSubmit {
      * AI 提议升级为已确立，由用户在复核队列中确认
      */
     requested_maturity?: "established" | null;
+    /**
+     * true 只预检、不写入
+     */
     dry_run?: boolean;
   }
 }
 
 export declare namespace ReviewBatch {
   /**
-   * 批量复核（逐条串行；单条失败不影响其他）。每项字段同 review.submit。
+   * 批量复核（逐条串行；单条失败不影响其他）。每项字段同 review_submit。
    */
   export interface Args {
-    items: {
-      [k: string]: unknown;
-    }[];
+    /**
+     * 每项字段同 review_submit：{target_claim_id, state, reason, scope?, evidence_refs?, replacement_claim_id?, maturity?, evidence_basis?, requested_maturity?}
+     *
+     * @minItems 1
+     */
+    items: [
+      {
+        target_claim_id: string;
+        state: "accepted" | "disputed" | "retracted" | "superseded" | "not-reviewed";
+        reason: string;
+        scope?: string | null;
+        evidence_refs?: {
+          target_kind: "owner" | "record" | "claim" | "file";
+          target_id: string;
+          revision: number | null;
+          sha256: string | null;
+          locator: string;
+          relation:
+            | "supports"
+            | "input"
+            | "contradicts"
+            | "background"
+            | "derived_from"
+            | "refines"
+            | "same_problem"
+            | "same_failure_mode"
+            | "prerequisite"
+            | "analogous_to"
+            | "used_in"
+            | "references"
+            | "same_entity"
+            | "mentions"
+            | "depends_on"
+            | "supersedes"
+            | "contains"
+            | "precedes"
+            | "member_of"
+            | "similar_structure"
+            | "related_to"
+            | "subject_of"
+            | "object_of";
+        }[];
+        replacement_claim_id?: string | null;
+        maturity?: "conjecture" | "preliminary" | "replicated" | "established" | null;
+        evidence_basis?: "engineering_case" | "proof" | "authoritative_source" | "replication" | null;
+        requested_maturity?: "established" | null;
+      },
+      ...{
+        target_claim_id: string;
+        state: "accepted" | "disputed" | "retracted" | "superseded" | "not-reviewed";
+        reason: string;
+        scope?: string | null;
+        evidence_refs?: {
+          target_kind: "owner" | "record" | "claim" | "file";
+          target_id: string;
+          revision: number | null;
+          sha256: string | null;
+          locator: string;
+          relation:
+            | "supports"
+            | "input"
+            | "contradicts"
+            | "background"
+            | "derived_from"
+            | "refines"
+            | "same_problem"
+            | "same_failure_mode"
+            | "prerequisite"
+            | "analogous_to"
+            | "used_in"
+            | "references"
+            | "same_entity"
+            | "mentions"
+            | "depends_on"
+            | "supersedes"
+            | "contains"
+            | "precedes"
+            | "member_of"
+            | "similar_structure"
+            | "related_to"
+            | "subject_of"
+            | "object_of";
+        }[];
+        replacement_claim_id?: string | null;
+        maturity?: "conjecture" | "preliminary" | "replicated" | "established" | null;
+        evidence_basis?: "engineering_case" | "proof" | "authoritative_source" | "replication" | null;
+        requested_maturity?: "established" | null;
+      }[]
+    ];
+    /**
+     * true 只预检、不写入
+     */
     dry_run?: boolean;
   }
 }
@@ -208,6 +391,9 @@ export declare namespace ReviewHistory {
    * 一条结论的复核历史。
    */
   export interface Args {
+    /**
+     * 结论 ID（CLM-…）
+     */
     claim_id: string;
   }
 }
@@ -217,6 +403,9 @@ export declare namespace ProvenanceImpact {
    * 这些内容变化后，哪些下游需要重新审阅（导航边只提示，supports/input 才是正式依赖）。
    */
   export interface Args {
+    /**
+     * 变化了的来源（SRC-…）、记录（MEM-…）或结论（CLM-…）
+     */
     changed_ids: string[];
   }
 }
@@ -226,6 +415,9 @@ export declare namespace ProvenanceLineage {
    * 沿依据追到可访问的原件身份（来源数不等于独立支持数）。
    */
   export interface Args {
+    /**
+     * 要追溯的记录（MEM-…）或结论（CLM-…）
+     */
     target_ids: string[];
   }
 }
@@ -245,7 +437,13 @@ export declare namespace ProvenanceFormal {
    * 正式使用：只返回在该范围内已接受、有效、来源可见的结论原文，其余列出原因。
    */
   export interface Args {
+    /**
+     * 结论（CLM-…）或包含结论的记录（MEM-…）
+     */
     target_ids: string[];
+    /**
+     * 正式使用的范围，只返回在该范围内已接受的结论
+     */
     scope: string;
   }
 }
@@ -275,7 +473,13 @@ export declare namespace RelationsSimilar {
    * 为种子记录找关联候选（关键词重合 / 语义近邻）；只是待判断的线索。
    */
   export interface Args {
+    /**
+     * 种子记录 ID（MEM-…）
+     */
     seeds: string[];
+    /**
+     * keyword=关键词重合；semantic=向量近邻（需要嵌入模型）
+     */
     method?: "keyword" | "semantic";
     limit?: number;
   }
@@ -286,7 +490,13 @@ export declare namespace RelationsAssociations {
    * 已保存的关联记录。
    */
   export interface Args {
+    /**
+     * 只看该状态
+     */
     status?: ("candidate" | "accepted" | "rejected" | "withdrawn") | null;
+    /**
+     * 只看一端是该记录的关联
+     */
     record_id?: string | null;
   }
 }
@@ -297,14 +507,181 @@ export declare namespace RelationsDecide {
    * "A 会影响 B"这类可以验证的判断写成结论（inference），不要写成关联。
    */
   export interface Args {
+    /**
+     * 关联记录存放的对象 ID
+     */
     owner_id: string;
     /**
      * {from, to, relation, explanation, shared_structure, transfer_limits[], basis_refs[], status, certainty?(speculative|plausible|supported), origin?, observed_in?}；快速添加只给 {from, to, explanation}：自动设为 related_to + speculative + accepted。from/to/basis_refs 都是固定引用对象 {target_kind, target_id, revision, sha256, locator, relation}，不能只写 ID
      */
     payload: {
-      [k: string]: unknown;
+      from: {
+        target_kind: "owner" | "record" | "claim" | "file";
+        target_id: string;
+        revision: number | null;
+        sha256: string | null;
+        locator: string;
+        relation:
+          | "supports"
+          | "input"
+          | "contradicts"
+          | "background"
+          | "derived_from"
+          | "refines"
+          | "same_problem"
+          | "same_failure_mode"
+          | "prerequisite"
+          | "analogous_to"
+          | "used_in"
+          | "references"
+          | "same_entity"
+          | "mentions"
+          | "depends_on"
+          | "supersedes"
+          | "contains"
+          | "precedes"
+          | "member_of"
+          | "similar_structure"
+          | "related_to"
+          | "subject_of"
+          | "object_of";
+      };
+      to: {
+        target_kind: "owner" | "record" | "claim" | "file";
+        target_id: string;
+        revision: number | null;
+        sha256: string | null;
+        locator: string;
+        relation:
+          | "supports"
+          | "input"
+          | "contradicts"
+          | "background"
+          | "derived_from"
+          | "refines"
+          | "same_problem"
+          | "same_failure_mode"
+          | "prerequisite"
+          | "analogous_to"
+          | "used_in"
+          | "references"
+          | "same_entity"
+          | "mentions"
+          | "depends_on"
+          | "supersedes"
+          | "contains"
+          | "precedes"
+          | "member_of"
+          | "similar_structure"
+          | "related_to"
+          | "subject_of"
+          | "object_of";
+      };
+      relation?:
+        | "supports"
+        | "input"
+        | "contradicts"
+        | "background"
+        | "derived_from"
+        | "refines"
+        | "same_problem"
+        | "same_failure_mode"
+        | "prerequisite"
+        | "analogous_to"
+        | "used_in"
+        | "references"
+        | "related_to";
+      explanation: string;
+      shared_structure?: string | null;
+      /**
+       * @minItems 0
+       */
+      transfer_limits?: string[];
+      differences?: string[];
+      /**
+       * @minItems 0
+       */
+      basis_refs?: {
+        target_kind: "owner" | "record" | "claim" | "file";
+        target_id: string;
+        revision: number | null;
+        sha256: string | null;
+        locator: string;
+        relation:
+          | "supports"
+          | "input"
+          | "contradicts"
+          | "background"
+          | "derived_from"
+          | "refines"
+          | "same_problem"
+          | "same_failure_mode"
+          | "prerequisite"
+          | "analogous_to"
+          | "used_in"
+          | "references"
+          | "same_entity"
+          | "mentions"
+          | "depends_on"
+          | "supersedes"
+          | "contains"
+          | "precedes"
+          | "member_of"
+          | "similar_structure"
+          | "related_to"
+          | "subject_of"
+          | "object_of";
+      }[];
+      status?: "candidate" | "accepted" | "rejected" | "withdrawn";
+      /**
+       * @minItems 0
+       */
+      missing_refs?: {
+        requested_target: string;
+        reason: string;
+        observed_at: string;
+      }[];
+      certainty?: "speculative" | "plausible" | "supported";
+      origin?: string;
+      observed_in?: {
+        target_kind: "owner" | "record" | "claim" | "file";
+        target_id: string;
+        revision: number | null;
+        sha256: string | null;
+        locator: string;
+        relation:
+          | "supports"
+          | "input"
+          | "contradicts"
+          | "background"
+          | "derived_from"
+          | "refines"
+          | "same_problem"
+          | "same_failure_mode"
+          | "prerequisite"
+          | "analogous_to"
+          | "used_in"
+          | "references"
+          | "same_entity"
+          | "mentions"
+          | "depends_on"
+          | "supersedes"
+          | "contains"
+          | "precedes"
+          | "member_of"
+          | "similar_structure"
+          | "related_to"
+          | "subject_of"
+          | "object_of";
+      };
     };
+    /**
+     * 为什么做这个判断（写进记录的 record_reason）
+     */
     reason: string;
+    /**
+     * true 只预检、不写入
+     */
     dry_run?: boolean;
     /**
      * 可见范围；不给时新关联默认全库可见、修订沿用原值。只有需要保密时才写 owner_only
@@ -319,8 +696,17 @@ export declare namespace RelationsCandidates {
    * 已判断过的端点对会被过滤。只读。
    */
   export interface Args {
+    /**
+     * 只看涉及该记录的线索
+     */
     record_id?: string | null;
+    /**
+     * 只看该对象内的线索
+     */
     owner_id?: string | null;
+    /**
+     * 线索类型：concept_mention、similar、external:*
+     */
     kinds?: string[] | null;
     limit?: number;
   }
@@ -410,6 +796,9 @@ export declare namespace RelationsNoteReply {
    * 回写用户交给你的工作台笔记（只能作用于 queued 的笔记）。写入方案须由用户在工作台执行，不能替用户确认或执行。
    */
   export interface Args {
+    /**
+     * queued 状态的笔记 ID
+     */
     note_id: string;
     /**
      * proposal：写入方案（先预演，用户在工作台执行后才写入）；question：向用户提问；declined：说明不需要或不能写入
@@ -420,12 +809,417 @@ export declare namespace RelationsNoteReply {
      */
     message: string;
     /**
-     * 仅 proposal：最多 10 步，每步 {op:'memory.commit', owner_id, operations, expected_head} 或 {op:'relations.decide', owner_id, payload, reason}；参数与对应操作相同。同一对象只提交一次；服务端逐步 dry_run 预检并生成预览，不会写入
+     * 仅 proposal：最多 10 步，每步 {op:'memory_commit', owner_id, operations, expected_head} 或 {op:'relations_decide', owner_id, payload, reason?}；参数与对应工具相同。同一对象只提交一次；服务端逐步 dry_run 预检并生成预览，不会写入
      */
     steps?:
-      | {
-          [k: string]: unknown;
-        }[]
+      | [
+          (
+            | {
+                op: "memory_commit" | "memory.commit";
+                owner_id: string;
+                /**
+                 * @minItems 1
+                 */
+                operations: [
+                  {
+                    op: "put_record" | "transition_question" | "set_policy" | "decide_association" | "save_checkpoint";
+                    client_key?: string;
+                    record_id?: string;
+                    expected_revision?: number;
+                    /**
+                     * 记录草案（对象）。至少写 kind、title、body_markdown、payload、sources、record_reason；owner_id、sensitivity、discovery 可省略（由服务补上）；修订已有记录时写 change_reason。payload 的结构随 kind 不同，写之前用 memory_contract(kind) 查字段和示例
+                     */
+                    draft: {};
+                    repin?: boolean;
+                  },
+                  ...{
+                    op: "put_record" | "transition_question" | "set_policy" | "decide_association" | "save_checkpoint";
+                    client_key?: string;
+                    record_id?: string;
+                    expected_revision?: number;
+                    /**
+                     * 记录草案（对象）。至少写 kind、title、body_markdown、payload、sources、record_reason；owner_id、sensitivity、discovery 可省略（由服务补上）；修订已有记录时写 change_reason。payload 的结构随 kind 不同，写之前用 memory_contract(kind) 查字段和示例
+                     */
+                    draft: {};
+                    repin?: boolean;
+                  }[]
+                ];
+                /**
+                 * 该对象当前 HEAD；新对象为 null
+                 */
+                expected_head: string | null;
+              }
+            | {
+                op: "relations_decide" | "relations.decide";
+                owner_id: string;
+                payload: {
+                  from: {
+                    target_kind: "owner" | "record" | "claim" | "file";
+                    target_id: string;
+                    revision: number | null;
+                    sha256: string | null;
+                    locator: string;
+                    relation:
+                      | "supports"
+                      | "input"
+                      | "contradicts"
+                      | "background"
+                      | "derived_from"
+                      | "refines"
+                      | "same_problem"
+                      | "same_failure_mode"
+                      | "prerequisite"
+                      | "analogous_to"
+                      | "used_in"
+                      | "references"
+                      | "same_entity"
+                      | "mentions"
+                      | "depends_on"
+                      | "supersedes"
+                      | "contains"
+                      | "precedes"
+                      | "member_of"
+                      | "similar_structure"
+                      | "related_to"
+                      | "subject_of"
+                      | "object_of";
+                  };
+                  to: {
+                    target_kind: "owner" | "record" | "claim" | "file";
+                    target_id: string;
+                    revision: number | null;
+                    sha256: string | null;
+                    locator: string;
+                    relation:
+                      | "supports"
+                      | "input"
+                      | "contradicts"
+                      | "background"
+                      | "derived_from"
+                      | "refines"
+                      | "same_problem"
+                      | "same_failure_mode"
+                      | "prerequisite"
+                      | "analogous_to"
+                      | "used_in"
+                      | "references"
+                      | "same_entity"
+                      | "mentions"
+                      | "depends_on"
+                      | "supersedes"
+                      | "contains"
+                      | "precedes"
+                      | "member_of"
+                      | "similar_structure"
+                      | "related_to"
+                      | "subject_of"
+                      | "object_of";
+                  };
+                  relation?:
+                    | "supports"
+                    | "input"
+                    | "contradicts"
+                    | "background"
+                    | "derived_from"
+                    | "refines"
+                    | "same_problem"
+                    | "same_failure_mode"
+                    | "prerequisite"
+                    | "analogous_to"
+                    | "used_in"
+                    | "references"
+                    | "related_to";
+                  explanation: string;
+                  shared_structure?: string | null;
+                  /**
+                   * @minItems 0
+                   */
+                  transfer_limits?: string[];
+                  differences?: string[];
+                  /**
+                   * @minItems 0
+                   */
+                  basis_refs?: {
+                    target_kind: "owner" | "record" | "claim" | "file";
+                    target_id: string;
+                    revision: number | null;
+                    sha256: string | null;
+                    locator: string;
+                    relation:
+                      | "supports"
+                      | "input"
+                      | "contradicts"
+                      | "background"
+                      | "derived_from"
+                      | "refines"
+                      | "same_problem"
+                      | "same_failure_mode"
+                      | "prerequisite"
+                      | "analogous_to"
+                      | "used_in"
+                      | "references"
+                      | "same_entity"
+                      | "mentions"
+                      | "depends_on"
+                      | "supersedes"
+                      | "contains"
+                      | "precedes"
+                      | "member_of"
+                      | "similar_structure"
+                      | "related_to"
+                      | "subject_of"
+                      | "object_of";
+                  }[];
+                  status?: "candidate" | "accepted" | "rejected" | "withdrawn";
+                  /**
+                   * @minItems 0
+                   */
+                  missing_refs?: {
+                    requested_target: string;
+                    reason: string;
+                    observed_at: string;
+                  }[];
+                  certainty?: "speculative" | "plausible" | "supported";
+                  origin?: string;
+                  observed_in?: {
+                    target_kind: "owner" | "record" | "claim" | "file";
+                    target_id: string;
+                    revision: number | null;
+                    sha256: string | null;
+                    locator: string;
+                    relation:
+                      | "supports"
+                      | "input"
+                      | "contradicts"
+                      | "background"
+                      | "derived_from"
+                      | "refines"
+                      | "same_problem"
+                      | "same_failure_mode"
+                      | "prerequisite"
+                      | "analogous_to"
+                      | "used_in"
+                      | "references"
+                      | "same_entity"
+                      | "mentions"
+                      | "depends_on"
+                      | "supersedes"
+                      | "contains"
+                      | "precedes"
+                      | "member_of"
+                      | "similar_structure"
+                      | "related_to"
+                      | "subject_of"
+                      | "object_of";
+                  };
+                };
+                reason?: string;
+              }
+          ),
+          ...(
+            | {
+                op: "memory_commit" | "memory.commit";
+                owner_id: string;
+                /**
+                 * @minItems 1
+                 */
+                operations: [
+                  {
+                    op: "put_record" | "transition_question" | "set_policy" | "decide_association" | "save_checkpoint";
+                    client_key?: string;
+                    record_id?: string;
+                    expected_revision?: number;
+                    /**
+                     * 记录草案（对象）。至少写 kind、title、body_markdown、payload、sources、record_reason；owner_id、sensitivity、discovery 可省略（由服务补上）；修订已有记录时写 change_reason。payload 的结构随 kind 不同，写之前用 memory_contract(kind) 查字段和示例
+                     */
+                    draft: {};
+                    repin?: boolean;
+                  },
+                  ...{
+                    op: "put_record" | "transition_question" | "set_policy" | "decide_association" | "save_checkpoint";
+                    client_key?: string;
+                    record_id?: string;
+                    expected_revision?: number;
+                    /**
+                     * 记录草案（对象）。至少写 kind、title、body_markdown、payload、sources、record_reason；owner_id、sensitivity、discovery 可省略（由服务补上）；修订已有记录时写 change_reason。payload 的结构随 kind 不同，写之前用 memory_contract(kind) 查字段和示例
+                     */
+                    draft: {};
+                    repin?: boolean;
+                  }[]
+                ];
+                /**
+                 * 该对象当前 HEAD；新对象为 null
+                 */
+                expected_head: string | null;
+              }
+            | {
+                op: "relations_decide" | "relations.decide";
+                owner_id: string;
+                payload: {
+                  from: {
+                    target_kind: "owner" | "record" | "claim" | "file";
+                    target_id: string;
+                    revision: number | null;
+                    sha256: string | null;
+                    locator: string;
+                    relation:
+                      | "supports"
+                      | "input"
+                      | "contradicts"
+                      | "background"
+                      | "derived_from"
+                      | "refines"
+                      | "same_problem"
+                      | "same_failure_mode"
+                      | "prerequisite"
+                      | "analogous_to"
+                      | "used_in"
+                      | "references"
+                      | "same_entity"
+                      | "mentions"
+                      | "depends_on"
+                      | "supersedes"
+                      | "contains"
+                      | "precedes"
+                      | "member_of"
+                      | "similar_structure"
+                      | "related_to"
+                      | "subject_of"
+                      | "object_of";
+                  };
+                  to: {
+                    target_kind: "owner" | "record" | "claim" | "file";
+                    target_id: string;
+                    revision: number | null;
+                    sha256: string | null;
+                    locator: string;
+                    relation:
+                      | "supports"
+                      | "input"
+                      | "contradicts"
+                      | "background"
+                      | "derived_from"
+                      | "refines"
+                      | "same_problem"
+                      | "same_failure_mode"
+                      | "prerequisite"
+                      | "analogous_to"
+                      | "used_in"
+                      | "references"
+                      | "same_entity"
+                      | "mentions"
+                      | "depends_on"
+                      | "supersedes"
+                      | "contains"
+                      | "precedes"
+                      | "member_of"
+                      | "similar_structure"
+                      | "related_to"
+                      | "subject_of"
+                      | "object_of";
+                  };
+                  relation?:
+                    | "supports"
+                    | "input"
+                    | "contradicts"
+                    | "background"
+                    | "derived_from"
+                    | "refines"
+                    | "same_problem"
+                    | "same_failure_mode"
+                    | "prerequisite"
+                    | "analogous_to"
+                    | "used_in"
+                    | "references"
+                    | "related_to";
+                  explanation: string;
+                  shared_structure?: string | null;
+                  /**
+                   * @minItems 0
+                   */
+                  transfer_limits?: string[];
+                  differences?: string[];
+                  /**
+                   * @minItems 0
+                   */
+                  basis_refs?: {
+                    target_kind: "owner" | "record" | "claim" | "file";
+                    target_id: string;
+                    revision: number | null;
+                    sha256: string | null;
+                    locator: string;
+                    relation:
+                      | "supports"
+                      | "input"
+                      | "contradicts"
+                      | "background"
+                      | "derived_from"
+                      | "refines"
+                      | "same_problem"
+                      | "same_failure_mode"
+                      | "prerequisite"
+                      | "analogous_to"
+                      | "used_in"
+                      | "references"
+                      | "same_entity"
+                      | "mentions"
+                      | "depends_on"
+                      | "supersedes"
+                      | "contains"
+                      | "precedes"
+                      | "member_of"
+                      | "similar_structure"
+                      | "related_to"
+                      | "subject_of"
+                      | "object_of";
+                  }[];
+                  status?: "candidate" | "accepted" | "rejected" | "withdrawn";
+                  /**
+                   * @minItems 0
+                   */
+                  missing_refs?: {
+                    requested_target: string;
+                    reason: string;
+                    observed_at: string;
+                  }[];
+                  certainty?: "speculative" | "plausible" | "supported";
+                  origin?: string;
+                  observed_in?: {
+                    target_kind: "owner" | "record" | "claim" | "file";
+                    target_id: string;
+                    revision: number | null;
+                    sha256: string | null;
+                    locator: string;
+                    relation:
+                      | "supports"
+                      | "input"
+                      | "contradicts"
+                      | "background"
+                      | "derived_from"
+                      | "refines"
+                      | "same_problem"
+                      | "same_failure_mode"
+                      | "prerequisite"
+                      | "analogous_to"
+                      | "used_in"
+                      | "references"
+                      | "same_entity"
+                      | "mentions"
+                      | "depends_on"
+                      | "supersedes"
+                      | "contains"
+                      | "precedes"
+                      | "member_of"
+                      | "similar_structure"
+                      | "related_to"
+                      | "subject_of"
+                      | "object_of";
+                  };
+                };
+                reason?: string;
+              }
+          )[]
+        ]
       | null;
   }
 }
@@ -463,7 +1257,13 @@ export declare namespace MaintenancePlan {
    * 来源变化或新反证后：列出受影响记录及其完整正文，生成维护计划。
    */
   export interface Args {
+    /**
+     * 变化了的来源（SRC-…）、记录（MEM-…）或结论（CLM-…）
+     */
     changed_ids: string[];
+    /**
+     * 给用户看的一句说明（为什么要维护）
+     */
     note?: string;
     /**
      * 只把这些受影响的记录放进计划；省略时放入全部
@@ -526,13 +1326,44 @@ export declare namespace MaintenanceReview {
    * 记录逐项处置与修订草案，并逐对象预检（不写记忆）。之后由用户在工作台预览并执行。
    */
   export interface Args {
+    /**
+     * 维护计划 ID
+     */
     plan_id: string;
     /**
-     * [{target_id, action: retain|revise|resynthesize|retract|defer, reason, draft?}]
+     * [{target_id, action: retain|revise|resynthesize|retract|defer, reason, draft?}]；revise / resynthesize 必须附完整的新草案 draft（owner_id 可省略，change_reason 由计划补上）
+     *
+     * @minItems 1
      */
-    decisions: {
-      [k: string]: unknown;
-    }[];
+    decisions: [
+      {
+        /**
+         * 计划条目的目标 ID
+         */
+        target_id: string;
+        action: "retain" | "revise" | "resynthesize" | "retract" | "defer";
+        reason: string;
+        /**
+         * revise / resynthesize 时必填：完整的新草案
+         */
+        draft?: {};
+      },
+      ...{
+        /**
+         * 计划条目的目标 ID
+         */
+        target_id: string;
+        action: "retain" | "revise" | "resynthesize" | "retract" | "defer";
+        reason: string;
+        /**
+         * revise / resynthesize 时必填：完整的新草案
+         */
+        draft?: {};
+      }[]
+    ];
+    /**
+     * maintenance_status 返回的计划修订号
+     */
     expected_revision?: number | null;
     /**
      * 给用户看的一句说明（改了什么、为什么）
@@ -556,6 +1387,9 @@ export declare namespace MaintenanceStatus {
    * 维护计划的当前状态。
    */
   export interface Args {
+    /**
+     * 维护计划 ID
+     */
     plan_id: string;
   }
 }
@@ -578,6 +1412,9 @@ export declare namespace MonitorCandidates {
    * 每项附 kind、title、record_id（结论落到包含它的记录）与 editable（能否放进计划修订）。
    */
   export interface Args {
+    /**
+     * open 待处理（默认）；planned 已放进计划；dismissed 已确认无需处理；null 列出全部
+     */
     status?: ("open" | "planned" | "dismissed") | null;
   }
 }
@@ -607,9 +1444,21 @@ export declare namespace RunsCreate {
    * 新建 Run（一次实际执行的证据：输入、程序、输出与失败）。给 owner_id 时放在该对象目录下，否则是独立 Run。
    */
   export interface Args {
+    /**
+     * 这次执行做什么，一句话
+     */
     title: string;
+    /**
+     * 上级对象 ID；不给时是独立 Run
+     */
     owner_id?: string | null;
+    /**
+     * 这次执行要回答的问题
+     */
     question?: string;
+    /**
+     * 查找 Run 用的关键词
+     */
     keywords?: string[] | null;
   }
 }
@@ -619,9 +1468,21 @@ export declare namespace RunsRegister {
    * 登记已有文件为 Run 的输入/产物（固定字节指纹，可回滚）。
    */
   export interface Args {
+    /**
+     * Run ID（RUN-…）
+     */
     run_id: string;
+    /**
+     * 输入文件：数据目录内相对路径或 SRC- ID
+     */
     inputs?: string[] | null;
+    /**
+     * 产物文件：数据目录内相对路径或 SRC- ID
+     */
     artifacts?: string[] | null;
+    /**
+     * true 只预览登记结果、不写入
+     */
     preview?: boolean;
   }
 }
@@ -631,11 +1492,29 @@ export declare namespace RunsExecute {
    * 前台运行 Python 脚本并登记输入、输出与日志（失败也登记）。参数可用 {input0}、{output_dir} 占位。
    */
   export interface Args {
+    /**
+     * Run ID（RUN-…）
+     */
     run_id: string;
+    /**
+     * 要运行的 Python 脚本路径
+     */
     script: string;
+    /**
+     * 输入文件：数据目录内相对路径或 SRC- ID
+     */
     inputs?: string[] | null;
+    /**
+     * 脚本参数，可用 {input0}、{output_dir} 占位
+     */
     args?: string[] | null;
+    /**
+     * 超时秒数
+     */
     timeout_seconds?: number;
+    /**
+     * true 只预览命令与登记、不执行
+     */
     preview?: boolean;
   }
 }
@@ -645,12 +1524,28 @@ export declare namespace RunsUpdate {
    * 修改 Run 的执行摘要、限制、状态等（不改输入/产物登记）。
    */
   export interface Args {
+    /**
+     * Run ID（RUN-…）
+     */
     run_id: string;
     /**
-     * 可改：title, question, conclusion, limitations, parameters, status, keywords, parent_run_ids。conclusion 只写执行摘要（成功或失败、产物、异常），知识写成记忆记录并引用本 Run
+     * 只写要改的字段：title, question, conclusion, limitations, parameters, status, keywords, parent_run_ids。conclusion 只写执行摘要（成功或失败、产物、异常），知识写成记忆记录并引用本 Run
      */
     fields: {
-      [k: string]: unknown;
+      title?: string;
+      question?: string;
+      /**
+       * 只写执行摘要（成功或失败、产物、异常）
+       */
+      conclusion?: string;
+      limitations?: string[];
+      /**
+       * 本次执行的参数（键值）
+       */
+      parameters?: {};
+      status?: "planned" | "running" | "succeeded" | "failed" | "abandoned";
+      keywords?: string[];
+      parent_run_ids?: string[];
     };
     /**
      * 读取时 run.json 的指纹（上次修改返回的 sha256）；不一致说明别人改过，拒绝覆盖
@@ -674,7 +1569,13 @@ export declare namespace RunsSearch {
    * 按标题/问题/关键词查找 Run。Run 不进检索与阅读，这是显式查找 Run 的入口；给 owner_id 时只列该对象目录下的 Run。
    */
   export interface Args {
+    /**
+     * 按标题、问题、关键词匹配；空串列出全部
+     */
     query?: string;
+    /**
+     * 只列该对象目录下的 Run
+     */
     owner_id?: string | null;
     limit?: number;
     /**
@@ -686,9 +1587,12 @@ export declare namespace RunsSearch {
 
 export declare namespace RunsDiscard {
   /**
-   * 丢弃没有知识的 Run：当前没有任何记录引用时，把整个 Run 目录移入回收站（可用 runs.restore 恢复）。
+   * 丢弃没有知识的 Run：当前没有任何记录引用时，把整个 Run 目录移入回收站（可用 runs_restore 恢复）。
    */
   export interface Args {
+    /**
+     * Run ID（RUN-…）
+     */
     run_id: string;
     /**
      * 为什么没有可写成记录的内容，例如：临时测试，沉淀检查无可复用的方法、边界或失败教训
@@ -743,6 +1647,9 @@ export declare namespace SourcesAddRoot {
      * 工作目录的绝对路径（不能在数据目录内）
      */
     path: string;
+    /**
+     * 给用户看的名称
+     */
     title?: string;
   }
 }
@@ -752,8 +1659,17 @@ export declare namespace SourcesRelocateRoot {
    * 工作目录整体搬家：逐个核对新位置下已登记文件的指纹，全部一致才改根的位置；已有固定引用不变。
    */
   export interface Args {
+    /**
+     * sources_roots 返回的根 ID
+     */
     root_id: string;
+    /**
+     * 新位置的绝对路径
+     */
     new_path: string;
+    /**
+     * true 时允许新位置缺少部分已登记文件（缺的会列出）
+     */
     allow_missing?: boolean;
   }
 }
@@ -762,15 +1678,24 @@ export declare namespace SourcesRegister {
   /**
    * 登记一个来源文件并记录当前字节指纹：L0 原件的唯一授权入口。原件留在原处，不复制、不修改。
    * 工作目录里的文件自动记为"工作根 + 相对路径"，迁移时随根重定向。
-   * 同一 ID 重复登记同一文件是幂等的；内容变了请用新 ID；文件搬家用 sources.relocate / sources.relocate_root。
+   * 同一 ID 重复登记同一文件是幂等的；内容变了请用新 ID；文件搬家用 sources_relocate / sources_relocate_root。
    */
   export interface Args {
+    /**
+     * 自定的来源 ID，SRC- 开头，如 SRC-SUMMATION-R01；内容变了用新 ID
+     */
     source_id: string;
     /**
      * 工作目录等外部位置用绝对路径；数据目录内可用相对路径
      */
     path: string;
+    /**
+     * 给人看的名称
+     */
     title?: string;
+    /**
+     * restricted 的来源不进索引、不能被引用
+     */
     sensitivity?: "public" | "internal" | "confidential" | "restricted";
   }
 }
@@ -782,10 +1707,35 @@ export declare namespace SourcesRegisterMany {
   export interface Args {
     /**
      * [{source_id, path, title?, sensitivity?}]，逐条登记；单条失败不影响其他
+     *
+     * @minItems 1
      */
-    items: {
-      [k: string]: unknown;
-    }[];
+    items: [
+      {
+        /**
+         * SRC- 开头的来源 ID
+         */
+        source_id: string;
+        /**
+         * 工作目录等外部位置用绝对路径；数据目录内可用相对路径
+         */
+        path: string;
+        title?: string;
+        sensitivity?: "public" | "internal" | "confidential" | "restricted";
+      },
+      ...{
+        /**
+         * SRC- 开头的来源 ID
+         */
+        source_id: string;
+        /**
+         * 工作目录等外部位置用绝对路径；数据目录内可用相对路径
+         */
+        path: string;
+        title?: string;
+        sensitivity?: "public" | "internal" | "confidential" | "restricted";
+      }[]
+    ];
   }
 }
 
@@ -794,7 +1744,13 @@ export declare namespace SourcesRelocate {
    * 原件搬家：新位置的字节必须与登记时一致，旧路径记入 relocated_from，已有固定引用继续有效。
    */
   export interface Args {
+    /**
+     * 已登记的来源 ID（SRC-…）
+     */
     source_id: string;
+    /**
+     * 新位置的绝对路径
+     */
     new_path: string;
   }
 }
@@ -815,7 +1771,13 @@ export declare namespace MemoryOwners {
    * 列出可读对象（按类型分组，带各层记录数）。
    */
   export interface Args {
+    /**
+     * 只列这些类型：research、project、core-algorithm、data、tool、report、knowledge、run
+     */
     owner_types?: string[] | null;
+    /**
+     * 按 ID、标题、关键词匹配；空串列出全部
+     */
     query?: string;
   }
 }
@@ -830,11 +1792,23 @@ export declare namespace MemoryOwnerRoute {
      */
     task: string;
     /**
-     * 最多 2 条等义改写 [{language: zh|en, question, lexical_terms?}]，与 reading_start 相同
+     * 最多 2 条等义改写 [{language: zh|en|other, question, lexical_terms?}]；技术问题建议补一条英文；型号、数值必须原样保留
      */
     variants?:
       | {
-          [k: string]: unknown;
+          /**
+           * 可选的改写编号
+           */
+          id?: string;
+          language: "zh" | "en" | "other";
+          /**
+           * 等义改写的问句；型号、数值必须原样保留
+           */
+          question: string;
+          /**
+           * 可选：词法检索用的关键词，不写按问句切词
+           */
+          lexical_terms?: string[];
         }[]
       | null;
     /**
@@ -855,16 +1829,28 @@ export declare namespace MemoryOwnerRoute {
 
 export declare namespace MemoryOwnerCreate {
   /**
-   * 新建对象（写入业务卡；首次提交记忆时才建立记忆目录）。Run 用 runs.create 建立。
+   * 新建对象（写入业务卡；首次提交记忆时才建立记忆目录）。Run 用 runs_create 建立。
    */
   export interface Args {
+    /**
+     * research 研究；project 项目；core-algorithm 公司文档定义的关键算法；data 数据集；tool 工具；report 报告；knowledge 通用知识或概念库
+     */
     owner_type: "research" | "project" | "core-algorithm" | "data" | "tool" | "report" | "knowledge";
     /**
      * 小写字母/数字/连字符
      */
     slug: string;
+    /**
+     * 能单独看懂的标题
+     */
     title: string;
+    /**
+     * 一两句话的目标或范围说明
+     */
     description?: string;
+    /**
+     * 检索关键词；技术名词中英文都给
+     */
     keywords?: string[] | null;
     /**
      * core-algorithm 必填：定义该算法的公司算法/模块文档（路径或文档编号）
@@ -874,6 +1860,9 @@ export declare namespace MemoryOwnerCreate {
      * 可选的可读短名，供 [[@短名/handle]] 链接其他对象的记录
      */
     short_name?: string | null;
+    /**
+     * 对象的敏感级别；restricted 不进索引、不发布
+     */
     sensitivity?: "public" | "internal" | "confidential" | "restricted";
   }
 }
@@ -883,7 +1872,13 @@ export declare namespace MemoryOwnerAdopt {
    * 把内容树中已有的文档登记为对象（原件不修改；须给出你看到的字节指纹）。
    */
   export interface Args {
+    /**
+     * 内容树中已有业务卡的相对路径
+     */
     path: string;
+    /**
+     * 你读到的该文件的 SHA-256；不一致时拒绝
+     */
     expected_sha256: string;
   }
 }
@@ -897,9 +1892,21 @@ export declare namespace MemoryRecords {
      * 对象 ID，如 RES-…、PRJ-…、RUN-…
      */
     owner_id: string;
+    /**
+     * 只列这些层级：L0–L4
+     */
     levels?: string[] | null;
+    /**
+     * 只列这些记录类型
+     */
     kinds?: string[] | null;
+    /**
+     * 按标题或 ID 匹配
+     */
     query?: string;
+    /**
+     * true 时不列关联、复核等辅助记录
+     */
     main_only?: boolean;
     offset?: number;
     limit?: number;
@@ -937,7 +1944,8 @@ export declare namespace MemoryKinds {
 
 export declare namespace MemoryContract {
   /**
-   * 某类记录的草案契约：必填字段、payload 结构、写作要点和一份经校验的示例草案。写草案前先调用。
+   * 某类记录的草案契约：每个字段是 required / optional / conditional（以及省略时的默认值）、不要写的服务端字段、
+   * payload 结构、写作要点和一份经校验的示例草案。写 memory_commit / memory_summary_save 的草案前先调用。
    */
   export interface Args {
     /**
@@ -956,14 +1964,20 @@ export declare namespace MemoryInspect {
      * 对象 ID，如 RES-…、PRJ-…、RUN-…
      */
     owner_id: string;
+    /**
+     * 记录 ID（MEM-…）；不给时返回整个对象的当前快照
+     */
     record_id?: string | null;
+    /**
+     * 指定修订号；不给时取当前修订
+     */
     revision?: number | null;
   }
 }
 
 export declare namespace MemoryCommit {
   /**
-   * 保存一批记录（同一对象内原子提交）。dry_run=true 只预检不写入。
+   * 保存一批记录到一个对象（同一对象内原子提交，要么全写入要么都不写）。dry_run=true 只预检不写入。
    */
   export interface Args {
     /**
@@ -971,25 +1985,57 @@ export declare namespace MemoryCommit {
      */
     owner_id: string;
     /**
-     * 操作列表：新建 {op:'put_record', client_key, draft}；修订 {op:'put_record', record_id, expected_revision, draft}。draft 的字段与示例用 memory.contract(kind) 查询；批内引用可写 {client_key: 'x'}
+     * 操作列表。新建 {op:'put_record', client_key, draft}；修订 {op:'put_record', record_id, expected_revision（当前修订号）, draft（完整的新内容）}；client_key 与 record_id 二选一。同批新记录之间用 {client_key: 'x'} 引用
+     *
+     * @minItems 1
      */
-    operations: {
-      [k: string]: unknown;
-    }[];
+    operations: [
+      {
+        op: "put_record" | "transition_question" | "set_policy" | "decide_association" | "save_checkpoint";
+        client_key?: string;
+        record_id?: string;
+        expected_revision?: number;
+        /**
+         * 记录草案（对象）。至少写 kind、title、body_markdown、payload、sources、record_reason；owner_id、sensitivity、discovery 可省略（由服务补上）；修订已有记录时写 change_reason。payload 的结构随 kind 不同，写之前用 memory_contract(kind) 查字段和示例
+         */
+        draft: {};
+        repin?: boolean;
+      },
+      ...{
+        op: "put_record" | "transition_question" | "set_policy" | "decide_association" | "save_checkpoint";
+        client_key?: string;
+        record_id?: string;
+        expected_revision?: number;
+        /**
+         * 记录草案（对象）。至少写 kind、title、body_markdown、payload、sources、record_reason；owner_id、sensitivity、discovery 可省略（由服务补上）；修订已有记录时写 change_reason。payload 的结构随 kind 不同，写之前用 memory_contract(kind) 查字段和示例
+         */
+        draft: {};
+        repin?: boolean;
+      }[]
+    ];
     /**
-     * 提交前看到的 HEAD commit_id；新对象为 null
+     * 提交前看到的对象 HEAD commit_id（memory_inspect / memory_resume 返回）；新对象为 null
      */
     expected_head: string | null;
     /**
      * UUID；重试时用同一个保证幂等
      */
     request_id?: string | null;
+    /**
+     * true 只预检、不写入；回执与正式提交相同
+     */
     dry_run?: boolean;
     /**
      * 归属确认点（本任务第一次往该对象保存）时必填：{action: continue|create, decided_by: user|ai, reason, rejected?: [{owner_id, reason}]}；rejected 写完整阅读后放弃的对象。之后的保存不再填写
      */
     attribution?: {
-      [k: string]: unknown;
+      action: "continue" | "create";
+      decided_by: "user" | "ai";
+      reason: string;
+      rejected?: {
+        owner_id: string;
+        reason: string;
+      }[];
     } | null;
   }
 }
@@ -1003,10 +2049,25 @@ export declare namespace MemoryDocument {
      * 对象 ID，如 RES-…、PRJ-…、RUN-…
      */
     owner_id: string;
+    /**
+     * full 完整文稿；outline 目录；section 单章上下文包（改写某章用）；impact 依据变化的影响
+     */
     view?: "full" | "outline" | "section" | "impact";
+    /**
+     * research_process 完整过程稿；research_report 精简报告
+     */
     document_type?: "research_process" | "research_report";
+    /**
+     * 文稿根记录 ID；对象有多份同类文稿时指定
+     */
     document_id?: string | null;
+    /**
+     * view=section 时必填：章节记录 ID
+     */
     section_id?: string | null;
+    /**
+     * 返回正文的字符上限
+     */
     max_chars?: number;
   }
 }
@@ -1105,6 +2166,9 @@ export declare namespace MemoryConsolidatePrepare {
      * 对象 ID，如 RES-…、PRJ-…、RUN-…
      */
     owner_id: string;
+    /**
+     * 从这个提交之后算变化；不给时从上次巩固算起
+     */
     since_commit?: string | null;
   }
 }
@@ -1139,28 +2203,50 @@ export declare namespace MemorySummaryMaterials {
    * 跨对象总结的固定材料包（不生成总结）。
    */
   export interface Args {
+    /**
+     * 要总结的对象 ID
+     */
     owner_ids: string[];
+    /**
+     * 不放进材料包的对象或记录 ID
+     */
     exclude_ids?: string[] | null;
   }
 }
 
 export declare namespace MemorySummarySave {
   /**
-   * 把写好的总结保存为本对象的 L3/L4；依据对象有新提交则拒绝。
+   * 把写好的跨对象总结保存为本对象的 L3（experience）或 L4（overview）。依据对象在准备材料后有新提交则拒绝，
+   * 不用旧材料覆盖新结果。修订已有总结时给 record_id、expected_revision，并在草案中写 change_reason。
    */
   export interface Args {
     /**
      * 对象 ID，如 RES-…、PRJ-…、RUN-…
      */
     owner_id: string;
+    /**
+     * kind 为 experience（L3）或 overview（L4）的完整草案；记录草案（对象）。至少写 kind、title、body_markdown、payload、sources、record_reason；owner_id、sensitivity、discovery 可省略（由服务补上）；修订已有记录时写 change_reason。payload 的结构随 kind 不同，写之前用 memory_contract(kind) 查字段和示例
+     */
     draft: {
       [k: string]: unknown;
     };
+    /**
+     * memory_summary_materials 返回的 basis_heads（各依据对象当时的 HEAD），原样传回；任何一个对象之后有新提交都会拒绝（STALE_BASIS），需要重新准备材料
+     */
     basis_heads: {
       [k: string]: string | null;
     };
+    /**
+     * 修订已有总结时填它的记录 ID；新建不填
+     */
     record_id?: string | null;
+    /**
+     * 修订时填当前修订号；新建不填
+     */
     expected_revision?: number | null;
+    /**
+     * true 只预检、不写入
+     */
     dry_run?: boolean;
   }
 }
@@ -1212,24 +2298,57 @@ export declare namespace QuerySearch {
    * 只有明确只要片段/候选列表或低层查询时直接使用本工具。候选不是已读正文。
    */
   export interface Args {
+    /**
+     * 要查的问题，一句话，保留型号与数值原文
+     */
     question: string;
+    /**
+     * 词法检索用的关键词；不给时按问题切词
+     */
     keywords?: string[] | null;
     /**
      * overview_experience=L4/L3（默认）；process=L2 研究经过；technical=L1 技术内容；all=全部含原始来源
      */
     content_source?: "overview_experience" | "process" | "technical" | "all";
+    /**
+     * 限定检索范围（对象、层级、类型等）；不给时全库
+     */
     scope?: Scope | null;
+    /**
+     * all（默认，带复核徽标）/ reviewed_only / exclude_unsafe / unreviewed_only
+     */
     review_filter?: "all" | "reviewed_only" | "exclude_unsafe" | "unreviewed_only";
+    /**
+     * exploration 探索；formal 正式使用（只返回在 applicability 范围内已接受的结论）
+     */
     purpose?: "exploration" | "formal";
     /**
      * purpose=formal 时必填：结论的适用范围
      */
     applicability?: string;
+    /**
+     * current 只用与当前版本一致的结果；allow_stale 允许索引落后时的结果（会标注）
+     */
     freshness?: "current" | "allow_stale";
+    /**
+     * 检索通道，默认 identity + lexical + dense
+     */
     channels?: ("identity" | "lexical" | "dense")[] | null;
+    /**
+     * 组包时依据可以来自任何可读对象，或只来自同一范围
+     */
     context_reach?: "any_readable" | "same_scope";
+    /**
+     * 每页候选数上限
+     */
     result_limit?: number | null;
+    /**
+     * 本次查询的预算（字符、节点等）；不给时用配置默认
+     */
     budget?: Budget | null;
+    /**
+     * 可选：自定查询 ID（重试时沿用）
+     */
     query_id?: string | null;
   }
   /**
@@ -1277,7 +2396,7 @@ export declare namespace QueryPage {
    */
   export interface Args {
     /**
-     * query.search 返回的 query_id
+     * query_search 返回的 query_id
      */
     query_id: string;
     cursor?: string | null;
@@ -1290,7 +2409,7 @@ export declare namespace QueryCancel {
    */
   export interface Args {
     /**
-     * query.search 返回的 query_id
+     * query_search 返回的 query_id
      */
     query_id: string;
   }
@@ -1302,13 +2421,16 @@ export declare namespace QueryAssemble {
    */
   export interface Args {
     /**
-     * query.search 返回的 query_id
+     * query_search 返回的 query_id
      */
     query_id: string;
     /**
      * 候选 ID（C-…），来自本次查询已返回的结果
      */
     candidate_ids: string[];
+    /**
+     * true 时补充已采纳关联指向的内容
+     */
     associations?: boolean;
   }
 }
@@ -1319,13 +2441,16 @@ export declare namespace QueryExpand {
    */
   export interface Args {
     /**
-     * query.search 返回的 query_id
+     * query_search 返回的 query_id
      */
     query_id: string;
     /**
      * 候选 ID（C-…），来自本次查询已返回的结果
      */
     candidate_ids: string[];
+    /**
+     * process 展开到研究经过（L2）；technical 展开到技术依据（L1）
+     */
     target: "process" | "technical";
   }
 }
@@ -1336,7 +2461,7 @@ export declare namespace QueryDeepen {
    */
   export interface Args {
     /**
-     * query.search 返回的 query_id
+     * query_search 返回的 query_id
      */
     query_id: string;
     /**
@@ -1355,13 +2480,16 @@ export declare namespace QueryDocuments {
    */
   export interface Args {
     /**
-     * query.search 返回的 query_id
+     * query_search 返回的 query_id
      */
     query_id: string;
     /**
      * 候选 ID（C-…），来自本次查询已返回的结果
      */
     candidate_ids: string[];
+    /**
+     * research_process 完整过程稿；research_report 精简报告
+     */
     document_type?: "research_process" | "research_report";
   }
 }
@@ -1390,11 +2518,23 @@ export declare namespace ReadingStart {
      */
     review_filter?: ("all" | "reviewed_only" | "exclude_unsafe" | "unreviewed_only") | null;
     /**
-     * 最多 2 条等义改写 [{language: zh|en, question, lexical_terms?}]；技术问题建议补一条英文；型号、数值必须原样保留
+     * 最多 2 条等义改写 [{language: zh|en|other, question, lexical_terms?}]；技术问题建议补一条英文；型号、数值必须原样保留
      */
     variants?:
       | {
-          [k: string]: unknown;
+          /**
+           * 可选的改写编号
+           */
+          id?: string;
+          language: "zh" | "en" | "other";
+          /**
+           * 等义改写的问句；型号、数值必须原样保留
+           */
+          question: string;
+          /**
+           * 可选：词法检索用的关键词，不写按问句切词
+           */
+          lexical_terms?: string[];
         }[]
       | null;
     /**
@@ -1418,7 +2558,24 @@ export declare namespace ReadingStart {
      */
     field_conditions?:
       | {
-          [k: string]: unknown;
+          id: string;
+          kind: "literal" | "numeric";
+          /**
+           * 原文“字段：值”中的字段名
+           */
+          field: string;
+          /**
+           * literal 只能用 eq/ne
+           */
+          operator: "eq" | "ne" | "lt" | "le" | "gt" | "ge";
+          /**
+           * literal 写文本，numeric 写数值
+           */
+          expected: string | number;
+          /**
+           * 仅 numeric 可写，如 °C、kPa
+           */
+          unit?: string;
         }[]
       | null;
   }
@@ -1435,10 +2592,43 @@ export declare namespace ReadingAssess {
     session_id: string;
     /**
      * [{owner_id, verdict, reason, digest, accepted_windows?}]。verdict：relevant=窗口显示它能回答问题或提供必要依据，值得完整阅读；uncertain=信息不足以判断，先 reading_peek 或交给用户；irrelevant=明确无关。reason 写依据窗口里的什么内容；digest 原样抄筛选包的 digest；quick 策略在 accepted_windows 列出可作为笔记依据的窗口 entry_id
+     *
+     * @minItems 1
      */
-    judgments: {
-      [k: string]: unknown;
-    }[];
+    judgments: [
+      {
+        owner_id: string;
+        verdict: "relevant" | "uncertain" | "irrelevant";
+        /**
+         * 依据窗口里的什么内容做出判断
+         */
+        reason: string;
+        /**
+         * 原样抄筛选包的 digest
+         */
+        digest: string;
+        /**
+         * 仅 quick 策略：可作为笔记依据的窗口 entry_id
+         */
+        accepted_windows?: string[];
+      },
+      ...{
+        owner_id: string;
+        verdict: "relevant" | "uncertain" | "irrelevant";
+        /**
+         * 依据窗口里的什么内容做出判断
+         */
+        reason: string;
+        /**
+         * 原样抄筛选包的 digest
+         */
+        digest: string;
+        /**
+         * 仅 quick 策略：可作为笔记依据的窗口 entry_id
+         */
+        accepted_windows?: string[];
+      }[]
+    ];
     /**
      * 可选 UUID；网络重试时沿用同一个，不会重复执行
      */
@@ -1455,6 +2645,9 @@ export declare namespace ReadingPeek {
      * 阅读会话 ID（RS-…）
      */
     session_id: string;
+    /**
+     * 本会话筛选结果中的对象 ID
+     */
     owner_id: string;
   }
 }
@@ -1469,7 +2662,13 @@ export declare namespace ReadingRead {
      * 阅读会话 ID（RS-…）
      */
     session_id: string;
+    /**
+     * 本会话筛选结果中的对象 ID
+     */
     owner_id: string;
+    /**
+     * 页码，从 1 起；按上次返回的 unread_pages 依次读完
+     */
     page?: number;
     /**
      * 不填即可：第一轮召回的对象整读；图扩展带来的对象默认 targets（定点阅读，只交付被关系指到的节点及必要上下文）。只有定点内容不足以判断、确有必要了解整个对象时才填 full 升级为整读，并在笔记中说明原因；整读计入会话的整读对象上限
@@ -1487,6 +2686,9 @@ export declare namespace ReadingNote {
      * 阅读会话 ID（RS-…）
      */
     session_id: string;
+    /**
+     * 本会话筛选结果中的对象 ID
+     */
     owner_id: string;
     /**
      * 研究笔记（Markdown）：只写材料中的知识——问题如何演进、方法/公式（定义变量与单位）/条件、关键数据、反例与局限；关键句旁就近标出处 ID；不重复本次问题，不写自己的操作计划
@@ -1505,7 +2707,14 @@ export declare namespace ReadingNote {
      */
     expand_from?:
       | {
-          [k: string]: unknown;
+          /**
+           * 本笔记 sources 中的一项
+           */
+          ref: string;
+          /**
+           * 为什么值得顺着关系去追
+           */
+          why: string;
         }[]
       | null;
     /**
@@ -1524,8 +2733,17 @@ export declare namespace ReadingSynthesize {
      * 阅读会话 ID（RS-…）
      */
     session_id: string;
+    /**
+     * 跨对象综合笔记（Markdown）：比较、归纳各对象的知识，关键句旁就近标出处 ID；不重复问题，不写操作计划
+     */
     note: string;
+    /**
+     * 出处 ID：必须是本会话交付过的 L1 块（MEM-…#块ID）、结论（CLM-…）、记录或 SRC-…
+     */
     sources: string[];
+    /**
+     * 综合了哪些对象的笔记（这些对象必须已有单篇笔记）
+     */
     owner_ids: string[];
     /**
      * 可选 UUID；网络重试时沿用同一个，不会重复执行
@@ -1546,8 +2764,17 @@ export declare namespace ReadingAskUser {
      * 阅读会话 ID（RS-…）
      */
     session_id: string;
+    /**
+     * 请求类型，含义见工具说明
+     */
     kind: "fulltext" | "broaden" | "direction" | "clarify";
+    /**
+     * 给用户看的问题：写清要什么、为什么、批准后会怎样
+     */
     prompt: string;
+    /**
+     * 可选的候选答案
+     */
     options?: string[] | null;
     /**
      * 可选 UUID；网络重试时沿用同一个，不会重复执行
@@ -1568,6 +2795,9 @@ export declare namespace ReadingRecall {
      * 阅读会话 ID（RS-…）
      */
     session_id: string;
+    /**
+     * fulltext 全文补偿、broaden 扩大检索（两者都要用户批准）；association 联想（仅 associative 策略）
+     */
     mode: "fulltext" | "broaden" | "association";
     /**
      * fulltext、broaden 模式必填：用户批准后的 approval_id（只能用一次）
@@ -1582,11 +2812,23 @@ export declare namespace ReadingRecall {
      */
     question?: string | null;
     /**
-     * broaden 模式可选：新问法的等义改写
+     * 最多 2 条等义改写 [{language: zh|en|other, question, lexical_terms?}]；技术问题建议补一条英文；型号、数值必须原样保留
      */
     variants?:
       | {
-          [k: string]: unknown;
+          /**
+           * 可选的改写编号
+           */
+          id?: string;
+          language: "zh" | "en" | "other";
+          /**
+           * 等义改写的问句；型号、数值必须原样保留
+           */
+          question: string;
+          /**
+           * 可选：词法检索用的关键词，不写按问句切词
+           */
+          lexical_terms?: string[];
         }[]
       | null;
     /**
@@ -1645,6 +2887,9 @@ export declare namespace ReadingDelegate {
      * 阅读会话 ID（RS-…）
      */
     session_id: string;
+    /**
+     * 宿主能否派子 agent；不能时返回由你自己执行的步骤
+     */
     host_supports_subagents: boolean;
   }
 }
@@ -1654,7 +2899,13 @@ export declare namespace ReadingList {
    * 阅读会话列表（最新在前）。
    */
   export interface Args {
+    /**
+     * 只看该状态的会话
+     */
     status?: string | null;
+    /**
+     * 只看服务于该对象的会话
+     */
     owner_id?: string | null;
     limit?: number;
   }
@@ -1780,9 +3031,12 @@ export declare namespace ConfigUpdate {
       [k: string]: unknown;
     };
     /**
-     * config.get 返回的 revision
+     * config_get 返回的 revision
      */
     expected_revision: string;
+    /**
+     * true 只校验并返回将要生效的配置、不写入
+     */
     dry_run?: boolean;
   }
 }
@@ -1802,6 +3056,9 @@ export declare namespace IndexStatus {
    * 某对象各投影/通道的就绪状态（stale 表示落后于当前 HEAD）。
    */
   export interface Args {
+    /**
+     * 对象 ID
+     */
     owner_id: string;
   }
 }
@@ -1811,8 +3068,17 @@ export declare namespace IndexReconcile {
    * 按当前 HEAD 补齐检索投影（不改记忆）；sources=true 同时更新来源文件投影。
    */
   export interface Args {
+    /**
+     * 只补这个对象；不给时补全部
+     */
     owner_id?: string | null;
+    /**
+     * true 时即使水位已是最新也重建
+     */
     force?: boolean;
+    /**
+     * 补全部对象时同时更新来源文件投影
+     */
     sources?: boolean;
   }
 }
@@ -1827,9 +3093,12 @@ export declare namespace IndexGaps {
 
 export declare namespace IndexSearch {
   /**
-   * 直接检索投影（调试/诊断用；正式查询请用 query.search，它会回到固定版本核对）。
+   * 直接检索投影（调试/诊断用；正式查询请用 query_search，它会回到固定版本核对）。
    */
   export interface Args {
+    /**
+     * 检索文本
+     */
     query: string;
     corpus?: "fulltext" | "discovery" | "source";
     owner_ids?: string[] | null;
@@ -1871,7 +3140,23 @@ export declare namespace SystemOps {
    * 全部操作的目录（名称、分组、读写类型、说明、参数 schema）。
    */
   export interface Args {
+    /**
+     * 只列这些分组，如 memory、reading
+     */
     groups?: string[] | null;
+  }
+}
+
+export declare namespace SystemToolErrors {
+  /**
+   * 最近被拒绝的工具调用与内部错误，按工具汇总（R20 D-10）：参数错误（input）、其他拒绝（other）、内部错误（internal）
+   * 的次数和最常出错的参数路径，以及最近的内部错误 incident_id。参数错误多的工具，说明说明或示例需要改；不含参数内容。
+   */
+  export interface Args {
+    /**
+     * 最多统计最近多少条
+     */
+    limit?: number;
   }
 }
 
@@ -2004,6 +3289,7 @@ export interface OpArgs {
   "system.guide": SystemGuide.Args;
   "system.validate": SystemValidate.Args;
   "system.ops": SystemOps.Args;
+  "system.tool_errors": SystemToolErrors.Args;
 }
 
 export type OpName = keyof OpArgs;
@@ -2137,4 +3423,5 @@ export const OP_EFFECTS: Record<OpName, string> = {
   "system.guide": "read",
   "system.validate": "read",
   "system.ops": "read",
+  "system.tool_errors": "read",
 };

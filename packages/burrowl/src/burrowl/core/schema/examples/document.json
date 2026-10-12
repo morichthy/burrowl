@@ -5,13 +5,11 @@
     "op": "put_record",
     "client_key": "new-document",
     "draft": {
-      "owner_id": "RES-FLOATING-POINT-SUMMATION",
       "kind": "document",
       "title": "浮点求和研究：精简报告（示例）",
       "keywords": [],
       "body_markdown": "",
       "record_reason": "编排面向读者的报告",
-      "sensitivity": "internal",
       "sources": [
         {
           "target_kind": "record",

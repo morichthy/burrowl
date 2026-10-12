@@ -5,13 +5,11 @@
     "op": "put_record",
     "client_key": "new-wiki_page",
     "draft": {
-      "owner_id": "RES-FLOATING-POINT-SUMMATION",
       "kind": "wiki_page",
       "title": "补偿求和",
       "keywords": [],
       "body_markdown": "补偿求和（Kahan 求和）在每一步保存舍入误差并在下一步补回，能减小一般输入的舍入误差；在 [[大数抵消]] 输入上仍可能丢失小量，需要用精确基准核对。",
       "record_reason": "整理概念页",
-      "sensitivity": "internal",
       "sources": [
         {
           "target_kind": "record",

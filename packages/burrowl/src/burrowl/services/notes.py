@@ -205,6 +205,8 @@ class WorkbenchNotes:
         prepared, commit_owners = [], set()
         for number, raw in enumerate(steps, 1):
             step = deepcopy(raw)
+            if isinstance(step.get("op"), str):  # R20：也接受 MCP 工具名（memory_commit / relations_decide）
+                step["op"] = step["op"].replace("_", ".", 1)
             if step.get("op") not in STEP_OPS or not step.get("owner_id"):
                 raise BurrowlError("INVALID_ARGUMENT", f"第 {number} 步：op 只能是 memory.commit 或 relations.decide，且要有 owner_id")
             if step["op"] == "memory.commit":

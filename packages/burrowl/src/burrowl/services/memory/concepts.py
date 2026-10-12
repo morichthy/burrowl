@@ -43,7 +43,9 @@ def check_library(records: dict[str, dict], changed: set[str]) -> None:
     if conflicts:
         raise BurrowlError("INVALID_SCHEMA", "概念库中已有同名（或同别名）的有效概念；相同就合并或加别名，"
                            "同名不同义请用限定名（如“收敛（数值）”）", {"conflicts": conflicts},
-                           errors=[{"path": "/title", "message": "duplicate concept name", **c} for c in conflicts])
+                           errors=[{"code": "INVALID_SCHEMA", "path": "/title", **c,
+                                   "message": f"概念名“{c['name']}”已被有效概念 {c['conflicts_with']}（{c['title']}）使用"}
+                                  for c in conflicts])
     for rid in changed & concepts.keys():
         payload = concepts[rid]["payload"]
         targets = [payload["merged_into"]] if "merged_into" in payload else list(payload.get("split_into", []))

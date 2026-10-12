@@ -24,7 +24,11 @@ CODES: dict[str, tuple[int, int, bool]] = {
     "CAPABILITY_UNAVAILABLE": (503, 10, True),
     "INTEGRITY_ERROR": (500, 7, False),
     "STORAGE_ERROR": (500, 8, True),
+    # R20 D-06：意外异常（缺陷或环境问题），不是调用方参数的问题；改参数重试无用
+    "INTERNAL_ERROR": (500, 8, False),
 }
+# 调用方可以照着报错改参数重试的错误码（R20 D-10 按它们统计参数错误）
+INPUT_CODES = {"INVALID_ARGUMENT", "INVALID_SCHEMA", "UNRESOLVED_REFERENCE", "UNRESOLVED_LINK"}
 
 
 @dataclass
@@ -57,6 +61,11 @@ class BurrowlError(Exception):
                 "errors": self.errors, "retryable": self.retryable}
 
 
-def schema_error(path: str, message: str, code: str = "INVALID_SCHEMA") -> dict[str, str]:
-    """单条字段错误，path 使用 JSON Pointer。"""
-    return {"code": code, "path": path, "message": message}
+def schema_error(path: str, message: str, code: str = "INVALID_SCHEMA", **extra: Any) -> dict[str, Any]:
+    """单条字段错误，path 使用 JSON Pointer。extra 只放帮助改正的信息：expected（允许的值或结构）、hint。"""
+    return {"code": code, "path": path, "message": message, **{k: v for k, v in extra.items() if v is not None}}
+
+
+def rebase(errors: list[dict], old: str, new: str) -> list[dict]:
+    """把内部请求的路径换成调用方参数的路径（如 /operations/0/draft → /draft），让 AI 知道改哪个参数。"""
+    return [{**e, "path": new + e["path"][len(old):]} if e.get("path", "").startswith(old) else e for e in errors]

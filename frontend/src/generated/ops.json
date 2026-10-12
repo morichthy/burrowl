@@ -22,6 +22,7 @@
    "description": "测试连接：服务版本、兼容性、能力、密钥是否已设置（不返回密钥）。",
    "properties": {
     "connector_id": {
+     "description": "连接器 ID（hub_connectors 列出）",
      "title": "Connector Id",
      "type": "string"
     }
@@ -43,6 +44,7 @@
    "description": "预览发布：按策略（默认只发已复核的 L4/L3 与成稿文档）列出新增/更新/删除，返回 plan_hash。",
    "properties": {
     "connector_id": {
+     "description": "连接器 ID（hub_connectors 列出）",
      "title": "Connector Id",
      "type": "string"
     }
@@ -64,11 +66,12 @@
    "description": "执行发布。逐条记录结果，单条失败不影响其他条目。",
    "properties": {
     "connector_id": {
+     "description": "连接器 ID（hub_connectors 列出）",
      "title": "Connector Id",
      "type": "string"
     },
     "plan_hash": {
-     "description": "hub.plan 返回的 plan_hash；数据变化后需重新预览",
+     "description": "hub_plan 返回的 plan_hash；数据变化后需重新预览",
      "title": "Plan Hash",
      "type": "string"
     },
@@ -97,11 +100,13 @@
    "description": "发布状态：各状态计数、失败/漂移条目、最近几次执行；refresh 时轮询外部解析进度。",
    "properties": {
     "connector_id": {
+     "description": "连接器 ID（hub_connectors 列出）",
      "title": "Connector Id",
      "type": "string"
     },
     "refresh": {
      "default": true,
+     "description": "true 时先轮询外部解析进度再返回",
      "title": "Refresh",
      "type": "boolean"
     }
@@ -123,6 +128,7 @@
    "description": "在外部知识中枢检索；命中能对上本地条目时附 fixed_ref 与按本地当前状态计算的复核类别。",
    "properties": {
     "query": {
+     "description": "检索文本",
      "title": "Query",
      "type": "string"
     },
@@ -139,6 +145,7 @@
       }
      ],
      "default": null,
+     "description": "只查这些连接器；不给时查全部",
      "title": "Connector Ids"
     },
     "limit": {
@@ -148,6 +155,7 @@
     },
     "review_filter": {
      "default": "all",
+     "description": "all（默认，带复核徽标）/ reviewed_only / exclude_unsafe / unreviewed_only",
      "enum": [
       "all",
       "reviewed_only",
@@ -175,6 +183,7 @@
    "description": "列出外部 Wiki 页面（authored_here 表示由本项目发布）。",
    "properties": {
     "connector_id": {
+     "description": "连接器 ID（hub_connectors 列出）",
      "title": "Connector Id",
      "type": "string"
     },
@@ -206,6 +215,7 @@
    "description": "读取一页外部 Wiki（含外部自动生成的页面）。",
    "properties": {
     "connector_id": {
+     "description": "连接器 ID（hub_connectors 列出）",
      "title": "Connector Id",
      "type": "string"
     },
@@ -232,6 +242,7 @@
    "description": "按配置 wiki.mode 开启/关闭外部自动 Wiki（auto/both 开启）。",
    "properties": {
     "connector_id": {
+     "description": "连接器 ID（hub_connectors 列出）",
      "title": "Connector Id",
      "type": "string"
     }
@@ -247,12 +258,13 @@
   "name": "hub.candidates_pull",
   "group": "hub",
   "effect": "write",
-  "summary": "把外部工具发现的关系线索拉回为关联候选（origin=tool:<连接器>，只写派生的候选表，不写记录）。 之后用 relations.candidates 查看并判断。",
+  "summary": "把外部工具发现的关系线索拉回为关联候选（origin=tool:<连接器>，只写派生的候选表，不写记录）。 之后用 relations_candidates 查看并判断。",
   "input": {
    "additionalProperties": false,
-   "description": "把外部工具发现的关系线索拉回为关联候选（origin=tool:<连接器>，只写派生的候选表，不写记录）。\n之后用 relations.candidates 查看并判断。",
+   "description": "把外部工具发现的关系线索拉回为关联候选（origin=tool:<连接器>，只写派生的候选表，不写记录）。\n之后用 relations_candidates 查看并判断。",
    "properties": {
     "connector_id": {
+     "description": "连接器 ID（hub_connectors 列出）",
      "title": "Connector Id",
      "type": "string"
     },
@@ -395,6 +407,7 @@
       }
      ],
      "default": null,
+     "description": "只看这些状态；不给时列出未复核、已失效、有争议、被上游阻断、有升级提议的",
      "title": "States"
     },
     "owner_id": {
@@ -407,10 +420,12 @@
       }
      ],
      "default": null,
+     "description": "只看该对象的结论",
      "title": "Owner Id"
     },
     "query": {
      "default": "",
+     "description": "按结论陈述或 ID 匹配",
      "title": "Query",
      "type": "string"
     },
@@ -439,10 +454,12 @@
    "description": "复核一条结论。accepted 需要适用范围与支持性证据；superseded 需要替代结论。dry_run 只预检。\n成熟度与复核状态分开：可以在 not-reviewed 时登记 conjecture/preliminary；established 必须 accepted。",
    "properties": {
     "target_claim_id": {
+     "description": "要复核的结论 ID（CLM-…）",
      "title": "Target Claim Id",
      "type": "string"
     },
     "state": {
+     "description": "accepted 在 scope 内成立；disputed 有争议；retracted 撤回；superseded 被替代；not-reviewed 未复核",
      "enum": [
       "accepted",
       "disputed",
@@ -454,6 +471,7 @@
      "type": "string"
     },
     "reason": {
+     "description": "复核理由；AI 代用户登记时写明“用户在对话中确认：…（时间）”",
      "minLength": 1,
      "title": "Reason",
      "type": "string"
@@ -468,13 +486,88 @@
       }
      ],
      "default": null,
+     "description": "在什么范围内成立（accepted 必填）",
      "title": "Scope"
     },
     "evidence_refs": {
      "anyOf": [
       {
+       "description": "支持或反驳的固定引用列表（accepted 必填）。固定引用 {target_kind, target_id, revision, sha256, locator, relation}，不能只写 ID。记录：revision 与 sha256 取 memory_inspect 的 revision 与 record_hash，或提交回执的 fixed_ref；文件：revision 写 null，sha256 取 sources_list 的指纹",
        "items": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+         "target_kind": {
+          "enum": [
+           "owner",
+           "record",
+           "claim",
+           "file"
+          ]
+         },
+         "target_id": {
+          "minLength": 1,
+          "type": "string"
+         },
+         "revision": {
+          "oneOf": [
+           {
+            "type": "integer"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "sha256": {
+          "oneOf": [
+           {
+            "minLength": 1,
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "locator": {
+          "type": "string"
+         },
+         "relation": {
+          "enum": [
+           "supports",
+           "input",
+           "contradicts",
+           "background",
+           "derived_from",
+           "refines",
+           "same_problem",
+           "same_failure_mode",
+           "prerequisite",
+           "analogous_to",
+           "used_in",
+           "references",
+           "same_entity",
+           "mentions",
+           "depends_on",
+           "supersedes",
+           "contains",
+           "precedes",
+           "member_of",
+           "similar_structure",
+           "related_to",
+           "subject_of",
+           "object_of"
+          ]
+         }
+        },
+        "required": [
+         "target_kind",
+         "target_id",
+         "revision",
+         "sha256",
+         "locator",
+         "relation"
+        ],
         "type": "object"
        },
        "type": "array"
@@ -484,6 +577,7 @@
       }
      ],
      "default": null,
+     "description": "支持或反驳的固定引用列表（accepted 必填）。固定引用 {target_kind, target_id, revision, sha256, locator, relation}，不能只写 ID。记录：revision 与 sha256 取 memory_inspect 的 revision 与 record_hash，或提交回执的 fixed_ref；文件：revision 写 null，sha256 取 sources_list 的指纹",
      "title": "Evidence Refs"
     },
     "replacement_claim_id": {
@@ -496,6 +590,7 @@
       }
      ],
      "default": null,
+     "description": "superseded 必填：替代它的结论 ID",
      "title": "Replacement Claim Id"
     },
     "maturity": {
@@ -552,6 +647,7 @@
     },
     "dry_run": {
      "default": false,
+     "description": "true 只预检、不写入",
      "title": "Dry Run",
      "type": "boolean"
     }
@@ -569,21 +665,164 @@
   "name": "review.batch",
   "group": "review",
   "effect": "write",
-  "summary": "批量复核（逐条串行；单条失败不影响其他）。每项字段同 review.submit。",
+  "summary": "批量复核（逐条串行；单条失败不影响其他）。每项字段同 review_submit。",
   "input": {
    "additionalProperties": false,
-   "description": "批量复核（逐条串行；单条失败不影响其他）。每项字段同 review.submit。",
+   "description": "批量复核（逐条串行；单条失败不影响其他）。每项字段同 review_submit。",
    "properties": {
     "items": {
+     "description": "每项字段同 review_submit：{target_claim_id, state, reason, scope?, evidence_refs?, replacement_claim_id?, maturity?, evidence_basis?, requested_maturity?}",
      "items": {
-      "additionalProperties": true,
+      "additionalProperties": false,
+      "properties": {
+       "target_claim_id": {
+        "minLength": 1,
+        "type": "string"
+       },
+       "state": {
+        "enum": [
+         "accepted",
+         "disputed",
+         "retracted",
+         "superseded",
+         "not-reviewed"
+        ]
+       },
+       "reason": {
+        "minLength": 1,
+        "type": "string"
+       },
+       "scope": {
+        "type": [
+         "string",
+         "null"
+        ]
+       },
+       "evidence_refs": {
+        "items": {
+         "additionalProperties": false,
+         "properties": {
+          "target_kind": {
+           "enum": [
+            "owner",
+            "record",
+            "claim",
+            "file"
+           ]
+          },
+          "target_id": {
+           "minLength": 1,
+           "type": "string"
+          },
+          "revision": {
+           "oneOf": [
+            {
+             "type": "integer"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "sha256": {
+           "oneOf": [
+            {
+             "minLength": 1,
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "locator": {
+           "type": "string"
+          },
+          "relation": {
+           "enum": [
+            "supports",
+            "input",
+            "contradicts",
+            "background",
+            "derived_from",
+            "refines",
+            "same_problem",
+            "same_failure_mode",
+            "prerequisite",
+            "analogous_to",
+            "used_in",
+            "references",
+            "same_entity",
+            "mentions",
+            "depends_on",
+            "supersedes",
+            "contains",
+            "precedes",
+            "member_of",
+            "similar_structure",
+            "related_to",
+            "subject_of",
+            "object_of"
+           ]
+          }
+         },
+         "required": [
+          "target_kind",
+          "target_id",
+          "revision",
+          "sha256",
+          "locator",
+          "relation"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       },
+       "replacement_claim_id": {
+        "type": [
+         "string",
+         "null"
+        ]
+       },
+       "maturity": {
+        "enum": [
+         "conjecture",
+         "preliminary",
+         "replicated",
+         "established",
+         null
+        ]
+       },
+       "evidence_basis": {
+        "enum": [
+         "engineering_case",
+         "proof",
+         "authoritative_source",
+         "replication",
+         null
+        ]
+       },
+       "requested_maturity": {
+        "enum": [
+         "established",
+         null
+        ]
+       }
+      },
+      "required": [
+       "target_claim_id",
+       "state",
+       "reason"
+      ],
       "type": "object"
      },
+     "minItems": 1,
      "title": "Items",
      "type": "array"
     },
     "dry_run": {
      "default": false,
+     "description": "true 只预检、不写入",
      "title": "Dry Run",
      "type": "boolean"
     }
@@ -605,6 +844,7 @@
    "description": "一条结论的复核历史。",
    "properties": {
     "claim_id": {
+     "description": "结论 ID（CLM-…）",
      "title": "Claim Id",
      "type": "string"
     }
@@ -626,6 +866,7 @@
    "description": "这些内容变化后，哪些下游需要重新审阅（导航边只提示，supports/input 才是正式依赖）。",
    "properties": {
     "changed_ids": {
+     "description": "变化了的来源（SRC-…）、记录（MEM-…）或结论（CLM-…）",
      "items": {
       "type": "string"
      },
@@ -650,6 +891,7 @@
    "description": "沿依据追到可访问的原件身份（来源数不等于独立支持数）。",
    "properties": {
     "target_ids": {
+     "description": "要追溯的记录（MEM-…）或结论（CLM-…）",
      "items": {
       "type": "string"
      },
@@ -707,6 +949,7 @@
    "description": "正式使用：只返回在该范围内已接受、有效、来源可见的结论原文，其余列出原因。",
    "properties": {
     "target_ids": {
+     "description": "结论（CLM-…）或包含结论的记录（MEM-…）",
      "items": {
       "type": "string"
      },
@@ -714,6 +957,7 @@
      "type": "array"
     },
     "scope": {
+     "description": "正式使用的范围，只返回在该范围内已接受的结论",
      "minLength": 1,
      "title": "Scope",
      "type": "string"
@@ -899,6 +1143,7 @@
    "description": "为种子记录找关联候选（关键词重合 / 语义近邻）；只是待判断的线索。",
    "properties": {
     "seeds": {
+     "description": "种子记录 ID（MEM-…）",
      "items": {
       "type": "string"
      },
@@ -907,6 +1152,7 @@
     },
     "method": {
      "default": "keyword",
+     "description": "keyword=关键词重合；semantic=向量近邻（需要嵌入模型）",
      "enum": [
       "keyword",
       "semantic"
@@ -952,6 +1198,7 @@
       }
      ],
      "default": null,
+     "description": "只看该状态",
      "title": "Status"
     },
     "record_id": {
@@ -964,6 +1211,7 @@
       }
      ],
      "default": null,
+     "description": "只看一端是该记录的关联",
      "title": "Record Id"
     }
    },
@@ -981,21 +1229,457 @@
    "description": "保存关联判断（candidate/accepted/rejected/withdrawn）；只能是导航关系。\n\"A 会影响 B\"这类可以验证的判断写成结论（inference），不要写成关联。",
    "properties": {
     "owner_id": {
+     "description": "关联记录存放的对象 ID",
      "title": "Owner Id",
      "type": "string"
     },
     "payload": {
-     "additionalProperties": true,
+     "additionalProperties": false,
      "description": "{from, to, relation, explanation, shared_structure, transfer_limits[], basis_refs[], status, certainty?(speculative|plausible|supported), origin?, observed_in?}；快速添加只给 {from, to, explanation}：自动设为 related_to + speculative + accepted。from/to/basis_refs 都是固定引用对象 {target_kind, target_id, revision, sha256, locator, relation}，不能只写 ID",
+     "examples": [
+      {
+       "explanation": "两者都在讨论抵消输入下的求和误差，可以对照着读",
+       "from": {
+        "locator": "record",
+        "relation": "related_to",
+        "revision": 1,
+        "sha256": "ba12342c6ca8afa0a1760dc517fd7bff2d1b60c7f082ee9113e419572834df51",
+        "target_id": "MEM-4acc73bb-59c7-560d-9415-fd42e9dcaa2d",
+        "target_kind": "record"
+       },
+       "to": {
+        "locator": "record",
+        "relation": "related_to",
+        "revision": 6,
+        "sha256": "e5fc7cb2327f0b0412166c545c6ae9e862dad0692c0038775dcb4deb0766e3c2",
+        "target_id": "MEM-58fd845a-05a5-516c-8bbe-c88d887cbb91",
+        "target_kind": "record"
+       }
+      }
+     ],
+     "properties": {
+      "from": {
+       "additionalProperties": false,
+       "properties": {
+        "target_kind": {
+         "enum": [
+          "owner",
+          "record",
+          "claim",
+          "file"
+         ]
+        },
+        "target_id": {
+         "minLength": 1,
+         "type": "string"
+        },
+        "revision": {
+         "oneOf": [
+          {
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "sha256": {
+         "oneOf": [
+          {
+           "minLength": 1,
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "locator": {
+         "type": "string"
+        },
+        "relation": {
+         "enum": [
+          "supports",
+          "input",
+          "contradicts",
+          "background",
+          "derived_from",
+          "refines",
+          "same_problem",
+          "same_failure_mode",
+          "prerequisite",
+          "analogous_to",
+          "used_in",
+          "references",
+          "same_entity",
+          "mentions",
+          "depends_on",
+          "supersedes",
+          "contains",
+          "precedes",
+          "member_of",
+          "similar_structure",
+          "related_to",
+          "subject_of",
+          "object_of"
+         ]
+        }
+       },
+       "required": [
+        "target_kind",
+        "target_id",
+        "revision",
+        "sha256",
+        "locator",
+        "relation"
+       ],
+       "type": "object"
+      },
+      "to": {
+       "additionalProperties": false,
+       "properties": {
+        "target_kind": {
+         "enum": [
+          "owner",
+          "record",
+          "claim",
+          "file"
+         ]
+        },
+        "target_id": {
+         "minLength": 1,
+         "type": "string"
+        },
+        "revision": {
+         "oneOf": [
+          {
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "sha256": {
+         "oneOf": [
+          {
+           "minLength": 1,
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "locator": {
+         "type": "string"
+        },
+        "relation": {
+         "enum": [
+          "supports",
+          "input",
+          "contradicts",
+          "background",
+          "derived_from",
+          "refines",
+          "same_problem",
+          "same_failure_mode",
+          "prerequisite",
+          "analogous_to",
+          "used_in",
+          "references",
+          "same_entity",
+          "mentions",
+          "depends_on",
+          "supersedes",
+          "contains",
+          "precedes",
+          "member_of",
+          "similar_structure",
+          "related_to",
+          "subject_of",
+          "object_of"
+         ]
+        }
+       },
+       "required": [
+        "target_kind",
+        "target_id",
+        "revision",
+        "sha256",
+        "locator",
+        "relation"
+       ],
+       "type": "object"
+      },
+      "relation": {
+       "enum": [
+        "supports",
+        "input",
+        "contradicts",
+        "background",
+        "derived_from",
+        "refines",
+        "same_problem",
+        "same_failure_mode",
+        "prerequisite",
+        "analogous_to",
+        "used_in",
+        "references",
+        "related_to"
+       ]
+      },
+      "explanation": {
+       "minLength": 1,
+       "type": "string"
+      },
+      "shared_structure": {
+       "oneOf": [
+        {
+         "minLength": 1,
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "transfer_limits": {
+       "items": {
+        "minLength": 1,
+        "type": "string"
+       },
+       "minItems": 0,
+       "type": "array"
+      },
+      "differences": {
+       "items": {
+        "minLength": 1,
+        "type": "string"
+       },
+       "type": "array"
+      },
+      "basis_refs": {
+       "items": {
+        "additionalProperties": false,
+        "properties": {
+         "target_kind": {
+          "enum": [
+           "owner",
+           "record",
+           "claim",
+           "file"
+          ]
+         },
+         "target_id": {
+          "minLength": 1,
+          "type": "string"
+         },
+         "revision": {
+          "oneOf": [
+           {
+            "type": "integer"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "sha256": {
+          "oneOf": [
+           {
+            "minLength": 1,
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "locator": {
+          "type": "string"
+         },
+         "relation": {
+          "enum": [
+           "supports",
+           "input",
+           "contradicts",
+           "background",
+           "derived_from",
+           "refines",
+           "same_problem",
+           "same_failure_mode",
+           "prerequisite",
+           "analogous_to",
+           "used_in",
+           "references",
+           "same_entity",
+           "mentions",
+           "depends_on",
+           "supersedes",
+           "contains",
+           "precedes",
+           "member_of",
+           "similar_structure",
+           "related_to",
+           "subject_of",
+           "object_of"
+          ]
+         }
+        },
+        "required": [
+         "target_kind",
+         "target_id",
+         "revision",
+         "sha256",
+         "locator",
+         "relation"
+        ],
+        "type": "object"
+       },
+       "minItems": 0,
+       "type": "array"
+      },
+      "status": {
+       "enum": [
+        "candidate",
+        "accepted",
+        "rejected",
+        "withdrawn"
+       ]
+      },
+      "missing_refs": {
+       "items": {
+        "additionalProperties": false,
+        "properties": {
+         "requested_target": {
+          "minLength": 1,
+          "type": "string"
+         },
+         "reason": {
+          "minLength": 1,
+          "type": "string"
+         },
+         "observed_at": {
+          "minLength": 1,
+          "type": "string"
+         }
+        },
+        "required": [
+         "requested_target",
+         "reason",
+         "observed_at"
+        ],
+        "type": "object"
+       },
+       "minItems": 0,
+       "type": "array"
+      },
+      "certainty": {
+       "enum": [
+        "speculative",
+        "plausible",
+        "supported"
+       ]
+      },
+      "origin": {
+       "minLength": 1,
+       "type": "string"
+      },
+      "observed_in": {
+       "additionalProperties": false,
+       "properties": {
+        "target_kind": {
+         "enum": [
+          "owner",
+          "record",
+          "claim",
+          "file"
+         ]
+        },
+        "target_id": {
+         "minLength": 1,
+         "type": "string"
+        },
+        "revision": {
+         "oneOf": [
+          {
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "sha256": {
+         "oneOf": [
+          {
+           "minLength": 1,
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "locator": {
+         "type": "string"
+        },
+        "relation": {
+         "enum": [
+          "supports",
+          "input",
+          "contradicts",
+          "background",
+          "derived_from",
+          "refines",
+          "same_problem",
+          "same_failure_mode",
+          "prerequisite",
+          "analogous_to",
+          "used_in",
+          "references",
+          "same_entity",
+          "mentions",
+          "depends_on",
+          "supersedes",
+          "contains",
+          "precedes",
+          "member_of",
+          "similar_structure",
+          "related_to",
+          "subject_of",
+          "object_of"
+         ]
+        }
+       },
+       "required": [
+        "target_kind",
+        "target_id",
+        "revision",
+        "sha256",
+        "locator",
+        "relation"
+       ],
+       "type": "object"
+      }
+     },
+     "required": [
+      "from",
+      "to",
+      "explanation"
+     ],
      "title": "Payload",
      "type": "object"
     },
     "reason": {
+     "description": "为什么做这个判断（写进记录的 record_reason）",
      "title": "Reason",
      "type": "string"
     },
     "dry_run": {
      "default": false,
+     "description": "true 只预检、不写入",
      "title": "Dry Run",
      "type": "boolean"
     },
@@ -1045,6 +1729,7 @@
       }
      ],
      "default": null,
+     "description": "只看涉及该记录的线索",
      "title": "Record Id"
     },
     "owner_id": {
@@ -1057,6 +1742,7 @@
       }
      ],
      "default": null,
+     "description": "只看该对象内的线索",
      "title": "Owner Id"
     },
     "kinds": {
@@ -1072,6 +1758,7 @@
       }
      ],
      "default": null,
+     "description": "线索类型：concept_mention、similar、external:*",
      "title": "Kinds"
     },
     "limit": {
@@ -1352,6 +2039,7 @@
    "description": "回写用户交给你的工作台笔记（只能作用于 queued 的笔记）。写入方案须由用户在工作台执行，不能替用户确认或执行。",
    "properties": {
     "note_id": {
+     "description": "queued 状态的笔记 ID",
      "title": "Note Id",
      "type": "string"
     },
@@ -1373,10 +2061,524 @@
     "steps": {
      "anyOf": [
       {
+       "description": "仅 proposal：最多 10 步，每步 {op:'memory_commit', owner_id, operations, expected_head} 或 {op:'relations_decide', owner_id, payload, reason?}；参数与对应工具相同。同一对象只提交一次；服务端逐步 dry_run 预检并生成预览，不会写入",
        "items": {
-        "additionalProperties": true,
-        "type": "object"
+        "oneOf": [
+         {
+          "additionalProperties": false,
+          "properties": {
+           "op": {
+            "enum": [
+             "memory_commit",
+             "memory.commit"
+            ]
+           },
+           "owner_id": {
+            "minLength": 1,
+            "type": "string"
+           },
+           "operations": {
+            "items": {
+             "additionalProperties": false,
+             "properties": {
+              "op": {
+               "enum": [
+                "put_record",
+                "transition_question",
+                "set_policy",
+                "decide_association",
+                "save_checkpoint"
+               ]
+              },
+              "client_key": {
+               "minLength": 1,
+               "type": "string"
+              },
+              "record_id": {
+               "minLength": 1,
+               "type": "string"
+              },
+              "expected_revision": {
+               "type": "integer"
+              },
+              "draft": {
+               "description": "记录草案（对象）。至少写 kind、title、body_markdown、payload、sources、record_reason；owner_id、sensitivity、discovery 可省略（由服务补上）；修订已有记录时写 change_reason。payload 的结构随 kind 不同，写之前用 memory_contract(kind) 查字段和示例",
+               "type": "object"
+              },
+              "repin": {
+               "type": "boolean"
+              }
+             },
+             "required": [
+              "op",
+              "draft"
+             ],
+             "type": "object"
+            },
+            "minItems": 1,
+            "type": "array"
+           },
+           "expected_head": {
+            "description": "该对象当前 HEAD；新对象为 null",
+            "type": [
+             "string",
+             "null"
+            ]
+           }
+          },
+          "required": [
+           "op",
+           "owner_id",
+           "operations",
+           "expected_head"
+          ],
+          "type": "object"
+         },
+         {
+          "additionalProperties": false,
+          "properties": {
+           "op": {
+            "enum": [
+             "relations_decide",
+             "relations.decide"
+            ]
+           },
+           "owner_id": {
+            "minLength": 1,
+            "type": "string"
+           },
+           "payload": {
+            "additionalProperties": false,
+            "properties": {
+             "from": {
+              "additionalProperties": false,
+              "properties": {
+               "target_kind": {
+                "enum": [
+                 "owner",
+                 "record",
+                 "claim",
+                 "file"
+                ]
+               },
+               "target_id": {
+                "minLength": 1,
+                "type": "string"
+               },
+               "revision": {
+                "oneOf": [
+                 {
+                  "type": "integer"
+                 },
+                 {
+                  "type": "null"
+                 }
+                ]
+               },
+               "sha256": {
+                "oneOf": [
+                 {
+                  "minLength": 1,
+                  "type": "string"
+                 },
+                 {
+                  "type": "null"
+                 }
+                ]
+               },
+               "locator": {
+                "type": "string"
+               },
+               "relation": {
+                "enum": [
+                 "supports",
+                 "input",
+                 "contradicts",
+                 "background",
+                 "derived_from",
+                 "refines",
+                 "same_problem",
+                 "same_failure_mode",
+                 "prerequisite",
+                 "analogous_to",
+                 "used_in",
+                 "references",
+                 "same_entity",
+                 "mentions",
+                 "depends_on",
+                 "supersedes",
+                 "contains",
+                 "precedes",
+                 "member_of",
+                 "similar_structure",
+                 "related_to",
+                 "subject_of",
+                 "object_of"
+                ]
+               }
+              },
+              "required": [
+               "target_kind",
+               "target_id",
+               "revision",
+               "sha256",
+               "locator",
+               "relation"
+              ],
+              "type": "object"
+             },
+             "to": {
+              "additionalProperties": false,
+              "properties": {
+               "target_kind": {
+                "enum": [
+                 "owner",
+                 "record",
+                 "claim",
+                 "file"
+                ]
+               },
+               "target_id": {
+                "minLength": 1,
+                "type": "string"
+               },
+               "revision": {
+                "oneOf": [
+                 {
+                  "type": "integer"
+                 },
+                 {
+                  "type": "null"
+                 }
+                ]
+               },
+               "sha256": {
+                "oneOf": [
+                 {
+                  "minLength": 1,
+                  "type": "string"
+                 },
+                 {
+                  "type": "null"
+                 }
+                ]
+               },
+               "locator": {
+                "type": "string"
+               },
+               "relation": {
+                "enum": [
+                 "supports",
+                 "input",
+                 "contradicts",
+                 "background",
+                 "derived_from",
+                 "refines",
+                 "same_problem",
+                 "same_failure_mode",
+                 "prerequisite",
+                 "analogous_to",
+                 "used_in",
+                 "references",
+                 "same_entity",
+                 "mentions",
+                 "depends_on",
+                 "supersedes",
+                 "contains",
+                 "precedes",
+                 "member_of",
+                 "similar_structure",
+                 "related_to",
+                 "subject_of",
+                 "object_of"
+                ]
+               }
+              },
+              "required": [
+               "target_kind",
+               "target_id",
+               "revision",
+               "sha256",
+               "locator",
+               "relation"
+              ],
+              "type": "object"
+             },
+             "relation": {
+              "enum": [
+               "supports",
+               "input",
+               "contradicts",
+               "background",
+               "derived_from",
+               "refines",
+               "same_problem",
+               "same_failure_mode",
+               "prerequisite",
+               "analogous_to",
+               "used_in",
+               "references",
+               "related_to"
+              ]
+             },
+             "explanation": {
+              "minLength": 1,
+              "type": "string"
+             },
+             "shared_structure": {
+              "oneOf": [
+               {
+                "minLength": 1,
+                "type": "string"
+               },
+               {
+                "type": "null"
+               }
+              ]
+             },
+             "transfer_limits": {
+              "items": {
+               "minLength": 1,
+               "type": "string"
+              },
+              "minItems": 0,
+              "type": "array"
+             },
+             "differences": {
+              "items": {
+               "minLength": 1,
+               "type": "string"
+              },
+              "type": "array"
+             },
+             "basis_refs": {
+              "items": {
+               "additionalProperties": false,
+               "properties": {
+                "target_kind": {
+                 "enum": [
+                  "owner",
+                  "record",
+                  "claim",
+                  "file"
+                 ]
+                },
+                "target_id": {
+                 "minLength": 1,
+                 "type": "string"
+                },
+                "revision": {
+                 "oneOf": [
+                  {
+                   "type": "integer"
+                  },
+                  {
+                   "type": "null"
+                  }
+                 ]
+                },
+                "sha256": {
+                 "oneOf": [
+                  {
+                   "minLength": 1,
+                   "type": "string"
+                  },
+                  {
+                   "type": "null"
+                  }
+                 ]
+                },
+                "locator": {
+                 "type": "string"
+                },
+                "relation": {
+                 "enum": [
+                  "supports",
+                  "input",
+                  "contradicts",
+                  "background",
+                  "derived_from",
+                  "refines",
+                  "same_problem",
+                  "same_failure_mode",
+                  "prerequisite",
+                  "analogous_to",
+                  "used_in",
+                  "references",
+                  "same_entity",
+                  "mentions",
+                  "depends_on",
+                  "supersedes",
+                  "contains",
+                  "precedes",
+                  "member_of",
+                  "similar_structure",
+                  "related_to",
+                  "subject_of",
+                  "object_of"
+                 ]
+                }
+               },
+               "required": [
+                "target_kind",
+                "target_id",
+                "revision",
+                "sha256",
+                "locator",
+                "relation"
+               ],
+               "type": "object"
+              },
+              "minItems": 0,
+              "type": "array"
+             },
+             "status": {
+              "enum": [
+               "candidate",
+               "accepted",
+               "rejected",
+               "withdrawn"
+              ]
+             },
+             "missing_refs": {
+              "items": {
+               "additionalProperties": false,
+               "properties": {
+                "requested_target": {
+                 "minLength": 1,
+                 "type": "string"
+                },
+                "reason": {
+                 "minLength": 1,
+                 "type": "string"
+                },
+                "observed_at": {
+                 "minLength": 1,
+                 "type": "string"
+                }
+               },
+               "required": [
+                "requested_target",
+                "reason",
+                "observed_at"
+               ],
+               "type": "object"
+              },
+              "minItems": 0,
+              "type": "array"
+             },
+             "certainty": {
+              "enum": [
+               "speculative",
+               "plausible",
+               "supported"
+              ]
+             },
+             "origin": {
+              "minLength": 1,
+              "type": "string"
+             },
+             "observed_in": {
+              "additionalProperties": false,
+              "properties": {
+               "target_kind": {
+                "enum": [
+                 "owner",
+                 "record",
+                 "claim",
+                 "file"
+                ]
+               },
+               "target_id": {
+                "minLength": 1,
+                "type": "string"
+               },
+               "revision": {
+                "oneOf": [
+                 {
+                  "type": "integer"
+                 },
+                 {
+                  "type": "null"
+                 }
+                ]
+               },
+               "sha256": {
+                "oneOf": [
+                 {
+                  "minLength": 1,
+                  "type": "string"
+                 },
+                 {
+                  "type": "null"
+                 }
+                ]
+               },
+               "locator": {
+                "type": "string"
+               },
+               "relation": {
+                "enum": [
+                 "supports",
+                 "input",
+                 "contradicts",
+                 "background",
+                 "derived_from",
+                 "refines",
+                 "same_problem",
+                 "same_failure_mode",
+                 "prerequisite",
+                 "analogous_to",
+                 "used_in",
+                 "references",
+                 "same_entity",
+                 "mentions",
+                 "depends_on",
+                 "supersedes",
+                 "contains",
+                 "precedes",
+                 "member_of",
+                 "similar_structure",
+                 "related_to",
+                 "subject_of",
+                 "object_of"
+                ]
+               }
+              },
+              "required": [
+               "target_kind",
+               "target_id",
+               "revision",
+               "sha256",
+               "locator",
+               "relation"
+              ],
+              "type": "object"
+             }
+            },
+            "required": [
+             "from",
+             "to",
+             "explanation"
+            ],
+            "type": "object"
+           },
+           "reason": {
+            "minLength": 1,
+            "type": "string"
+           }
+          },
+          "required": [
+           "op",
+           "owner_id",
+           "payload"
+          ],
+          "type": "object"
+         }
+        ]
        },
+       "maxItems": 10,
+       "minItems": 1,
        "type": "array"
       },
       {
@@ -1384,7 +2586,7 @@
       }
      ],
      "default": null,
-     "description": "仅 proposal：最多 10 步，每步 {op:'memory.commit', owner_id, operations, expected_head} 或 {op:'relations.decide', owner_id, payload, reason}；参数与对应操作相同。同一对象只提交一次；服务端逐步 dry_run 预检并生成预览，不会写入",
+     "description": "仅 proposal：最多 10 步，每步 {op:'memory_commit', owner_id, operations, expected_head} 或 {op:'relations_decide', owner_id, payload, reason?}；参数与对应工具相同。同一对象只提交一次；服务端逐步 dry_run 预检并生成预览，不会写入",
      "title": "Steps"
     }
    },
@@ -1477,6 +2679,7 @@
    "description": "来源变化或新反证后：列出受影响记录及其完整正文，生成维护计划。",
    "properties": {
     "changed_ids": {
+     "description": "变化了的来源（SRC-…）、记录（MEM-…）或结论（CLM-…）",
      "items": {
       "type": "string"
      },
@@ -1485,6 +2688,7 @@
     },
     "note": {
      "default": "",
+     "description": "给用户看的一句说明（为什么要维护）",
      "title": "Note",
      "type": "string"
     },
@@ -1656,15 +2860,46 @@
    "description": "记录逐项处置与修订草案，并逐对象预检（不写记忆）。之后由用户在工作台预览并执行。",
    "properties": {
     "plan_id": {
+     "description": "维护计划 ID",
      "title": "Plan Id",
      "type": "string"
     },
     "decisions": {
-     "description": "[{target_id, action: retain|revise|resynthesize|retract|defer, reason, draft?}]",
+     "description": "[{target_id, action: retain|revise|resynthesize|retract|defer, reason, draft?}]；revise / resynthesize 必须附完整的新草案 draft（owner_id 可省略，change_reason 由计划补上）",
      "items": {
-      "additionalProperties": true,
+      "additionalProperties": false,
+      "properties": {
+       "target_id": {
+        "description": "计划条目的目标 ID",
+        "minLength": 1,
+        "type": "string"
+       },
+       "action": {
+        "enum": [
+         "retain",
+         "revise",
+         "resynthesize",
+         "retract",
+         "defer"
+        ]
+       },
+       "reason": {
+        "minLength": 1,
+        "type": "string"
+       },
+       "draft": {
+        "description": "revise / resynthesize 时必填：完整的新草案",
+        "type": "object"
+       }
+      },
+      "required": [
+       "target_id",
+       "action",
+       "reason"
+      ],
       "type": "object"
      },
+     "minItems": 1,
      "title": "Decisions",
      "type": "array"
     },
@@ -1678,6 +2913,7 @@
       }
      ],
      "default": null,
+     "description": "maintenance_status 返回的计划修订号",
      "title": "Expected Revision"
     },
     "message": {
@@ -1731,6 +2967,7 @@
    "description": "维护计划的当前状态。",
    "properties": {
     "plan_id": {
+     "description": "维护计划 ID",
      "title": "Plan Id",
      "type": "string"
     }
@@ -1786,6 +3023,7 @@
       }
      ],
      "default": "open",
+     "description": "open 待处理（默认）；planned 已放进计划；dismissed 已确认无需处理；null 列出全部",
      "title": "Status"
     }
    },
@@ -1852,12 +3090,13 @@
   "name": "runs.create",
   "group": "runs",
   "effect": "write",
-  "summary": "新建 Run（一次实际执行的证据：输入、程序、输出与失败）。给 owner_id 时放在该对象目录下，否则是独立 Run。 Run 不保存记忆记录、不进检索；执行得到的知识写进上级对象或合适的知识对象的记录，并引用该 Run。 一次性小任务默认不建 Run，只有执行结果要被记录引用时才建；没有知识的 Run 用 runs.discard 丢弃。",
+  "summary": "新建 Run（一次实际执行的证据：输入、程序、输出与失败）。给 owner_id 时放在该对象目录下，否则是独立 Run。 Run 不保存记忆记录、不进检索；执行得到的知识写进上级对象或合适的知识对象的记录，并引用该 Run。 一次性小任务默认不建 Run，只有执行结果要被记录引用时才建；没有知识的 Run 用 runs_discard 丢弃。",
   "input": {
    "additionalProperties": false,
    "description": "新建 Run（一次实际执行的证据：输入、程序、输出与失败）。给 owner_id 时放在该对象目录下，否则是独立 Run。",
    "properties": {
     "title": {
+     "description": "这次执行做什么，一句话",
      "title": "Title",
      "type": "string"
     },
@@ -1871,10 +3110,12 @@
       }
      ],
      "default": null,
+     "description": "上级对象 ID；不给时是独立 Run",
      "title": "Owner Id"
     },
     "question": {
      "default": "",
+     "description": "这次执行要回答的问题",
      "title": "Question",
      "type": "string"
     },
@@ -1891,6 +3132,7 @@
       }
      ],
      "default": null,
+     "description": "查找 Run 用的关键词",
      "title": "Keywords"
     }
    },
@@ -1911,6 +3153,7 @@
    "description": "登记已有文件为 Run 的输入/产物（固定字节指纹，可回滚）。",
    "properties": {
     "run_id": {
+     "description": "Run ID（RUN-…）",
      "title": "Run Id",
      "type": "string"
     },
@@ -1927,6 +3170,7 @@
       }
      ],
      "default": null,
+     "description": "输入文件：数据目录内相对路径或 SRC- ID",
      "title": "Inputs"
     },
     "artifacts": {
@@ -1942,10 +3186,12 @@
       }
      ],
      "default": null,
+     "description": "产物文件：数据目录内相对路径或 SRC- ID",
      "title": "Artifacts"
     },
     "preview": {
      "default": false,
+     "description": "true 只预览登记结果、不写入",
      "title": "Preview",
      "type": "boolean"
     }
@@ -1967,10 +3213,12 @@
    "description": "前台运行 Python 脚本并登记输入、输出与日志（失败也登记）。参数可用 {input0}、{output_dir} 占位。",
    "properties": {
     "run_id": {
+     "description": "Run ID（RUN-…）",
      "title": "Run Id",
      "type": "string"
     },
     "script": {
+     "description": "要运行的 Python 脚本路径",
      "title": "Script",
      "type": "string"
     },
@@ -1987,6 +3235,7 @@
       }
      ],
      "default": null,
+     "description": "输入文件：数据目录内相对路径或 SRC- ID",
      "title": "Inputs"
     },
     "args": {
@@ -2002,15 +3251,18 @@
       }
      ],
      "default": null,
+     "description": "脚本参数，可用 {input0}、{output_dir} 占位",
      "title": "Args"
     },
     "timeout_seconds": {
      "default": 3600,
+     "description": "超时秒数",
      "title": "Timeout Seconds",
      "type": "number"
     },
     "preview": {
      "default": false,
+     "description": "true 只预览命令与登记、不执行",
      "title": "Preview",
      "type": "boolean"
     }
@@ -2033,12 +3285,58 @@
    "description": "修改 Run 的执行摘要、限制、状态等（不改输入/产物登记）。",
    "properties": {
     "run_id": {
+     "description": "Run ID（RUN-…）",
      "title": "Run Id",
      "type": "string"
     },
     "fields": {
-     "additionalProperties": true,
-     "description": "可改：title, question, conclusion, limitations, parameters, status, keywords, parent_run_ids。conclusion 只写执行摘要（成功或失败、产物、异常），知识写成记忆记录并引用本 Run",
+     "additionalProperties": false,
+     "description": "只写要改的字段：title, question, conclusion, limitations, parameters, status, keywords, parent_run_ids。conclusion 只写执行摘要（成功或失败、产物、异常），知识写成记忆记录并引用本 Run",
+     "properties": {
+      "title": {
+       "minLength": 1,
+       "type": "string"
+      },
+      "question": {
+       "type": "string"
+      },
+      "conclusion": {
+       "description": "只写执行摘要（成功或失败、产物、异常）",
+       "type": "string"
+      },
+      "limitations": {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      "parameters": {
+       "description": "本次执行的参数（键值）",
+       "type": "object"
+      },
+      "status": {
+       "enum": [
+        "planned",
+        "running",
+        "succeeded",
+        "failed",
+        "abandoned"
+       ]
+      },
+      "keywords": {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      "parent_run_ids": {
+       "items": {
+        "minLength": 1,
+        "type": "string"
+       },
+       "type": "array"
+      }
+     },
      "title": "Fields",
      "type": "object"
     },
@@ -2101,6 +3399,7 @@
    "properties": {
     "query": {
      "default": "",
+     "description": "按标题、问题、关键词匹配；空串列出全部",
      "title": "Query",
      "type": "string"
     },
@@ -2114,6 +3413,7 @@
       }
      ],
      "default": null,
+     "description": "只列该对象目录下的 Run",
      "title": "Owner Id"
     },
     "limit": {
@@ -2136,12 +3436,13 @@
   "name": "runs.discard",
   "group": "runs",
   "effect": "write",
-  "summary": "丢弃没有知识的 Run：当前没有任何记录引用时，把整个 Run 目录移入回收站（可用 runs.restore 恢复）。 失败本身有教训时不要丢弃，写成记录并引用它。被记录引用的 Run 不能丢弃。",
+  "summary": "丢弃没有知识的 Run：当前没有任何记录引用时，把整个 Run 目录移入回收站（可用 runs_restore 恢复）。 失败本身有教训时不要丢弃，写成记录并引用它。被记录引用的 Run 不能丢弃。",
   "input": {
    "additionalProperties": false,
-   "description": "丢弃没有知识的 Run：当前没有任何记录引用时，把整个 Run 目录移入回收站（可用 runs.restore 恢复）。",
+   "description": "丢弃没有知识的 Run：当前没有任何记录引用时，把整个 Run 目录移入回收站（可用 runs_restore 恢复）。",
    "properties": {
     "run_id": {
+     "description": "Run ID（RUN-…）",
      "title": "Run Id",
      "type": "string"
     },
@@ -2248,6 +3549,7 @@
     },
     "title": {
      "default": "",
+     "description": "给用户看的名称",
      "title": "Title",
      "type": "string"
     }
@@ -2269,15 +3571,18 @@
    "description": "工作目录整体搬家：逐个核对新位置下已登记文件的指纹，全部一致才改根的位置；已有固定引用不变。",
    "properties": {
     "root_id": {
+     "description": "sources_roots 返回的根 ID",
      "title": "Root Id",
      "type": "string"
     },
     "new_path": {
+     "description": "新位置的绝对路径",
      "title": "New Path",
      "type": "string"
     },
     "allow_missing": {
      "default": false,
+     "description": "true 时允许新位置缺少部分已登记文件（缺的会列出）",
      "title": "Allow Missing",
      "type": "boolean"
     }
@@ -2294,12 +3599,13 @@
   "name": "sources.register",
   "group": "sources",
   "effect": "write",
-  "summary": "登记一个来源文件并记录当前字节指纹：L0 原件的唯一授权入口。原件留在原处，不复制、不修改。 工作目录里的文件自动记为\"工作根 + 相对路径\"，迁移时随根重定向。 同一 ID 重复登记同一文件是幂等的；内容变了请用新 ID；文件搬家用 sources.relocate / sources.relocate_root。",
+  "summary": "登记一个来源文件并记录当前字节指纹：L0 原件的唯一授权入口。原件留在原处，不复制、不修改。 工作目录里的文件自动记为\"工作根 + 相对路径\"，迁移时随根重定向。 同一 ID 重复登记同一文件是幂等的；内容变了请用新 ID；文件搬家用 sources_relocate / sources_relocate_root。",
   "input": {
    "additionalProperties": false,
-   "description": "登记一个来源文件并记录当前字节指纹：L0 原件的唯一授权入口。原件留在原处，不复制、不修改。\n工作目录里的文件自动记为\"工作根 + 相对路径\"，迁移时随根重定向。\n同一 ID 重复登记同一文件是幂等的；内容变了请用新 ID；文件搬家用 sources.relocate / sources.relocate_root。",
+   "description": "登记一个来源文件并记录当前字节指纹：L0 原件的唯一授权入口。原件留在原处，不复制、不修改。\n工作目录里的文件自动记为\"工作根 + 相对路径\"，迁移时随根重定向。\n同一 ID 重复登记同一文件是幂等的；内容变了请用新 ID；文件搬家用 sources_relocate / sources_relocate_root。",
    "properties": {
     "source_id": {
+     "description": "自定的来源 ID，SRC- 开头，如 SRC-SUMMATION-R01；内容变了用新 ID",
      "pattern": "^SRC-",
      "title": "Source Id",
      "type": "string"
@@ -2311,11 +3617,13 @@
     },
     "title": {
      "default": "",
+     "description": "给人看的名称",
      "title": "Title",
      "type": "string"
     },
     "sensitivity": {
      "default": "internal",
+     "description": "restricted 的来源不进索引、不能被引用",
      "enum": [
       "public",
       "internal",
@@ -2346,9 +3654,37 @@
     "items": {
      "description": "[{source_id, path, title?, sensitivity?}]，逐条登记；单条失败不影响其他",
      "items": {
-      "additionalProperties": true,
+      "additionalProperties": false,
+      "properties": {
+       "source_id": {
+        "description": "SRC- 开头的来源 ID",
+        "minLength": 1,
+        "type": "string"
+       },
+       "path": {
+        "description": "工作目录等外部位置用绝对路径；数据目录内可用相对路径",
+        "minLength": 1,
+        "type": "string"
+       },
+       "title": {
+        "type": "string"
+       },
+       "sensitivity": {
+        "enum": [
+         "public",
+         "internal",
+         "confidential",
+         "restricted"
+        ]
+       }
+      },
+      "required": [
+       "source_id",
+       "path"
+      ],
       "type": "object"
      },
+     "minItems": 1,
      "title": "Items",
      "type": "array"
     }
@@ -2370,10 +3706,12 @@
    "description": "原件搬家：新位置的字节必须与登记时一致，旧路径记入 relocated_from，已有固定引用继续有效。",
    "properties": {
     "source_id": {
+     "description": "已登记的来源 ID（SRC-…）",
      "title": "Source Id",
      "type": "string"
     },
     "new_path": {
+     "description": "新位置的绝对路径",
      "title": "New Path",
      "type": "string"
     }
@@ -2459,10 +3797,12 @@
       }
      ],
      "default": null,
+     "description": "只列这些类型：research、project、core-algorithm、data、tool、report、knowledge、run",
      "title": "Owner Types"
     },
     "query": {
      "default": "",
+     "description": "按 ID、标题、关键词匹配；空串列出全部",
      "title": "Query",
      "type": "string"
     }
@@ -2488,10 +3828,51 @@
     "variants": {
      "anyOf": [
       {
+       "description": "最多 2 条等义改写 [{language: zh|en|other, question, lexical_terms?}]；技术问题建议补一条英文；型号、数值必须原样保留",
+       "examples": [
+        [
+         {
+          "language": "en",
+          "question": "Is pairwise summation more robust than Kahan on cancelling inputs?"
+         }
+        ]
+       ],
        "items": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+         "id": {
+          "description": "可选的改写编号",
+          "minLength": 1,
+          "type": "string"
+         },
+         "language": {
+          "enum": [
+           "zh",
+           "en",
+           "other"
+          ]
+         },
+         "question": {
+          "description": "等义改写的问句；型号、数值必须原样保留",
+          "minLength": 1,
+          "type": "string"
+         },
+         "lexical_terms": {
+          "description": "可选：词法检索用的关键词，不写按问句切词",
+          "items": {
+           "minLength": 1,
+           "type": "string"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "language",
+         "question"
+        ],
         "type": "object"
        },
+       "maxItems": 2,
        "type": "array"
       },
       {
@@ -2499,7 +3880,7 @@
       }
      ],
      "default": null,
-     "description": "最多 2 条等义改写 [{language: zh|en, question, lexical_terms?}]，与 reading_start 相同",
+     "description": "最多 2 条等义改写 [{language: zh|en|other, question, lexical_terms?}]；技术问题建议补一条英文；型号、数值必须原样保留",
      "title": "Variants"
     },
     "protected_terms": {
@@ -2566,12 +3947,13 @@
   "name": "memory.owner_create",
   "group": "memory",
   "effect": "write",
-  "summary": "新建对象（写入业务卡；首次提交记忆时才建立记忆目录）。Run 用 runs.create 建立。 先用 memory.owners 查找：同一目标的继续或子任务沿用已有对象；主题相似只引用；独立交付目标才新建。 core-algorithm 只用于公司文档定义的关键算法，普通脚本/模块/工具不要建算法卡。 knowledge 有两种用途：配置 graph.concept_owner_id 指定的那一个是概念库（只放概念页，建好后把 owner_id 填进该配置）； 其他 knowledge 对象是通用知识对象，承接不属于任何具体研究、项目、工具、数据的知识，按主题复用，主题不同再新建。",
+  "summary": "新建对象（写入业务卡；首次提交记忆时才建立记忆目录）。Run 用 runs_create 建立。 先用 memory_owners 查找：同一目标的继续或子任务沿用已有对象；主题相似只引用；独立交付目标才新建。 core-algorithm 只用于公司文档定义的关键算法，普通脚本/模块/工具不要建算法卡。 knowledge 有两种用途：配置 graph.concept_owner_id 指定的那一个是概念库（只放概念页，建好后把 owner_id 填进该配置）； 其他 knowledge 对象是通用知识对象，承接不属于任何具体研究、项目、工具、数据的知识，按主题复用，主题不同再新建。",
   "input": {
    "additionalProperties": false,
-   "description": "新建对象（写入业务卡；首次提交记忆时才建立记忆目录）。Run 用 runs.create 建立。",
+   "description": "新建对象（写入业务卡；首次提交记忆时才建立记忆目录）。Run 用 runs_create 建立。",
    "properties": {
     "owner_type": {
+     "description": "research 研究；project 项目；core-algorithm 公司文档定义的关键算法；data 数据集；tool 工具；report 报告；knowledge 通用知识或概念库",
      "enum": [
       "research",
       "project",
@@ -2590,11 +3972,13 @@
      "type": "string"
     },
     "title": {
+     "description": "能单独看懂的标题",
      "title": "Title",
      "type": "string"
     },
     "description": {
      "default": "",
+     "description": "一两句话的目标或范围说明",
      "title": "Description",
      "type": "string"
     },
@@ -2611,6 +3995,7 @@
       }
      ],
      "default": null,
+     "description": "检索关键词；技术名词中英文都给",
      "title": "Keywords"
     },
     "source_document": {
@@ -2641,6 +4026,7 @@
     },
     "sensitivity": {
      "default": "internal",
+     "description": "对象的敏感级别；restricted 不进索引、不发布",
      "enum": [
       "public",
       "internal",
@@ -2670,10 +4056,12 @@
    "description": "把内容树中已有的文档登记为对象（原件不修改；须给出你看到的字节指纹）。",
    "properties": {
     "path": {
+     "description": "内容树中已有业务卡的相对路径",
      "title": "Path",
      "type": "string"
     },
     "expected_sha256": {
+     "description": "你读到的该文件的 SHA-256；不一致时拒绝",
      "title": "Expected Sha256",
      "type": "string"
     }
@@ -2713,6 +4101,7 @@
       }
      ],
      "default": null,
+     "description": "只列这些层级：L0–L4",
      "title": "Levels"
     },
     "kinds": {
@@ -2728,15 +4117,18 @@
       }
      ],
      "default": null,
+     "description": "只列这些记录类型",
      "title": "Kinds"
     },
     "query": {
      "default": "",
+     "description": "按标题或 ID 匹配",
      "title": "Query",
      "type": "string"
     },
     "main_only": {
      "default": true,
+     "description": "true 时不列关联、复核等辅助记录",
      "title": "Main Only",
      "type": "boolean"
     },
@@ -2846,10 +4238,10 @@
   "name": "memory.contract",
   "group": "memory",
   "effect": "read",
-  "summary": "某类记录的草案契约：必填字段、payload 结构、写作要点和一份经校验的示例草案。写草案前先调用。",
+  "summary": "某类记录的草案契约：每个字段是 required / optional / conditional（以及省略时的默认值）、不要写的服务端字段、 payload 结构、写作要点和一份经校验的示例草案。写 memory_commit / memory_summary_save 的草案前先调用。",
   "input": {
    "additionalProperties": false,
-   "description": "某类记录的草案契约：必填字段、payload 结构、写作要点和一份经校验的示例草案。写草案前先调用。",
+   "description": "某类记录的草案契约：每个字段是 required / optional / conditional（以及省略时的默认值）、不要写的服务端字段、\npayload 结构、写作要点和一份经校验的示例草案。写 memory_commit / memory_summary_save 的草案前先调用。",
    "properties": {
     "kind": {
      "description": "记录类型，如 detail、narrative、experience、overview、checkpoint",
@@ -2888,6 +4280,7 @@
       }
      ],
      "default": null,
+     "description": "记录 ID（MEM-…）；不给时返回整个对象的当前快照",
      "title": "Record Id"
     },
     "revision": {
@@ -2900,6 +4293,7 @@
       }
      ],
      "default": null,
+     "description": "指定修订号；不给时取当前修订",
      "title": "Revision"
     }
    },
@@ -2914,10 +4308,10 @@
   "name": "memory.commit",
   "group": "memory",
   "effect": "write",
-  "summary": "保存一批记录（同一对象内原子提交）。dry_run=true 只预检不写入。",
+  "summary": "保存一批记录到一个对象（同一对象内原子提交，要么全写入要么都不写）。dry_run=true 只预检不写入。 草案必须写 kind、title、body_markdown、payload、sources、record_reason；owner_id、sensitivity、discovery、 keywords、provenance_gap、handle 可省略（由服务补上，修订时沿用原值）；修订已有记录时写 change_reason。 payload 结构随 kind 不同，写之前用 memory_contract(kind) 查字段与示例。引用一律写固定引用 （刚保存的记录用回执的 fixed_ref）。出错时 errors 一次列出所有问题，path 指向要改的参数位置。",
   "input": {
    "additionalProperties": false,
-   "description": "保存一批记录（同一对象内原子提交）。dry_run=true 只预检不写入。",
+   "description": "保存一批记录到一个对象（同一对象内原子提交，要么全写入要么都不写）。dry_run=true 只预检不写入。",
    "properties": {
     "owner_id": {
      "description": "对象 ID，如 RES-…、PRJ-…、RUN-…",
@@ -2925,11 +4319,121 @@
      "type": "string"
     },
     "operations": {
-     "description": "操作列表：新建 {op:'put_record', client_key, draft}；修订 {op:'put_record', record_id, expected_revision, draft}。draft 的字段与示例用 memory.contract(kind) 查询；批内引用可写 {client_key: 'x'}",
+     "description": "操作列表。新建 {op:'put_record', client_key, draft}；修订 {op:'put_record', record_id, expected_revision（当前修订号）, draft（完整的新内容）}；client_key 与 record_id 二选一。同批新记录之间用 {client_key: 'x'} 引用",
+     "examples": [
+      [
+       {
+        "client_key": "new-question",
+        "draft": {
+         "body_markdown": "",
+         "keywords": [],
+         "kind": "question",
+         "payload": {
+          "decision_affected": "扩展研究选用哪种求和作对照",
+          "missing_evidence": [
+           "成对求和实验结果"
+          ],
+          "missing_refs": [],
+          "question": "成对求和在抵消输入上的误差是否显著小于顺序与补偿",
+          "reopen_reason": null,
+          "replacement_ref": null,
+          "resolution_refs": [],
+          "status": "open"
+         },
+         "provenance_gap": null,
+         "record_reason": "记录未决问题",
+         "sources": [
+          {
+           "locator": "record",
+           "relation": "references",
+           "revision": 6,
+           "sha256": "e5fc7cb2327f0b0412166c545c6ae9e862dad0692c0038775dcb4deb0766e3c2",
+           "target_id": "MEM-58fd845a-05a5-516c-8bbe-c88d887cbb91",
+           "target_kind": "record"
+          }
+         ],
+         "title": "成对求和在抵消输入上是否更稳健"
+        },
+        "op": "put_record"
+       }
+      ],
+      [
+       {
+        "draft": {
+         "body_markdown": "",
+         "change_reason": "补上缺失证据的说明",
+         "keywords": [],
+         "kind": "question",
+         "payload": {
+          "decision_affected": "扩展研究选用哪种求和作对照",
+          "missing_evidence": [
+           "成对求和实验结果"
+          ],
+          "missing_refs": [],
+          "question": "成对求和在抵消输入上的误差是否显著小于顺序与补偿",
+          "reopen_reason": null,
+          "replacement_ref": null,
+          "resolution_refs": [],
+          "status": "open"
+         },
+         "provenance_gap": null,
+         "record_reason": "记录未决问题",
+         "sources": [
+          {
+           "locator": "record",
+           "relation": "references",
+           "revision": 6,
+           "sha256": "e5fc7cb2327f0b0412166c545c6ae9e862dad0692c0038775dcb4deb0766e3c2",
+           "target_id": "MEM-58fd845a-05a5-516c-8bbe-c88d887cbb91",
+           "target_kind": "record"
+          }
+         ],
+         "title": "成对求和在抵消输入上是否更稳健"
+        },
+        "expected_revision": 2,
+        "op": "put_record",
+        "record_id": "MEM-58fd845a-05a5-516c-8bbe-c88d887cbb91"
+       }
+      ]
+     ],
      "items": {
-      "additionalProperties": true,
+      "additionalProperties": false,
+      "properties": {
+       "op": {
+        "enum": [
+         "put_record",
+         "transition_question",
+         "set_policy",
+         "decide_association",
+         "save_checkpoint"
+        ]
+       },
+       "client_key": {
+        "minLength": 1,
+        "type": "string"
+       },
+       "record_id": {
+        "minLength": 1,
+        "type": "string"
+       },
+       "expected_revision": {
+        "type": "integer"
+       },
+       "draft": {
+        "description": "记录草案（对象）。至少写 kind、title、body_markdown、payload、sources、record_reason；owner_id、sensitivity、discovery 可省略（由服务补上）；修订已有记录时写 change_reason。payload 的结构随 kind 不同，写之前用 memory_contract(kind) 查字段和示例",
+        "type": "object"
+       },
+       "repin": {
+        "type": "boolean"
+       }
+      },
+      "required": [
+       "op",
+       "draft"
+      ],
       "type": "object"
      },
+     "minItems": 1,
      "title": "Operations",
      "type": "array"
     },
@@ -2942,7 +4446,7 @@
        "type": "null"
       }
      ],
-     "description": "提交前看到的 HEAD commit_id；新对象为 null",
+     "description": "提交前看到的对象 HEAD commit_id（memory_inspect / memory_resume 返回）；新对象为 null",
      "title": "Expected Head"
     },
     "request_id": {
@@ -2960,13 +4464,59 @@
     },
     "dry_run": {
      "default": false,
+     "description": "true 只预检、不写入；回执与正式提交相同",
      "title": "Dry Run",
      "type": "boolean"
     },
     "attribution": {
      "anyOf": [
       {
-       "additionalProperties": true,
+       "additionalProperties": false,
+       "description": "归属确认点（本任务第一次往该对象保存）时必填：{action: continue|create, decided_by: user|ai, reason, rejected?: [{owner_id, reason}]}；rejected 写完整阅读后放弃的对象。之后的保存不再填写",
+       "properties": {
+        "action": {
+         "enum": [
+          "continue",
+          "create"
+         ]
+        },
+        "decided_by": {
+         "enum": [
+          "user",
+          "ai"
+         ]
+        },
+        "reason": {
+         "minLength": 1,
+         "type": "string"
+        },
+        "rejected": {
+         "items": {
+          "additionalProperties": false,
+          "properties": {
+           "owner_id": {
+            "minLength": 1,
+            "type": "string"
+           },
+           "reason": {
+            "minLength": 1,
+            "type": "string"
+           }
+          },
+          "required": [
+           "owner_id",
+           "reason"
+          ],
+          "type": "object"
+         },
+         "type": "array"
+        }
+       },
+       "required": [
+        "action",
+        "decided_by",
+        "reason"
+       ],
        "type": "object"
       },
       {
@@ -3003,6 +4553,7 @@
     },
     "view": {
      "default": "full",
+     "description": "full 完整文稿；outline 目录；section 单章上下文包（改写某章用）；impact 依据变化的影响",
      "enum": [
       "full",
       "outline",
@@ -3014,6 +4565,7 @@
     },
     "document_type": {
      "default": "research_process",
+     "description": "research_process 完整过程稿；research_report 精简报告",
      "enum": [
       "research_process",
       "research_report"
@@ -3031,6 +4583,7 @@
       }
      ],
      "default": null,
+     "description": "文稿根记录 ID；对象有多份同类文稿时指定",
      "title": "Document Id"
     },
     "section_id": {
@@ -3043,10 +4596,12 @@
       }
      ],
      "default": null,
+     "description": "view=section 时必填：章节记录 ID",
      "title": "Section Id"
     },
     "max_chars": {
      "default": 20000,
+     "description": "返回正文的字符上限",
      "title": "Max Chars",
      "type": "integer"
     }
@@ -3294,6 +4849,7 @@
       }
      ],
      "default": null,
+     "description": "从这个提交之后算变化；不给时从上次巩固算起",
      "title": "Since Commit"
     }
    },
@@ -3377,6 +4933,7 @@
    "description": "跨对象总结的固定材料包（不生成总结）。",
    "properties": {
     "owner_ids": {
+     "description": "要总结的对象 ID",
      "items": {
       "type": "string"
      },
@@ -3396,6 +4953,7 @@
       }
      ],
      "default": null,
+     "description": "不放进材料包的对象或记录 ID",
      "title": "Exclude Ids"
     }
    },
@@ -3410,10 +4968,10 @@
   "name": "memory.summary_save",
   "group": "memory",
   "effect": "write",
-  "summary": "把写好的总结保存为本对象的 L3/L4；依据对象有新提交则拒绝。",
+  "summary": "把写好的跨对象总结保存为本对象的 L3（experience）或 L4（overview）。依据对象在准备材料后有新提交则拒绝， 不用旧材料覆盖新结果。修订已有总结时给 record_id、expected_revision，并在草案中写 change_reason。",
   "input": {
    "additionalProperties": false,
-   "description": "把写好的总结保存为本对象的 L3/L4；依据对象有新提交则拒绝。",
+   "description": "把写好的跨对象总结保存为本对象的 L3（experience）或 L4（overview）。依据对象在准备材料后有新提交则拒绝，\n不用旧材料覆盖新结果。修订已有总结时给 record_id、expected_revision，并在草案中写 change_reason。",
    "properties": {
     "owner_id": {
      "description": "对象 ID，如 RES-…、PRJ-…、RUN-…",
@@ -3422,6 +4980,7 @@
     },
     "draft": {
      "additionalProperties": true,
+     "description": "kind 为 experience（L3）或 overview（L4）的完整草案；记录草案（对象）。至少写 kind、title、body_markdown、payload、sources、record_reason；owner_id、sensitivity、discovery 可省略（由服务补上）；修订已有记录时写 change_reason。payload 的结构随 kind 不同，写之前用 memory_contract(kind) 查字段和示例",
      "title": "Draft",
      "type": "object"
     },
@@ -3436,6 +4995,7 @@
        }
       ]
      },
+     "description": "memory_summary_materials 返回的 basis_heads（各依据对象当时的 HEAD），原样传回；任何一个对象之后有新提交都会拒绝（STALE_BASIS），需要重新准备材料",
      "title": "Basis Heads",
      "type": "object"
     },
@@ -3449,6 +5009,7 @@
       }
      ],
      "default": null,
+     "description": "修订已有总结时填它的记录 ID；新建不填",
      "title": "Record Id"
     },
     "expected_revision": {
@@ -3461,10 +5022,12 @@
       }
      ],
      "default": null,
+     "description": "修订时填当前修订号；新建不填",
      "title": "Expected Revision"
     },
     "dry_run": {
      "default": false,
+     "description": "true 只预检、不写入",
      "title": "Dry Run",
      "type": "boolean"
     }
@@ -3770,6 +5333,7 @@
    "description": "独立检索材料并核对固定版本，返回第一页候选；不建立阅读会话、不进入工作台阅读页。\n用户查询主题相关知识、找已有经验时默认先 reading_start（简查 quick、完整阅读 standard）；\n只有明确只要片段/候选列表或低层查询时直接使用本工具。候选不是已读正文。",
    "properties": {
     "question": {
+     "description": "要查的问题，一句话，保留型号与数值原文",
      "title": "Question",
      "type": "string"
     },
@@ -3786,6 +5350,7 @@
       }
      ],
      "default": null,
+     "description": "词法检索用的关键词；不给时按问题切词",
      "title": "Keywords"
     },
     "content_source": {
@@ -3809,10 +5374,12 @@
        "type": "null"
       }
      ],
-     "default": null
+     "default": null,
+     "description": "限定检索范围（对象、层级、类型等）；不给时全库"
     },
     "review_filter": {
      "default": "all",
+     "description": "all（默认，带复核徽标）/ reviewed_only / exclude_unsafe / unreviewed_only",
      "enum": [
       "all",
       "reviewed_only",
@@ -3824,6 +5391,7 @@
     },
     "purpose": {
      "default": "exploration",
+     "description": "exploration 探索；formal 正式使用（只返回在 applicability 范围内已接受的结论）",
      "enum": [
       "exploration",
       "formal"
@@ -3839,6 +5407,7 @@
     },
     "freshness": {
      "default": "current",
+     "description": "current 只用与当前版本一致的结果；allow_stale 允许索引落后时的结果（会标注）",
      "enum": [
       "current",
       "allow_stale"
@@ -3864,10 +5433,12 @@
       }
      ],
      "default": null,
+     "description": "检索通道，默认 identity + lexical + dense",
      "title": "Channels"
     },
     "context_reach": {
      "default": "any_readable",
+     "description": "组包时依据可以来自任何可读对象，或只来自同一范围",
      "enum": [
       "any_readable",
       "same_scope"
@@ -3885,6 +5456,7 @@
       }
      ],
      "default": null,
+     "description": "每页候选数上限",
      "title": "Result Limit"
     },
     "budget": {
@@ -3896,7 +5468,8 @@
        "type": "null"
       }
      ],
-     "default": null
+     "default": null,
+     "description": "本次查询的预算（字符、节点等）；不给时用配置默认"
     },
     "query_id": {
      "anyOf": [
@@ -3908,6 +5481,7 @@
       }
      ],
      "default": null,
+     "description": "可选：自定查询 ID（重试时沿用）",
      "title": "Query Id"
     }
    },
@@ -3928,7 +5502,7 @@
    "description": "下一页候选（沿用原范围与累计预算）。",
    "properties": {
     "query_id": {
-     "description": "query.search 返回的 query_id",
+     "description": "query_search 返回的 query_id",
      "title": "Query Id",
      "type": "string"
     },
@@ -3962,7 +5536,7 @@
    "description": "取消查询（已完成部分保留）。",
    "properties": {
     "query_id": {
-     "description": "query.search 返回的 query_id",
+     "description": "query_search 返回的 query_id",
      "title": "Query Id",
      "type": "string"
     }
@@ -3984,7 +5558,7 @@
    "description": "把所选候选组合成阅读包：正文 + 必要依据（+ 已采纳关联补充）；预算不足整块省略并报告。",
    "properties": {
     "query_id": {
-     "description": "query.search 返回的 query_id",
+     "description": "query_search 返回的 query_id",
      "title": "Query Id",
      "type": "string"
     },
@@ -3998,6 +5572,7 @@
     },
     "associations": {
      "default": false,
+     "description": "true 时补充已采纳关联指向的内容",
      "title": "Associations",
      "type": "boolean"
     }
@@ -4020,7 +5595,7 @@
    "description": "沿作者保存的固定引用展开：经验/概览 → 研究经过或技术依据。",
    "properties": {
     "query_id": {
-     "description": "query.search 返回的 query_id",
+     "description": "query_search 返回的 query_id",
      "title": "Query Id",
      "type": "string"
     },
@@ -4033,6 +5608,7 @@
      "type": "array"
     },
     "target": {
+     "description": "process 展开到研究经过（L2）；technical 展开到技术依据（L1）",
      "enum": [
       "process",
       "technical"
@@ -4060,7 +5636,7 @@
    "description": "沿已保存关系有界深化（节点/边/跳数计入预算）；可达不等于科学支持。",
    "properties": {
     "query_id": {
-     "description": "query.search 返回的 query_id",
+     "description": "query_search 返回的 query_id",
      "title": "Query Id",
      "type": "string"
     },
@@ -4116,7 +5692,7 @@
    "description": "返回候选所属对象的完整文稿（按文稿去重，保持章节顺序）。",
    "properties": {
     "query_id": {
-     "description": "query.search 返回的 query_id",
+     "description": "query_search 返回的 query_id",
      "title": "Query Id",
      "type": "string"
     },
@@ -4130,6 +5706,7 @@
     },
     "document_type": {
      "default": "research_process",
+     "description": "research_process 完整过程稿；research_report 精简报告",
      "enum": [
       "research_process",
       "research_report"
@@ -4216,10 +5793,51 @@
     "variants": {
      "anyOf": [
       {
+       "description": "最多 2 条等义改写 [{language: zh|en|other, question, lexical_terms?}]；技术问题建议补一条英文；型号、数值必须原样保留",
+       "examples": [
+        [
+         {
+          "language": "en",
+          "question": "Is pairwise summation more robust than Kahan on cancelling inputs?"
+         }
+        ]
+       ],
        "items": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+         "id": {
+          "description": "可选的改写编号",
+          "minLength": 1,
+          "type": "string"
+         },
+         "language": {
+          "enum": [
+           "zh",
+           "en",
+           "other"
+          ]
+         },
+         "question": {
+          "description": "等义改写的问句；型号、数值必须原样保留",
+          "minLength": 1,
+          "type": "string"
+         },
+         "lexical_terms": {
+          "description": "可选：词法检索用的关键词，不写按问句切词",
+          "items": {
+           "minLength": 1,
+           "type": "string"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "language",
+         "question"
+        ],
         "type": "object"
        },
+       "maxItems": 2,
        "type": "array"
       },
       {
@@ -4227,7 +5845,7 @@
       }
      ],
      "default": null,
-     "description": "最多 2 条等义改写 [{language: zh|en, question, lexical_terms?}]；技术问题建议补一条英文；型号、数值必须原样保留",
+     "description": "最多 2 条等义改写 [{language: zh|en|other, question, lexical_terms?}]；技术问题建议补一条英文；型号、数值必须原样保留",
      "title": "Variants"
     },
     "protected_terms": {
@@ -4294,10 +5912,71 @@
     "field_conditions": {
      "anyOf": [
       {
+       "description": "可选的显式字段条件，最多 16 条：[{id, kind: literal|numeric, field, operator: eq|ne|lt|le|gt|ge, expected, unit?}]。只在原文的“字段：值”中核对，冲突的对象排后、不删除",
+       "examples": [
+        [
+         {
+          "expected": 85,
+          "field": "工作温度",
+          "id": "c1",
+          "kind": "numeric",
+          "operator": "le",
+          "unit": "°C"
+         }
+        ]
+       ],
        "items": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+         "id": {
+          "minLength": 1,
+          "type": "string"
+         },
+         "kind": {
+          "enum": [
+           "literal",
+           "numeric"
+          ]
+         },
+         "field": {
+          "description": "原文“字段：值”中的字段名",
+          "minLength": 1,
+          "type": "string"
+         },
+         "operator": {
+          "description": "literal 只能用 eq/ne",
+          "enum": [
+           "eq",
+           "ne",
+           "lt",
+           "le",
+           "gt",
+           "ge"
+          ]
+         },
+         "expected": {
+          "description": "literal 写文本，numeric 写数值",
+          "type": [
+           "string",
+           "number"
+          ]
+         },
+         "unit": {
+          "description": "仅 numeric 可写，如 °C、kPa",
+          "minLength": 1,
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "kind",
+         "field",
+         "operator",
+         "expected"
+        ],
         "type": "object"
        },
+       "maxItems": 16,
        "type": "array"
       },
       {
@@ -4332,10 +6011,64 @@
     },
     "judgments": {
      "description": "[{owner_id, verdict, reason, digest, accepted_windows?}]。verdict：relevant=窗口显示它能回答问题或提供必要依据，值得完整阅读；uncertain=信息不足以判断，先 reading_peek 或交给用户；irrelevant=明确无关。reason 写依据窗口里的什么内容；digest 原样抄筛选包的 digest；quick 策略在 accepted_windows 列出可作为笔记依据的窗口 entry_id",
+     "examples": [
+      [
+       {
+        "digest": "9f2c41d0",
+        "owner_id": "RES-FLOATING-POINT-SUMMATION",
+        "reason": "窗口给出了 Kahan 求和在抵消输入上的实测误差",
+        "verdict": "relevant"
+       },
+       {
+        "digest": "4be07a13",
+        "owner_id": "PRJ-SENSOR-FUSION",
+        "reason": "只提到求和这个词，内容是滤波参数",
+        "verdict": "irrelevant"
+       }
+      ]
+     ],
      "items": {
-      "additionalProperties": true,
+      "additionalProperties": false,
+      "properties": {
+       "owner_id": {
+        "minLength": 1,
+        "type": "string"
+       },
+       "verdict": {
+        "enum": [
+         "relevant",
+         "uncertain",
+         "irrelevant"
+        ]
+       },
+       "reason": {
+        "description": "依据窗口里的什么内容做出判断",
+        "minLength": 1,
+        "type": "string"
+       },
+       "digest": {
+        "description": "原样抄筛选包的 digest",
+        "minLength": 1,
+        "type": "string"
+       },
+       "accepted_windows": {
+        "description": "仅 quick 策略：可作为笔记依据的窗口 entry_id",
+        "items": {
+         "minLength": 1,
+         "type": "string"
+        },
+        "type": "array"
+       }
+      },
+      "required": [
+       "owner_id",
+       "verdict",
+       "reason",
+       "digest"
+      ],
       "type": "object"
      },
+     "minItems": 1,
      "title": "Judgments",
      "type": "array"
     },
@@ -4376,6 +6109,7 @@
      "type": "string"
     },
     "owner_id": {
+     "description": "本会话筛选结果中的对象 ID",
      "title": "Owner Id",
      "type": "string"
     }
@@ -4403,11 +6137,13 @@
      "type": "string"
     },
     "owner_id": {
+     "description": "本会话筛选结果中的对象 ID",
      "title": "Owner Id",
      "type": "string"
     },
     "page": {
      "default": 1,
+     "description": "页码，从 1 起；按上次返回的 unread_pages 依次读完",
      "title": "Page",
      "type": "integer"
     },
@@ -4452,6 +6188,7 @@
      "type": "string"
     },
     "owner_id": {
+     "description": "本会话筛选结果中的对象 ID",
      "title": "Owner Id",
      "type": "string"
     },
@@ -4487,10 +6224,28 @@
     "expand_from": {
      "anyOf": [
       {
+       "description": "可选的扩展锚点 [{ref, why}]，最多 3 个：ref 是本笔记 sources 中值得顺着关系去追的节点（例如该块引用了另一项目的实测、该结论有待查的反例），why 写原因。没有值得追的就不写；写了锚点时，联想优先从锚点出发",
        "items": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+         "ref": {
+          "description": "本笔记 sources 中的一项",
+          "minLength": 1,
+          "type": "string"
+         },
+         "why": {
+          "description": "为什么值得顺着关系去追",
+          "minLength": 1,
+          "type": "string"
+         }
+        },
+        "required": [
+         "ref",
+         "why"
+        ],
         "type": "object"
        },
+       "maxItems": 3,
        "type": "array"
       },
       {
@@ -4540,10 +6295,12 @@
      "type": "string"
     },
     "note": {
+     "description": "跨对象综合笔记（Markdown）：比较、归纳各对象的知识，关键句旁就近标出处 ID；不重复问题，不写操作计划",
      "title": "Note",
      "type": "string"
     },
     "sources": {
+     "description": "出处 ID：必须是本会话交付过的 L1 块（MEM-…#块ID）、结论（CLM-…）、记录或 SRC-…",
      "items": {
       "type": "string"
      },
@@ -4551,6 +6308,7 @@
      "type": "array"
     },
     "owner_ids": {
+     "description": "综合了哪些对象的笔记（这些对象必须已有单篇笔记）",
      "items": {
       "type": "string"
      },
@@ -4596,6 +6354,7 @@
      "type": "string"
     },
     "kind": {
+     "description": "请求类型，含义见工具说明",
      "enum": [
       "fulltext",
       "broaden",
@@ -4606,6 +6365,7 @@
      "type": "string"
     },
     "prompt": {
+     "description": "给用户看的问题：写清要什么、为什么、批准后会怎样",
      "title": "Prompt",
      "type": "string"
     },
@@ -4622,6 +6382,7 @@
       }
      ],
      "default": null,
+     "description": "可选的候选答案",
      "title": "Options"
     },
     "request_id": {
@@ -4662,6 +6423,7 @@
      "type": "string"
     },
     "mode": {
+     "description": "fulltext 全文补偿、broaden 扩大检索（两者都要用户批准）；association 联想（仅 associative 策略）",
      "enum": [
       "fulltext",
       "broaden",
@@ -4712,10 +6474,51 @@
     "variants": {
      "anyOf": [
       {
+       "description": "最多 2 条等义改写 [{language: zh|en|other, question, lexical_terms?}]；技术问题建议补一条英文；型号、数值必须原样保留",
+       "examples": [
+        [
+         {
+          "language": "en",
+          "question": "Is pairwise summation more robust than Kahan on cancelling inputs?"
+         }
+        ]
+       ],
        "items": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+         "id": {
+          "description": "可选的改写编号",
+          "minLength": 1,
+          "type": "string"
+         },
+         "language": {
+          "enum": [
+           "zh",
+           "en",
+           "other"
+          ]
+         },
+         "question": {
+          "description": "等义改写的问句；型号、数值必须原样保留",
+          "minLength": 1,
+          "type": "string"
+         },
+         "lexical_terms": {
+          "description": "可选：词法检索用的关键词，不写按问句切词",
+          "items": {
+           "minLength": 1,
+           "type": "string"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "language",
+         "question"
+        ],
         "type": "object"
        },
+       "maxItems": 2,
        "type": "array"
       },
       {
@@ -4723,7 +6526,7 @@
       }
      ],
      "default": null,
-     "description": "broaden 模式可选：新问法的等义改写",
+     "description": "最多 2 条等义改写 [{language: zh|en|other, question, lexical_terms?}]；技术问题建议补一条英文；型号、数值必须原样保留",
      "title": "Variants"
     },
     "protected_terms": {
@@ -4855,6 +6658,7 @@
      "type": "string"
     },
     "host_supports_subagents": {
+     "description": "宿主能否派子 agent；不能时返回由你自己执行的步骤",
      "title": "Host Supports Subagents",
      "type": "boolean"
     }
@@ -4886,6 +6690,7 @@
       }
      ],
      "default": null,
+     "description": "只看该状态的会话",
      "title": "Status"
     },
     "owner_id": {
@@ -4898,6 +6703,7 @@
       }
      ],
      "default": null,
+     "description": "只看服务于该对象的会话",
      "title": "Owner Id"
     },
     "limit": {
@@ -5171,12 +6977,13 @@
      "type": "object"
     },
     "expected_revision": {
-     "description": "config.get 返回的 revision",
+     "description": "config_get 返回的 revision",
      "title": "Expected Revision",
      "type": "string"
     },
     "dry_run": {
      "default": false,
+     "description": "true 只校验并返回将要生效的配置、不写入",
      "title": "Dry Run",
      "type": "boolean"
     }
@@ -5226,6 +7033,7 @@
    "description": "某对象各投影/通道的就绪状态（stale 表示落后于当前 HEAD）。",
    "properties": {
     "owner_id": {
+     "description": "对象 ID",
      "title": "Owner Id",
      "type": "string"
     }
@@ -5256,15 +7064,18 @@
       }
      ],
      "default": null,
+     "description": "只补这个对象；不给时补全部",
      "title": "Owner Id"
     },
     "force": {
      "default": false,
+     "description": "true 时即使水位已是最新也重建",
      "title": "Force",
      "type": "boolean"
     },
     "sources": {
      "default": true,
+     "description": "补全部对象时同时更新来源文件投影",
      "title": "Sources",
      "type": "boolean"
     }
@@ -5290,12 +7101,13 @@
   "name": "index.search",
   "group": "index",
   "effect": "read",
-  "summary": "直接检索投影（调试/诊断用；正式查询请用 query.search，它会回到固定版本核对）。",
+  "summary": "直接检索投影（调试/诊断用；正式查询请用 query_search，它会回到固定版本核对）。",
   "input": {
    "additionalProperties": false,
-   "description": "直接检索投影（调试/诊断用；正式查询请用 query.search，它会回到固定版本核对）。",
+   "description": "直接检索投影（调试/诊断用；正式查询请用 query_search，它会回到固定版本核对）。",
    "properties": {
     "query": {
+     "description": "检索文本",
      "title": "Query",
      "type": "string"
     },
@@ -5450,10 +7262,33 @@
       }
      ],
      "default": null,
+     "description": "只列这些分组，如 memory、reading",
      "title": "Groups"
     }
    },
    "title": "system_ops_input",
+   "type": "object"
+  }
+ },
+ {
+  "name": "system.tool_errors",
+  "group": "system",
+  "effect": "read",
+  "summary": "最近被拒绝的工具调用与内部错误，按工具汇总（R20 D-10）：参数错误（input）、其他拒绝（other）、内部错误（internal） 的次数和最常出错的参数路径，以及最近的内部错误 incident_id。参数错误多的工具，说明说明或示例需要改；不含参数内容。",
+  "input": {
+   "additionalProperties": false,
+   "description": "最近被拒绝的工具调用与内部错误，按工具汇总（R20 D-10）：参数错误（input）、其他拒绝（other）、内部错误（internal）\n的次数和最常出错的参数路径，以及最近的内部错误 incident_id。参数错误多的工具，说明说明或示例需要改；不含参数内容。",
+   "properties": {
+    "limit": {
+     "default": 2000,
+     "description": "最多统计最近多少条",
+     "maximum": 20000,
+     "minimum": 1,
+     "title": "Limit",
+     "type": "integer"
+    }
+   },
+   "title": "system_tool_errors_input",
    "type": "object"
   }
  }

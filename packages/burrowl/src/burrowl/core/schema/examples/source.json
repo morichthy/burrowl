@@ -1,11 +1,10 @@
 {
   "kind": "source",
-  "note": "L0 原始依据：先用 sources.register 登记文件（得到 SRC-ID 与 sha256），再写这条登记说明。body_markdown 说明材料是什么、谁产生、怎么解释（列、单位、限制）；原件不改，未展开原件不能声称已核验全文。",
+  "note": "L0 原始依据：先用 sources_register 登记文件（得到 SRC-ID 与 sha256），再写这条登记说明。body_markdown 说明材料是什么、谁产生、怎么解释（列、单位、限制）；原件不改，未展开原件不能声称已核验全文。",
   "operation": {
     "op": "put_record",
     "client_key": "new-source",
     "draft": {
-      "owner_id": "RES-FLOATING-POINT-SUMMATION",
       "kind": "source",
       "title": "第一轮原始结果：单位增量与抵消（登记说明）",
       "keywords": [
@@ -14,7 +13,6 @@
       ],
       "body_markdown": "第一轮实验脚本输出的原始结果表：顺序求和与 Kahan 补偿求和在三项抵消输入上的逐步累加值。列依次为步号、累加值、精确参考值，数值无量纲。本条只登记原件，不给结论。",
       "record_reason": "登记第一轮原始结果，供技术单元固定引用",
-      "sensitivity": "internal",
       "sources": [
         {
           "target_kind": "file",

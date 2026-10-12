@@ -26,7 +26,8 @@ const entries = [];
 for (const op of ops) {
   const space = pascal(op.name);
   const schema = { ...stripTitles(op.input), title: "Args", additionalProperties: false };
-  const body = await compile(schema, "Args", { bannerComment: "", additionalProperties: false });
+  // maxItems: -1：列表上限（如最多 10 步）不展开成逐个长度的元组联合，否则生成文件膨胀上万行
+  const body = await compile(schema, "Args", { bannerComment: "", additionalProperties: false, maxItems: -1 });
   out += `export declare namespace ${space} {\n${body.replace(/^/gm, "  ").trimEnd()}\n}\n\n`;
   entries.push(`  "${op.name}": ${space}.Args;`);
 }

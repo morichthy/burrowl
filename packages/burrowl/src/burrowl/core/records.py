@@ -59,20 +59,22 @@ REF_SHAPE = "{target_kind: record|file|owner|claim, target_id, revision, sha256,
 def require_ref(value: Any, field: str) -> dict:
     """入口参数里的固定引用必须是完整的引用对象；只写一个 ID 字符串时给出参数错误，而不是在深处报内部错误。"""
     if not isinstance(value, dict) or value.get("target_kind") not in {"record", "file", "owner", "claim"}             or not isinstance(value.get("target_id"), str) or not value["target_id"]:
+        hint = "记录引用取 memory_inspect 中的 revision 与 record_hash，或提交回执的 fixed_ref；检索命中可直接用其 ref"
         raise BurrowlError("INVALID_ARGUMENT", f"{field} 必须是固定引用对象，不能只写 ID",
-                           {"field": field, "expected": REF_SHAPE,
-                            "hint": "记录引用取 memory.inspect 中的 revision 与 record_hash；检索命中可直接用其 ref"})
+                           {"field": field, "expected": REF_SHAPE, "hint": hint},
+                           errors=[schema_error("/" + field.replace(".", "/"), "必须是固定引用对象，不能只写 ID",
+                                                "INVALID_ARGUMENT", expected=REF_SHAPE, hint=hint)])
     return value
 
 
 def handle_errors(handle: object) -> str | None:
     """handle 的书写规则（同一对象内唯一由服务层检查）；合规返回 None。"""
     if not isinstance(handle, str) or not handle.strip() or handle != handle.strip():
-        return "Handle must be a non-empty string without leading or trailing spaces"
+        return "handle 必须是非空字符串，首尾不能有空格"
     if len(handle) > HANDLE_MAX:
-        return f"Handle must be at most {HANDLE_MAX} characters"
+        return f"handle 最多 {HANDLE_MAX} 个字符"
     if HANDLE_FORBIDDEN & set(handle) or any(ch.isspace() for ch in handle):
-        return "Handle cannot contain spaces or any of / # | [ ] @ !"
+        return "handle 不能含空格和 / # | [ ] @ !"
     return None
 
 
@@ -91,14 +93,14 @@ def _reference_errors(record: dict, resolver: Resolver | None) -> list[dict]:
     def check_ref(ref: dict, path: str) -> None:
         revision = ref.get("revision")
         if revision is not None and (type(revision) is not int or revision < 1):
-            errors.append(schema_error(path + "/revision", "Fixed revisions must be positive integers"))
+            errors.append(schema_error(path + "/revision", "固定修订号必须是正整数"))
         if ref["target_kind"] == "record":
             if type(revision) is not int or revision < 1:
-                errors.append(schema_error(path + "/revision", "Record references need a positive fixed revision"))
+                errors.append(schema_error(path + "/revision", "引用记录要写固定修订号（正整数，取 memory_inspect 的 revision 或提交回执的 fixed_ref）"))
         elif not is_sha256(ref.get("sha256")):
-            errors.append(schema_error(path + "/sha256", "Reference needs a SHA-256 fingerprint"))
+            errors.append(schema_error(path + "/sha256", "引用要写 SHA-256 指纹（文件取 sources_list 的 sha256，对象取业务卡指纹）"))
         if ref.get("sha256") is not None and not is_sha256(ref["sha256"]):
-            errors.append(schema_error(path + "/sha256", "Invalid SHA-256"))
+            errors.append(schema_error(path + "/sha256", "不是有效的 SHA-256（64 位十六进制）"))
         if resolver is None:
             return
         try:
@@ -107,18 +109,18 @@ def _reference_errors(record: dict, resolver: Resolver | None) -> list[dict]:
                 raise LookupError
         except (LookupError, ValueError):
             # 回调异常可能含原文或私有路径，只返回安全文本。
-            errors.append(schema_error(path, "Reference target could not be resolved", "UNRESOLVED_REFERENCE"))
+            errors.append(schema_error(path, "引用目标无法解析：ID、修订号或指纹与当前存储不符，或目标不可读", "UNRESOLVED_REFERENCE"))
             return
         match = re.fullmatch(r"/payload/(process_refs|technical_refs|experience_refs)/\d+", path)
         if match:
             expected = LINK_ROLES[match[1]]
             if not isinstance(resolved, dict) or resolved.get("kind") != expected:
-                errors.append(schema_error(path, "Content link resolves to the wrong content role"))
+                errors.append(schema_error(path, "内容链接指向的记录类型不对（process_refs→narrative，technical_refs→detail，experience_refs→experience）"))
             elif str(ref.get("locator") or "").startswith("block:"):
                 block_id = ref["locator"][6:]
                 if expected != "detail" or not any(
                         b.get("block_id") == block_id for b in resolved.get("payload", {}).get("blocks", [])):
-                    errors.append(schema_error(path + "/locator", "Content link names a missing technical block"))
+                    errors.append(schema_error(path + "/locator", "内容链接指定的技术块不存在"))
 
     def walk(value: Any, path: str) -> None:
         if isinstance(value, dict):
@@ -126,7 +128,7 @@ def _reference_errors(record: dict, resolver: Resolver | None) -> list[dict]:
                 check_ref(value, path)
             for key, item in value.items():
                 if key.endswith("_at") and item is not None and not is_utc(item):
-                    errors.append(schema_error(pointer(path, key), "Expected RFC3339 UTC timestamp ending Z"))
+                    errors.append(schema_error(pointer(path, key), "时间必须是以 Z 结尾的 RFC3339 UTC 时间"))
                 walk(item, pointer(path, key))
         elif isinstance(value, list):
             for index, item in enumerate(value):
@@ -146,26 +148,26 @@ def _source_excerpt_errors(record: dict, read_source: SourceReader | None) -> li
         return []
     ref = payload["source_ref"]
     if not ref["locator"]:
-        return [schema_error("/payload/source_ref/locator", "An excerpt requires a precise locator")]
+        return [schema_error("/payload/source_ref/locator", "摘录必须给出精确位置（locator）")]
     if payload["acquisition"] != "verbatim_export":
         return []
     match = re.fullmatch(r"(lines|chars):(\d+)-(\d+)", ref["locator"])
     if not match or read_source is None:
         return [schema_error("/payload/source_ref/locator",
-                             "Verbatim export requires readable original text and lines:N-M or chars:N-M")]
+                             "逐字导出要求原文可读，且 locator 写成 lines:N-M 或 chars:N-M")]
     try:
         original = read_source(ref)
     except (ValueError, LookupError, OSError):
-        return [schema_error("/payload/source_ref", "Original text could not be read for comparison")]
+        return [schema_error("/payload/source_ref", "无法读取原文进行比对")]
     if not isinstance(original, str):
-        return [schema_error("/body_markdown", "Source is not text; use original_link")]
+        return [schema_error("/body_markdown", "来源不是文本，改用 original_link")]
     unit, first, last = match[1], int(match[2]), int(match[3])
     values: list[str] | str = original.splitlines(keepends=True) if unit == "lines" else original
     start, stop = (first - 1, last) if unit == "lines" else (first, last)
     if start < 0 or stop <= start or stop > len(values):
-        return [schema_error("/body_markdown", "Source locator is outside original text")]
+        return [schema_error("/body_markdown", "locator 超出了原文范围")]
     if "".join(values[start:stop]) != record["body_markdown"]:
-        return [schema_error("/body_markdown", "Body is not identical to the selected original text")]
+        return [schema_error("/body_markdown", "正文与所选原文不完全一致（逐字导出不能改动空白和换行）")]
     return []
 
 
@@ -180,84 +182,84 @@ def _domain_errors(record: dict, *, allow_review: bool) -> list[dict]:
         for position, ref in enumerate(p.get(name, [])):
             if ref["target_kind"] != "record" or type(ref.get("revision")) is not int or ref["revision"] < 1 \
                     or not is_sha256(ref.get("sha256")):
-                add(f"/payload/{name}/{position}", "Content links require fixed record revision and SHA-256")
+                add(f"/payload/{name}/{position}", "内容链接必须写固定的记录修订号和 SHA-256")
     if not record["sources"] and not record["provenance_gap"]:
-        add("/provenance_gap", "Explain missing provenance when sources are empty")
+        add("/provenance_gap", "sources 为空时要在 provenance_gap 说明依据缺口")
     if kind == "review":
         if not allow_review:
-            add("/kind", "Review records require the dedicated review service")
+            add("/kind", "复核记录只能通过 review_submit 写入")
         if not p["target_claim_id"].startswith("CLM-"):
-            add("/payload/target_claim_id", "Review target must be a claim identity")
+            add("/payload/target_claim_id", "复核目标必须是结论 ID（CLM-…）")
         if not is_sha256(p["target_content_hash"]):
-            add("/payload/target_content_hash", "Review must bind a SHA-256 content fingerprint")
+            add("/payload/target_content_hash", "复核必须绑定结论内容的 SHA-256")
         if p["state"] == "accepted" and (not p["scope"] or not p["evidence_refs"]):
-            add("/payload/evidence_refs", "Accepted review requires scope and evidence")
+            add("/payload/evidence_refs", "accepted 需要适用范围（scope）和支持性证据（evidence_refs）")
         if p["state"] == "superseded" and (not p["replacement_claim_id"]
                                            or p["replacement_claim_id"] == p["target_claim_id"]):
-            add("/payload/replacement_claim_id", "Superseded review needs a different replacement claim")
+            add("/payload/replacement_claim_id", "superseded 需要另一条替代结论（replacement_claim_id）")
     if "handle" in record and (problem := handle_errors(record["handle"])):
         add("/handle", problem)
     if kind == "wiki_page":
         if "slug" in p and not _WIKI_SLUG.fullmatch(p["slug"]):  # slug 可省略（R12 §4.6），提供时才校验
-            add("/payload/slug", "Wiki slug must be '<type>/<name>' in lowercase letters, digits and hyphens")
+            add("/payload/slug", "slug 必须写成 '<类型>/<名称>'，只用小写字母、数字和连字符")
         if len(p.get("category_path", [])) > 3:
-            add("/payload/category_path", "Category path has at most 3 levels")
+            add("/payload/category_path", "分类路径最多 3 级")
         status = p.get("status", "active")
         if (status == "merged") != ("merged_into" in p):
-            add("/payload/merged_into", "merged_into is required exactly when status is merged")
+            add("/payload/merged_into", "status 为 merged 时必须写 merged_into，其他状态不能写")
         if (status == "split") != ("split_into" in p):
-            add("/payload/split_into", "split_into is required exactly when status is split")
+            add("/payload/split_into", "status 为 split 时必须写 split_into，其他状态不能写")
         for index, ref in enumerate(p["source_refs"]):
             if not is_sha256(ref.get("sha256")) and not (ref["target_kind"] == "record" and type(ref.get("revision")) is int):
-                add(f"/payload/source_refs/{index}", "Wiki sources must be fixed references")
+                add(f"/payload/source_refs/{index}", "概念页的来源必须是固定引用")
     if kind == "association" and "origin" in p and not _ORIGIN.fullmatch(p["origin"]):
-        add("/payload/origin", "Origin must be human, ai, unknown or tool:<connector id>")
+        add("/payload/origin", "origin 只能是 human、ai、unknown 或 tool:<连接器 ID>")
     if kind == "review":
         maturity = p.get("maturity")
         if maturity == "established" and (p["state"] != "accepted" or not p["evidence_refs"]
                                           or "evidence_basis" not in p):
-            add("/payload/maturity", "Established maturity requires accepted state, evidence_basis and evidence")
+            add("/payload/maturity", "established 需要 accepted 状态、evidence_basis 和证据")
         if "evidence_basis" in p and maturity != "established":
-            add("/payload/evidence_basis", "evidence_basis only applies to established maturity")
+            add("/payload/evidence_basis", "evidence_basis 只用于 established")
         if "requested_maturity" in p and (p["state"] not in {"not-reviewed", "accepted"} or maturity == "established"):
-            add("/payload/requested_maturity", "A maturity request goes with not-reviewed or accepted, below established")
+            add("/payload/requested_maturity", "成熟度升级提议只能配合 not-reviewed 或 accepted，且当前不是 established")
     if kind == "association" and p["relation"] == "analogous_to":
         if not p["shared_structure"]:
-            add("/payload/shared_structure", "Analogy requires a shared problem structure")
+            add("/payload/shared_structure", "analogous_to 需要写共同的问题结构（shared_structure）")
         if not p["transfer_limits"]:
-            add("/payload/transfer_limits", "Analogy requires non-transferable boundaries")
+            add("/payload/transfer_limits", "analogous_to 需要写不可迁移的边界（transfer_limits）")
     if kind == "question" and p["status"] == "resolved" and not p["resolution_refs"]:
-        add("/payload/resolution_refs", "Resolved question requires fixed answer references", "INVALID_TRANSITION")
+        add("/payload/resolution_refs", "已解决的问题需要答案的固定引用（resolution_refs）", "INVALID_TRANSITION")
     if kind in ("question", "route") and p["status"] == "superseded" and (
             not p["replacement_ref"] or p["replacement_ref"]["target_id"] == record.get("record_id")):
-        add("/payload/replacement_ref", "Superseded item requires a different replacement", "INVALID_TRANSITION")
+        add("/payload/replacement_ref", "superseded 需要另一条替代项（replacement_ref）", "INVALID_TRANSITION")
     if kind == "route" and p["status"] == "blocked" and not p["blocker"]:
-        add("/payload/blocker", "Blocked route requires a blocker", "INVALID_TRANSITION")
+        add("/payload/blocker", "blocked 的路线需要写阻塞原因（blocker）", "INVALID_TRANSITION")
     if kind == "consolidation":
         remaining = {canonical_hash(r) for r in p["remaining_refs"]}
         for index, decision in enumerate(p["decisions"]):
             if decision["action"] == "defer" and canonical_hash(decision["target"]) not in remaining:
-                add(f"/payload/decisions/{index}", "Deferred target must remain in remaining_refs")
+                add(f"/payload/decisions/{index}", "defer 的目标必须留在 remaining_refs 中")
     claims = p.get("claims", [])
     block_ids = {b["block_id"] for b in p.get("blocks", [])} if kind == "detail" else set()
     for index, claim in enumerate(claims):
         if not claim["claim_id"].startswith("CLM-") or len(claim["claim_id"]) == 4:
-            add(f"/payload/claims/{index}/claim_id", "Claim ID must use CLM- prefix")
+            add(f"/payload/claims/{index}/claim_id", "结论 ID 必须以 CLM- 开头")
         if kind == "detail" and claim["kind"] not in L1_CLAIM_KINDS:
-            add(f"/payload/claims/{index}/kind", "L1 claims must be fact or calculation")
+            add(f"/payload/claims/{index}/kind", "L1 的结论只能是 fact 或 calculation")
         if "block_id" in claim and (kind != "detail" or claim["block_id"] not in block_ids):
-            add(f"/payload/claims/{index}/block_id", "block_id must name a block of this technical unit")
+            add(f"/payload/claims/{index}/block_id", "block_id 必须是本技术单元里的块")
         predicate = claim.get("relation", {}).get("predicate")
         if predicate is not None and predicate not in PREDICATES and not re.fullmatch(r"x-[a-z0-9_-]+", predicate):
-            add(f"/payload/claims/{index}/relation/predicate", "Unknown predicate; use the vocabulary or an x- prefix")
+            add(f"/payload/claims/{index}/relation/predicate", "未知谓词：用词表中的谓词，或以 x- 开头自定义")
     if len({c["claim_id"] for c in claims}) != len(claims):
-        add("/payload/claims", "Duplicate claim identity")
+        add("/payload/claims", "结论 ID 重复")
     if "revision" in record:
         revision = record["revision"]
         if revision < 1 or record.get("previous_revision") != (None if revision == 1 else revision - 1):
-            add("/previous_revision", "Revision chain must increment by one")
+            add("/previous_revision", "修订号必须逐一递增")
     if "record_id" in record and not _RECORD_ID.fullmatch(record["record_id"]):
-        add("/record_id", "Record ID must be a safe MEM- identity")
+        add("/record_id", "记录 ID 必须是合法的 MEM- 标识")
     return errors
 
 
@@ -281,13 +283,13 @@ def validate_record(draft: dict, *, resolver: Resolver | None = None, read_sourc
                     allow_review: bool = False) -> tuple[dict, list[dict]]:
     """返回 (规范化后的记录, 错误列表)。错误为空才可保存。"""
     if not isinstance(draft, dict):
-        return draft, [schema_error("", "Record must be an object")]
+        return draft, [schema_error("", "记录草案必须是对象")]
     record = normalize_draft(draft)
     kind = record.get("kind")
     if kind not in LEVELS:
-        return record, [schema_error("/kind", "Unknown record kind")]
+        return record, [schema_error("/kind", "未知的记录类型（用 memory_kinds 查看可用类型）")]
     if record["schema_version"] != current_versions()[kind]:
-        return record, [schema_error("/schema_version", "Only the current record version is accepted")]
+        return record, [schema_error("/schema_version", "只接受现行版本的记录（schema_version 不写即可）")]
     all_defs = defs()
     errors = validate(record, all_defs[definition_name(kind)], all_defs)
     if errors:
@@ -301,9 +303,9 @@ def validate_record(draft: dict, *, resolver: Resolver | None = None, read_sourc
     errors.extend(_reference_errors(record, resolver))
     errors.extend(_source_excerpt_errors(record, read_source))
     if "content_hash" in record and record["content_hash"] != content_hash(record):
-        errors.append(schema_error("/content_hash", "Stored hash does not match canonical content"))
+        errors.append(schema_error("/content_hash", "存储的指纹与内容不一致"))
     if "record_hash" in record and record["record_hash"] != record_hash(record):
-        errors.append(schema_error("/record_hash", "Stored hash does not match canonical content"))
+        errors.append(schema_error("/record_hash", "存储的指纹与内容不一致"))
     return record, errors
 
 
@@ -322,12 +324,12 @@ def validate_commit_request(request: dict, *, allow_review: bool = False) -> lis
         path = f"/operations/{index}"
         draft = operation["draft"]
         for key in sorted(SERVER_FIELDS & draft.keys()):
-            errors.append(schema_error(f"{path}/draft/{key}", "Server-owned field cannot be supplied in a request"))
+            errors.append(schema_error(f"{path}/draft/{key}", "这是服务端维护的字段，草案里不要写"))
         expected = OPERATION_KINDS.get(operation["op"])
         if (draft.get("kind") == "review" and not allow_review) or (expected and draft.get("kind") != expected):
-            errors.append(schema_error(path + "/draft/kind", "Operation does not permit this record kind"))
+            errors.append(schema_error(path + "/draft/kind", "这种操作不允许写这类记录"))
         creating, updating = "client_key" in operation, "record_id" in operation
         if creating == updating or (updating and operation.get("expected_revision", 0) < 1) \
                 or (creating and "expected_revision" in operation):
-            errors.append(schema_error(path, "Use client_key for creation or record_id and positive expected_revision for update"))
+            errors.append(schema_error(path, "新建写 client_key；修订写 record_id 和 expected_revision（当前修订号）；二者只能选一种"))
     return errors

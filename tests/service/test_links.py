@@ -233,8 +233,9 @@ def test_l1_claim_rules(sample_workspace):
         memory.commit(request(OWNER, head_of(memory, OWNER), {"op": "put_record", "record_id": record["record_id"],
                                                               "expected_revision": record["revision"], "draft": draft},
                               dry_run=True))
-    messages = {e["message"] for e in caught.value.errors}
-    assert {"L1 claims must be fact or calculation", "block_id must name a block of this technical unit"} <= messages
+    # R20 D-05：路径从提交参数的根算起，指向要改的草案字段
+    paths = {e["path"] for e in caught.value.errors}
+    assert {"/operations/0/draft/payload/claims/0/kind", "/operations/0/draft/payload/claims/0/block_id"} <= paths
 
 
 def test_concept_library_names_are_unique_and_feed_query_terms(tmp_path):

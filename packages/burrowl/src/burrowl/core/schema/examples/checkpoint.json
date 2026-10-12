@@ -1,17 +1,15 @@
 {
   "kind": "checkpoint",
-  "note": "检查点（level=null）：交接时点的状态：已完成什么、下一步、前提与停止原因。续接时 memory.resume 会读它。",
+  "note": "检查点（level=null）：交接时点的状态：已完成什么、下一步、前提与停止原因。续接时 memory_resume 会读它。",
   "operation": {
     "op": "put_record",
     "client_key": "new-checkpoint",
     "draft": {
-      "owner_id": "RES-FLOATING-POINT-SUMMATION",
       "kind": "checkpoint",
       "title": "三轮实验完成，扩展研究待开始",
       "keywords": [],
       "body_markdown": "",
       "record_reason": "保存交接检查点",
-      "sensitivity": "internal",
       "sources": [
         {
           "target_kind": "record",

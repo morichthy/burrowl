@@ -1,17 +1,15 @@
 {
   "kind": "association",
-  "note": "关联（level=null）：相似、对照、依赖等导航关系，不是证据。analogous_to 必须写 shared_structure 与 transfer_limits。certainty 写确定度（speculative / plausible / supported），origin 写提出者（human / ai）。通常先由 relations.candidates 产生候选，再用 relations.decide 处理；快速添加只给 from/to/explanation，自动设为 related_to + speculative。\"A 会影响 B\"这类可验证的判断写成结论，不写成关联。",
+  "note": "关联（level=null）：相似、对照、依赖等导航关系，不是证据。analogous_to 必须写 shared_structure 与 transfer_limits。certainty 写确定度（speculative / plausible / supported），origin 写提出者（human / ai）。通常先由 relations_candidates 产生候选，再用 relations_decide 处理；快速添加只给 from/to/explanation，自动设为 related_to + speculative。\"A 会影响 B\"这类可验证的判断写成结论，不写成关联。",
   "operation": {
     "op": "put_record",
     "client_key": "new-association",
     "draft": {
-      "owner_id": "RES-FLOATING-POINT-SUMMATION",
       "kind": "association",
       "title": "补偿经验与第三轮经过的同一失败模式",
       "keywords": [],
       "body_markdown": "",
       "record_reason": "登记导航关联",
-      "sensitivity": "internal",
       "sources": [
         {
           "target_kind": "record",

@@ -7,6 +7,7 @@ from ....core.config import ReviewFilter
 from ....core.errors import BurrowlError
 from ....services import health
 from ....storage import secrets
+from .. import errorlog
 from ..registry import Ctx, catalog, op
 
 
@@ -25,8 +26,8 @@ def config_schema(ctx: Ctx) -> dict:
 
 @op("config.update", effect="admin")
 def config_update(ctx: Ctx, patch: Annotated[dict, Field(description="JSON Merge Patch：只写要改的字段；null 恢复默认")],
-                  expected_revision: Annotated[str, Field(description="config.get 返回的 revision")],
-                  dry_run: bool = False) -> dict:
+                  expected_revision: Annotated[str, Field(description="config_get 返回的 revision")],
+                  dry_run: Annotated[bool, Field(description="true 只校验并返回将要生效的配置、不写入")] = False) -> dict:
     """修改配置（如数据库/索引位置、嵌入模型、向量后端、默认阅读策略、连接器）。返回需要的后续动作。"""
     return ctx.app.config.update(patch, expected_revision=expected_revision, dry_run=dry_run)
 
@@ -40,13 +41,15 @@ def secret_set(ctx: Ctx, secret_ref: Annotated[str, Field(pattern=r"^keyring:bur
 
 # ---------- 索引 ----------
 @op("index.status")
-def index_status(ctx: Ctx, owner_id: str) -> dict:
+def index_status(ctx: Ctx, owner_id: Annotated[str, Field(description="对象 ID")]) -> dict:
     """某对象各投影/通道的就绪状态（stale 表示落后于当前 HEAD）。"""
     return ctx.app.index.status(owner_id)
 
 
 @op("index.reconcile", effect="admin")
-def index_reconcile(ctx: Ctx, owner_id: str | None = None, force: bool = False, sources: bool = True) -> dict:
+def index_reconcile(ctx: Ctx, owner_id: Annotated[str | None, Field(description="只补这个对象；不给时补全部")] = None,
+                    force: Annotated[bool, Field(description="true 时即使水位已是最新也重建")] = False,
+                    sources: Annotated[bool, Field(description="补全部对象时同时更新来源文件投影")] = True) -> dict:
     """按当前 HEAD 补齐检索投影（不改记忆）；sources=true 同时更新来源文件投影。"""
     result = ctx.app.index.reconcile(owner_id, force=force)
     if sources and owner_id is None:
@@ -62,11 +65,11 @@ def index_gaps(ctx: Ctx) -> list:
 
 
 @op("index.search")
-def index_search(ctx: Ctx, query: str, corpus: Literal["fulltext", "discovery", "source"] = "fulltext",
+def index_search(ctx: Ctx, query: Annotated[str, Field(description="检索文本")], corpus: Literal["fulltext", "discovery", "source"] = "fulltext",
                  owner_ids: list[str] | None = None, levels: list[str] | None = None,
                  review_filter: ReviewFilter = "all", group: Literal["record", "owner"] = "record",
                  limit: int = 20) -> dict:
-    """直接检索投影（调试/诊断用；正式查询请用 query.search，它会回到固定版本核对）。"""
+    """直接检索投影（调试/诊断用；正式查询请用 query_search，它会回到固定版本核对）。"""
     return ctx.app.index.search(query, corpus=corpus, owner_ids=owner_ids, levels=levels,
                                 review_filter=review_filter, group=group, limit=limit)
 
@@ -98,6 +101,13 @@ def validate(ctx: Ctx) -> dict:
 
 
 @op("system.ops")
-def ops(ctx: Ctx, groups: list[str] | None = None) -> list:
+def ops(ctx: Ctx, groups: Annotated[list[str] | None, Field(description="只列这些分组，如 memory、reading")] = None) -> list:
     """全部操作的目录（名称、分组、读写类型、说明、参数 schema）。"""
     return catalog(groups)
+
+
+@op("system.tool_errors")
+def tool_errors(ctx: Ctx, limit: Annotated[int, Field(ge=1, le=20000, description="最多统计最近多少条")] = 2000) -> dict:
+    """最近被拒绝的工具调用与内部错误，按工具汇总（R20 D-10）：参数错误（input）、其他拒绝（other）、内部错误（internal）
+    的次数和最常出错的参数路径，以及最近的内部错误 incident_id。参数错误多的工具，说明说明或示例需要改；不含参数内容。"""
+    return errorlog.summary(ctx.app.root, limit=limit)

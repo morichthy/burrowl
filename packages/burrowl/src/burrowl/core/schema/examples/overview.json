@@ -5,7 +5,6 @@
     "op": "put_record",
     "client_key": "new-overview",
     "draft": {
-      "owner_id": "RES-FLOATING-POINT-SUMMATION",
       "kind": "overview",
       "title": "浮点求和数值稳定性研究概览",
       "keywords": [
@@ -14,7 +13,6 @@
       ],
       "body_markdown": "## 用途与范围\n\n研究有限 binary64 数列求和时顺序与补偿对误差的影响，重点是大数抵消场景。\n\n## 当前结果\n\n顺序与 Kahan 补偿在构造的抵消输入上都可能丢失小量；以有理数精确基准为判断依据。\n\n## 限制与未决\n\n只覆盖构造输入；随机输入与成对求和尚未研究。",
       "record_reason": "维护对象的顶层发现入口",
-      "sensitivity": "internal",
       "sources": [
         {
           "target_kind": "record",

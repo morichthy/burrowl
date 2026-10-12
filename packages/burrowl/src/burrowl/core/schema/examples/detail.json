@@ -5,7 +5,6 @@
     "op": "put_record",
     "client_key": "new-detail",
     "draft": {
-      "owner_id": "RES-FLOATING-POINT-SUMMATION",
       "kind": "detail",
       "title": "顺序求和误差的精确基准计算方法",
       "keywords": [
@@ -14,7 +13,6 @@
       ],
       "body_markdown": "",
       "record_reason": "保存可复用的基准计算方法",
-      "sensitivity": "internal",
       "sources": [
         {
           "target_kind": "file",

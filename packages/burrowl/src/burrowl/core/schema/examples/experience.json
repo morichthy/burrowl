@@ -5,7 +5,6 @@
     "op": "put_record",
     "client_key": "new-experience",
     "draft": {
-      "owner_id": "RES-FLOATING-POINT-SUMMATION",
       "kind": "experience",
       "title": "补偿求和不能替代抵消场景的精确基准",
       "keywords": [
@@ -14,7 +13,6 @@
       ],
       "body_markdown": "## 适用问题\n\n判断浮点求和结果在大数抵消输入上是否可信时。\n\n## 认识\n\n补偿求和能减小一般舍入误差，但在大数抵消、小量夹在中间的输入上仍可能丢失小量；下结论前应先用有理数精确基准核对。\n\n## 依据与边界\n\n依据第一轮与第三轮实验经过。只在有限 binary64 抵消输入上观察到；不能推出补偿求和在一般输入上无效。",
       "record_reason": "提炼可迁移到其他求和问题的经验",
-      "sensitivity": "internal",
       "sources": [
         {
           "target_kind": "record",

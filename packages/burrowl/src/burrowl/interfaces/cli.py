@@ -280,7 +280,11 @@ def skills_check() -> None:
     groups = {item["group"] for item in ops.values()}
     # 正文中用反引号写出的工具名，如 `reading_start` 或 `reading_start{...}`
     pattern = re.compile(rf"`((?:{'|'.join(sorted(groups))})_[a-z_]+)[`{{(]")
+    from ..core.schema import defs as record_defs  # noqa: PLC0415
+
     params = {name for item in ops.values() for name in item["input"].get("properties", {})}
+    # 记录草案的字段名（如 provenance_gap）也不是工具，只是恰好以工具组名开头
+    params |= {name for definition in record_defs().values() for name in definition.get("properties", {})}
     problems = []
     source = skills_source()
     for path in sorted([*source.glob("*/SKILL.md"), *source.glob("*.md")]):

@@ -8,9 +8,10 @@ import uuid
 from copy import deepcopy
 from typing import Any
 
+from ...core import contract as record_contract
 from ...core import links as link_syntax
 from ...core.clock import Clock, utc_now
-from ...core.errors import BurrowlError
+from ...core.errors import BurrowlError, rebase, schema_error
 from ...core.hashing import canonical_hash, sha256_bytes
 from ...core.ports import IndexSink, NullIndex
 from ...core.records import content_hash, record_hash, validate_commit_request, validate_record
@@ -110,7 +111,18 @@ class MemoryService:
             uuid.UUID(request["request_id"])
         except ValueError as exc:
             raise BurrowlError("INVALID_ARGUMENT", "request_id 必须为 UUID") from exc
-        return deepcopy(request)
+        request = deepcopy(request)
+        # R20 D-01：草案的 owner_id 就是提交的 owner_id，可以省略；写了别的对象才报错（一次提交只写一个对象）
+        owner_id = request["owner_id"]
+        wrong = [schema_error(f"/operations/{i}/draft/owner_id",
+                              f"第 {i + 1} 条草案写的是 {written}，本次提交的对象是 {owner_id}；"
+                              "草案的 owner_id 可以省略，写了就必须与提交的 owner_id 相同", expected=[owner_id])
+                 for i, operation in enumerate(request["operations"])
+                 if (written := operation["draft"].setdefault("owner_id", owner_id)) != owner_id]
+        if wrong:
+            raise BurrowlError("INVALID_SCHEMA", "草案的归属对象与本次提交不一致（一次提交只写一个对象）",
+                               {"owner_id": owner_id}, errors=wrong)
+        return request
 
     @staticmethod
     def _target(index: OwnerIndex, owner_id: str) -> Owner:
@@ -139,14 +151,14 @@ class MemoryService:
         for operation in request["operations"]:
             rid = ids[operation.get("client_key") or operation["record_id"]]
             draft = self._replace_client_keys(deepcopy(operation["draft"]), ids)
+            previous = snapshot.records.get(rid)
             if "discovery" not in draft:
                 # R19 D-02：修订沿用上一修订的可见范围，默认值变化不能静默改变已有记录；新记录按 D-01 取默认
-                previous = snapshot.records.get(rid)
                 draft["discovery"] = previous["discovery"] if previous else policy.discovery_for(draft.get("kind"),
                                                                                                  resolved)
-            if draft.get("owner_id") != owner_id:
-                raise BurrowlError("INVALID_SCHEMA", "单批只允许一个归属对象",
-                               errors=[{"path": "/owner_id", "message": "归属不匹配"}])
+            if "sensitivity" not in draft:
+                # R20 D-01：新记录默认 internal；修订沿用原值，不写就不会把 confidential 悄悄降成 internal
+                draft["sensitivity"] = previous["sensitivity"] if previous else "internal"
             old = snapshot.records.get(rid)
             if old and draft.get("kind") != old["kind"]:
                 raise BurrowlError("INVALID_SCHEMA", "不能改变已有记录的类型", {"record_id": rid})
@@ -166,18 +178,23 @@ class MemoryService:
             return raw.decode("utf-8-sig")
 
         changed, results = [], []
+        positions = {id(operation): i for i, operation in enumerate(request["operations"])}
         for operation, rid, draft, old in operations:
             record, errors = validate_record(draft, resolver=resolver, read_source=read_source,
                                              allow_review=allow_review)
             if errors:
-                raise BurrowlError(errors[0].get("code", "INVALID_SCHEMA"), "记录草案验证失败", errors=errors)
-            rules.validate_change(old, record, record_id=rid, resolve=resolver)
-            # R12 T-P2.2：解析正文链接并固定版本；没有链接时省略 links（D-27，保持旧记录指纹）
-            resolved = link_resolver.resolve(record, record_id=rid, previous=old.get("links") if old else None,
-                                             repin=bool(operation.get("repin")))
+                raise self._draft_error(errors, positions[id(operation)], draft.get("kind"))
+            try:
+                rules.validate_change(old, record, record_id=rid, resolve=resolver)
+                # R12 T-P2.2：解析正文链接并固定版本；没有链接时省略 links（D-27，保持旧记录指纹）
+                resolved = link_resolver.resolve(record, record_id=rid, previous=old.get("links") if old else None,
+                                                 repin=bool(operation.get("repin")))
+                self._check_sensitivity(record, resolver)
+            except BurrowlError as exc:  # R20 D-05：规则层的路径相对草案，补成从提交参数根算起
+                exc.errors = rebase(exc.errors, "", f"/operations/{positions[id(operation)]}/draft")
+                raise
             if resolved:
                 record["links"] = resolved
-            self._check_sensitivity(record, resolver)
             digest = content_hash(record)
             if old and digest == old["content_hash"]:
                 record, status = old, "no_change"
@@ -208,6 +225,22 @@ class MemoryService:
         return changed, results, resolver
 
     @staticmethod
+    def _draft_error(errors: list[dict], position: int, kind: object) -> BurrowlError:
+        """R20 D-05：草案错误一次列全，路径从工具参数根算起，缺字段时附上该字段的契约说明。"""
+        notes = record_contract.field_notes(kind) if isinstance(kind, str) else {}
+        base = f"/operations/{position}/draft"
+        detailed = []
+        for error in errors:
+            field = error["path"].split("/")[1] if error["path"].count("/") == 1 else None
+            note = notes.get(field) if field and error["message"].startswith("缺少必填字段") else None
+            detailed.append({**error, "path": base + error["path"],
+                             "message": error["message"] + (f"：{note}" if note else "")})
+        hint = (f"字段要求与示例用 memory_contract(\"{kind}\") 查询" if isinstance(kind, str)
+                else "kind 写记录类型，用 memory_kinds 查看可用类型")
+        return BurrowlError(errors[0].get("code", "INVALID_SCHEMA"), f"第 {position + 1} 条草案没有通过校验",
+                            {"kind": kind, "hint": hint}, errors=detailed)
+
+    @staticmethod
     def _assign_handles(operations: list, snapshot: Snapshot) -> None:
         """R12 D-28 / T-P2.3：handle 在对象内唯一、创建后不可修改；未提供时按标题生成（冲突追加 -2、-3）。
         旧记录没有 handle 时，在它下一次修订时补上（handle 不进内容指纹，不会让复核失效）。"""
@@ -230,7 +263,8 @@ class MemoryService:
                 if owner_of not in (None, rid):
                     raise BurrowlError("INVALID_SCHEMA", "handle 在本对象内已被使用",
                                        {"handle": draft["handle"], "record_id": owner_of},
-                                       errors=[{"path": "/handle", "message": "handle already used"}])
+                                       errors=[schema_error("/handle", f"handle {draft['handle']} 已被 {owner_of} 使用，"
+                                                                       "换一个或不写（按标题自动生成）")])
             else:
                 # taken 的键已是规范形：按需判断占用（排除本记录自己），批量导入时保持线性
                 draft["handle"] = link_syntax.pick_handle(link_syntax.make_handle(draft.get("title", "")),
@@ -382,11 +416,14 @@ class MemoryService:
                 self.index.on_commit(owner.owner_id, self.snapshot(owner).head)
             state = self.index.status(result["owner_id"])
         except Exception as exc:  # noqa: BLE001 - 发布后的边界：保留业务成功
-            state = {"index_status": "pending", "details": {"reason": type(exc).__name__}}
+            # R20 D-06：附一句摘要，AI 能据此判断要不要告诉用户（例如模型文件缺失）；不带堆栈
+            state = {"index_status": "pending",
+                     "details": {"reason": type(exc).__name__, "summary": str(exc).strip()[:200]}}
         result["index"] = state
         notes = list(warnings or [])
         if state["index_status"] not in {"indexed", "not_configured"}:
-            notes.append({"code": "INDEX_PENDING", "message": "记录已保存；检索索引待补偿（index.reconcile），不要重复提交"})
+            notes.append({"code": "INDEX_PENDING", "message": "记录已保存；检索索引待补偿",
+                          "action": "不要重复提交；稍后调用 index_reconcile 补齐，仍失败时把 index.details 告诉用户"})
         if notes:
             result["warnings"] = notes
         return result

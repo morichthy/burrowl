@@ -7,12 +7,15 @@ from typing import Annotated, Literal
 from pydantic import Field
 
 from ....core.config import ReviewFilter
+from .. import shapes
 from ..registry import Ctx, op
+from .memory import VARIANTS
 
 SessionId = Annotated[str, Field(description="阅读会话 ID（RS-…）")]
 Strategy = Literal["standard", "associative", "quick"]
 Verdict = Literal["relevant", "uncertain", "irrelevant"]
 RequestId = Annotated[str | None, Field(description="可选 UUID；网络重试时沿用同一个，不会重复执行")]
+OwnerInSession = Annotated[str, Field(description="本会话筛选结果中的对象 ID")]
 
 
 # ---------- agent ----------
@@ -24,16 +27,16 @@ def start(ctx: Ctx, question: Annotated[str, Field(description="要回答的问�
               "一跳图扩展）；quick=只依据片段、不读全文"))] = None,
           review_filter: Annotated[ReviewFilter | None, Field(description=(
               "all（默认，带复核徽标）/ reviewed_only / exclude_unsafe / unreviewed_only"))] = None,
-          variants: Annotated[list[dict] | None, Field(description=(
-              "最多 2 条等义改写 [{language: zh|en, question, lexical_terms?}]；技术问题建议补一条英文；"
-              "型号、数值必须原样保留"))] = None,
+          variants: VARIANTS = None,
           protected_terms: Annotated[list[str] | None, Field(description="必须原样出现的词（型号、编号）")] = None,
           domains: Annotated[list[str] | None, Field(description="术语库领域，用于术语扩展")] = None,
           owner_id: Annotated[str | None, Field(description="本次阅读服务于哪个对象（续接用）")] = None,
           scope_owner_ids: Annotated[list[str] | None, Field(description="只在这些对象中召回")] = None,
-          field_conditions: Annotated[list[dict] | None, Field(description=(
+          field_conditions: shapes.shaped(list[dict] | None, shapes.FIELD_CONDITIONS, (
               "可选的显式字段条件，最多 16 条：[{id, kind: literal|numeric, field, operator: eq|ne|lt|le|gt|ge, "
-              "expected, unit?}]。只在原文的“字段：值”中核对，冲突的对象排后、不删除"))] = None) -> dict:
+              "expected, unit?}]。只在原文的“字段：值”中核对，冲突的对象排后、不删除"), nullable=True,
+              examples=[[{"id": "c1", "kind": "numeric", "field": "工作温度", "operator": "le", "expected": 85,
+                          "unit": "°C"}]]) = None) -> dict:
     """查询主题相关知识、找已有经验的默认入口：创建工作台可见阅读会话并立即召回。
     简查选 quick（采纳片段、写笔记）；完整阅读选 standard。返回第一批对象筛选包
     （每个对象 2–4 个命中窗口，含 digest），继续 assess → read（quick 跳过）→ note → finish。"""
@@ -44,23 +47,29 @@ def start(ctx: Ctx, question: Annotated[str, Field(description="要回答的问�
 
 
 @op("reading.assess", effect="write")
-def assess(ctx: Ctx, session_id: SessionId, judgments: Annotated[list[dict], Field(description=(
+def assess(ctx: Ctx, session_id: SessionId, judgments: shapes.shaped(list[dict], shapes.JUDGMENTS, (
         "[{owner_id, verdict, reason, digest, accepted_windows?}]。verdict：relevant=窗口显示它能回答问题或"
         "提供必要依据，值得完整阅读；uncertain=信息不足以判断，先 reading_peek 或交给用户；irrelevant=明确无关。"
         "reason 写依据窗口里的什么内容；digest 原样抄筛选包的 digest；quick 策略在 accepted_windows 列出"
-        "可作为笔记依据的窗口 entry_id"))], request_id: RequestId = None) -> dict:
+        "可作为笔记依据的窗口 entry_id"), examples=[[
+            {"owner_id": "RES-FLOATING-POINT-SUMMATION", "verdict": "relevant",
+             "reason": "窗口给出了 Kahan 求和在抵消输入上的实测误差", "digest": "9f2c41d0"},
+            {"owner_id": "PRJ-SENSOR-FUSION", "verdict": "irrelevant", "reason": "只提到求和这个词，内容是滤波参数",
+             "digest": "4be07a13"}]]),
+           request_id: RequestId = None) -> dict:
     """三态判断一批对象；返回下一批或“可以开始读”的提示。用户的改判优先，不会被覆盖。"""
     return ctx.app.reading.assess(session_id, judgments, request_id=request_id)
 
 
 @op("reading.peek", effect="write")
-def peek(ctx: Ctx, session_id: SessionId, owner_id: str) -> dict:
+def peek(ctx: Ctx, session_id: SessionId, owner_id: OwnerInSession) -> dict:
     """查看某对象更多的命中窗口（用于 uncertain 的对象）。"""
     return ctx.app.reading.peek(session_id, owner_id)
 
 
 @op("reading.read", effect="write")
-def read(ctx: Ctx, session_id: SessionId, owner_id: str, page: int = 1,
+def read(ctx: Ctx, session_id: SessionId, owner_id: OwnerInSession,
+         page: Annotated[int, Field(description="页码，从 1 起；按上次返回的 unread_pages 依次读完")] = 1,
          scope: Annotated[Literal["targets", "full"] | None, Field(description=(
              "不填即可：第一轮召回的对象整读；图扩展带来的对象默认 targets（定点阅读，只交付被关系指到的节点及"
              "必要上下文）。只有定点内容不足以判断、确有必要了解整个对象时才填 full 升级为整读，并在笔记中说明原因；"
@@ -71,7 +80,7 @@ def read(ctx: Ctx, session_id: SessionId, owner_id: str, page: int = 1,
 
 
 @op("reading.note", effect="write")
-def note(ctx: Ctx, session_id: SessionId, owner_id: str,
+def note(ctx: Ctx, session_id: SessionId, owner_id: OwnerInSession,
          note: Annotated[str, Field(description=(
              "研究笔记（Markdown）：只写材料中的知识——问题如何演进、方法/公式（定义变量与单位）/条件、关键数据、"
              "反例与局限；关键句旁就近标出处 ID；不重复本次问题，不写自己的操作计划"))],
@@ -80,10 +89,10 @@ def note(ctx: Ctx, session_id: SessionId, owner_id: str,
              "不要只写整条记录（MEM-…）；也可以是 SRC-…。quick 下只能是已采纳的窗口。出处也是联想（图扩展）的种子"))],
          clues: Annotated[list[str] | None, Field(description=(
              "可选的探索线索（材料提到但未核实的方向、可能相关的对象）；只作导航，不会成为结论"))] = None,
-         expand_from: Annotated[list[dict] | None, Field(description=(
+         expand_from: shapes.shaped(list[dict] | None, shapes.EXPAND_FROM, (
              "可选的扩展锚点 [{ref, why}]，最多 3 个：ref 是本笔记 sources 中值得顺着关系去追的节点"
              "（例如该块引用了另一项目的实测、该结论有待查的反例），why 写原因。没有值得追的就不写；"
-             "写了锚点时，联想优先从锚点出发"))] = None,
+             "写了锚点时，联想优先从锚点出发"), nullable=True) = None,
          request_id: RequestId = None) -> dict:
     """保存某对象的研究笔记（standard/associative 须先读完全部页；定点阅读读完定点页即可）；出处补全为固定引用。"""
     return ctx.app.reading.note(session_id, owner_id, note, sources, clues=clues, expand_from=expand_from,
@@ -91,15 +100,23 @@ def note(ctx: Ctx, session_id: SessionId, owner_id: str,
 
 
 @op("reading.synthesize", effect="write")
-def synthesize(ctx: Ctx, session_id: SessionId, note: str, sources: list[str], owner_ids: list[str],
+def synthesize(ctx: Ctx, session_id: SessionId,
+               note: Annotated[str, Field(description=(
+                   "跨对象综合笔记（Markdown）：比较、归纳各对象的知识，关键句旁就近标出处 ID；不重复问题，不写操作计划"))],
+               sources: Annotated[list[str], Field(description=(
+                   "出处 ID：必须是本会话交付过的 L1 块（MEM-…#块ID）、结论（CLM-…）、记录或 SRC-…"))],
+               owner_ids: Annotated[list[str], Field(description="综合了哪些对象的笔记（这些对象必须已有单篇笔记）")],
                request_id: RequestId = None) -> dict:
     """跨对象综合笔记；所依据的任何单篇笔记改变或陈旧后，综合稿自动失效。"""
     return ctx.app.reading.synthesize(session_id, note, sources, owner_ids, request_id=request_id)
 
 
 @op("reading.ask_user", effect="write")
-def ask_user(ctx: Ctx, session_id: SessionId, kind: Literal["fulltext", "broaden", "direction", "clarify"],
-             prompt: str, options: list[str] | None = None, request_id: RequestId = None) -> dict:
+def ask_user(ctx: Ctx, session_id: SessionId, kind: Annotated[Literal["fulltext", "broaden", "direction", "clarify"],
+                                                                Field(description="请求类型，含义见工具说明")],
+             prompt: Annotated[str, Field(description="给用户看的问题：写清要什么、为什么、批准后会怎样")],
+             options: Annotated[list[str] | None, Field(description="可选的候选答案")] = None,
+             request_id: RequestId = None) -> dict:
     """向用户提问。fulltext=申请全文补偿（仅当发现召回不可用、不完整或不足，见 fulltext_available；批准后得到
     approval_id）；broaden=申请扩大检索：放宽条件、去掉限定词或型号、改问更宽的问题都算，prompt 写清新问法、
     理由与预计多带来哪类材料（等义改写、补保护词、改错别字不算扩大，不用申请）；direction=请用户给联想方向；
@@ -116,14 +133,15 @@ def ask_user(ctx: Ctx, session_id: SessionId, kind: Literal["fulltext", "broaden
 
 
 @op("reading.recall", effect="write")
-def recall(ctx: Ctx, session_id: SessionId, mode: Literal["fulltext", "broaden", "association"],
+def recall(ctx: Ctx, session_id: SessionId, mode: Annotated[Literal["fulltext", "broaden", "association"], Field(
+        description="fulltext 全文补偿、broaden 扩大检索（两者都要用户批准）；association 联想（仅 associative 策略）")],
            approval_id: Annotated[str | None, Field(description=(
                "fulltext、broaden 模式必填：用户批准后的 approval_id（只能用一次）"))] = None,
            focus: Annotated[str | None, Field(description=(
                "association 模式：一句话写当前还缺什么（例如“缺少长记录上 late 与 windows 的实测对比”），不要重复原问题；"
                "只用于给图邻居排序，不召回新范围，不需要审批。不填时用用户补充的方向或会话问题"))] = None,
            question: Annotated[str | None, Field(description="broaden 模式必填：用户批准的新问法")] = None,
-           variants: Annotated[list[dict] | None, Field(description="broaden 模式可选：新问法的等义改写")] = None,
+           variants: VARIANTS = None,
            protected_terms: Annotated[list[str] | None, Field(description="broaden 模式可选：必须原样出现的词")] = None,
            association_text: Annotated[str | None, Field(description=(
                "已停用：联想改为图扩展；要换更宽的问法先 reading_ask_user(kind=broaden)。传入会返回参数错误"))] = None,
@@ -152,13 +170,16 @@ def status(ctx: Ctx, session_id: SessionId) -> dict:
 
 
 @op("reading.delegate")
-def delegate(ctx: Ctx, session_id: SessionId, host_supports_subagents: bool) -> dict:
+def delegate(ctx: Ctx, session_id: SessionId,
+             host_supports_subagents: Annotated[bool, Field(description="宿主能否派子 agent；不能时返回由你自己执行的步骤")]) -> dict:
     """子 agent 任务包（只描述任务；实际派工由宿主完成）。"""
     return ctx.app.reading.delegate(session_id, host_supports_subagents=host_supports_subagents)
 
 
 @op("reading.list")
-def list_sessions(ctx: Ctx, status: str | None = None, owner_id: str | None = None, limit: int = 50) -> list:
+def list_sessions(ctx: Ctx, status: Annotated[str | None, Field(description="只看该状态的会话")] = None,
+                  owner_id: Annotated[str | None, Field(description="只看服务于该对象的会话")] = None,
+                  limit: int = 50) -> list:
     """阅读会话列表（最新在前）。"""
     return ctx.app.reading.list(status=status, owner_id=owner_id, limit=limit)
 

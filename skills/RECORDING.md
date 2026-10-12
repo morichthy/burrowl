@@ -164,7 +164,8 @@ $S_{\mathrm{ref}}=\sum_i \operatorname{Fraction}(x_i)$，$e_{\mathrm{abs}}=|\ope
 1. **先保存被引用的内容**（L0 → L1 → L2 → L3），再保存引用它们的概览、章节，最后保存文稿根。同一批提交里，可以用 `{client_key: "x"}` 引用同批新建的记录。
 2. 用 `memory_commit`（可先 `dry_run`）提交，带上 `expected_head` 和 `request_id`：
    - 新建：`{op: "put_record", client_key, draft}`；
-   - 修订：`{op: "put_record", record_id, expected_revision, draft}`。
+   - 修订：`{op: "put_record", record_id, expected_revision, draft}`，draft 是完整的新内容，并写 `change_reason`（为什么改）。
+   - 草案必须写 kind、title、body_markdown、payload、sources、record_reason；`owner_id`、`sensitivity`、`discovery`、`keywords`、`provenance_gap`、`handle` 可以不写（服务补上，修订时沿用原值）。`memory_contract(kind)` 的 `draft_fields` 逐项标了 required / optional / conditional。
 3. 看回执：`save_status` 和 `index_status` 是两件事。索引 pending 说明内容已保存，**不要换新 request_id 重复提交**，等它补齐或调用 `index_reconcile`。
 4. 用 `memory_inspect` 回读本次修订，按第 2 节逐条检查。
 

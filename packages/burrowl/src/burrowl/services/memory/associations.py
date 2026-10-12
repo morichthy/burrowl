@@ -10,7 +10,7 @@ R12 D-14：关联带 certainty（speculative / plausible / supported）、origin
 import uuid
 from copy import deepcopy
 
-from ...core.errors import BurrowlError
+from ...core.errors import BurrowlError, rebase
 from ...core.hashing import canonical_hash
 from ...core.records import require_ref
 from .claims import ClaimGraph
@@ -124,4 +124,8 @@ def decide(memory: MemoryService, owner_id: str, payload: dict, *, actor: dict, 
                "expected_head": head, "operations": [operation], "dry_run": dry_run}
     digest = canonical_hash({"operation": "association", "payload": payload, "reason": reason, "owner_id": owner_id,
                              **({"discovery": discovery} if discovery is not None else {})})
-    return memory.commit(request, hash_override=digest)
+    try:
+        return memory.commit(request, hash_override=digest)
+    except BurrowlError as exc:  # R20 D-05：内部请求的路径换成 relations_decide 参数的路径
+        exc.errors = rebase(exc.errors, "/operations/0/draft/payload", "/payload")
+        raise

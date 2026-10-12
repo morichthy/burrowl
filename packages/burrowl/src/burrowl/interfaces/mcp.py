@@ -4,6 +4,8 @@
     burrowl serve 时同时挂载 /<token>/mcp          Streamable HTTP
 
 工具名把点换成下划线（memory.inspect → memory_inspect）；按配置 mcp.toolsets 选择暴露哪些分组。
+参数不在 MCP 层校验（R20 D-08）：工具声明的 inputSchema 仍由操作签名生成，调用时原样交给 registry.call，
+输入错误都以 isError 工具结果和统一的错误结构返回（MCP 2025-11-25：输入校验错误是工具执行错误，供模型自我纠正）。
 reading_ask_user 在宿主支持 elicitation 时直接在对话里询问用户；否则请求进入工作台待处理队列。
 每个 Skill 的正文作为 prompt 提供，供不支持 Skill 的客户端使用。
 """
@@ -16,6 +18,7 @@ import anyio
 from anyio import from_thread, to_thread
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
+from mcp.server.mcpserver.utilities.func_metadata import ArgModelBase, FuncMetadata
 from mcp_types import ToolAnnotations
 from pydantic import BaseModel
 
@@ -108,13 +111,41 @@ def _elicitor(context: Context | None):
     return elicit
 
 
+class _PassThrough(FuncMetadata):
+    """不按函数签名校验参数，原样交给 registry.call（那里一次列全所有错误并给出完整路径）。"""
+
+    def validate_arguments(self, arguments_to_validate: dict[str, Any]) -> dict[str, Any]:
+        return dict(arguments_to_validate)
+
+
+def _wants_json(prop: dict) -> bool:
+    """该参数是否接受对象或列表：只有这类参数才把 JSON 字符串解析回来（有的客户端把列表/对象当字符串传）。"""
+    options = prop.get("anyOf") or [prop]
+    return any(o.get("type") in {"array", "object"} for o in options)
+
+
+def _pre_parse(spec: OpSpec, arguments: dict[str, Any]) -> dict[str, Any]:
+    properties = spec.schema().get("properties", {})
+    parsed = dict(arguments)
+    for key, value in arguments.items():
+        if isinstance(value, str) and _wants_json(properties.get(key, {})):
+            try:
+                decoded = json.loads(value)
+            except (ValueError, RecursionError):
+                continue
+            if isinstance(decoded, list | dict):
+                parsed[key] = decoded
+    return parsed
+
+
 def _tool(app: App, spec: OpSpec, actor: dict):
     params = list(inspect.signature(spec.fn).parameters.values())[1:]
 
     async def tool(context: Context | None = None, **kwargs: Any) -> Any:
         ctx = Ctx(app=app, actor=actor, channel="mcp", elicit=_elicitor(context))
+        arguments = _pre_parse(spec, kwargs)
         try:
-            return await to_thread.run_sync(lambda: call(ctx, spec.name, kwargs))
+            return await to_thread.run_sync(lambda: call(ctx, spec.name, arguments))
         except BurrowlError as exc:
             raise ToolError(json.dumps(exc.problem(), ensure_ascii=False)) from exc
 
@@ -139,6 +170,9 @@ def build_server(app: App, *, actor: dict | None = None, skills_dir: Path | None
                         annotations=ToolAnnotations(readOnlyHint=spec.effect == "read", destructiveHint=False,
                                                     idempotentHint=spec.effect == "read"),
                         structured_output=False)
+        # R20 D-08：保留由签名生成的 inputSchema，去掉 SDK 的参数预校验（它的报错是 pydantic 英文原文、没有 path）
+        registered = server._tool_manager.get_tool(spec.tool_name)  # noqa: SLF001 - SDK 未提供替换校验的公开入口
+        registered.fn_metadata = _PassThrough(arg_model=ArgModelBase)
     if skills_dir and skills_dir.is_dir():
         # 公共文档（RULES.md、RECORDING.md）作为独立 prompt；每个 Skill prompt 附上 RULES，
         # 这样只通过 MCP 接入的宿主也能拿到 Skill 引用的公共规则。

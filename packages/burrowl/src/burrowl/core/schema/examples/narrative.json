@@ -5,7 +5,6 @@
     "op": "put_record",
     "client_key": "new-narrative",
     "draft": {
-      "owner_id": "RES-FLOATING-POINT-SUMMATION",
       "kind": "narrative",
       "title": "从单位增量丢失到补偿比较的第一轮经过",
       "keywords": [
@@ -14,7 +13,6 @@
       ],
       "body_markdown": "## 背景\n\n研究要比较求和顺序对抵消输入的影响。\n\n## 经过\n\n先用顺序求和处理三项抵消输入，单位增量完全丢失；随后加入 Kahan 补偿作对照，补偿后仍丢失，说明补偿不能覆盖所有抵消情形。\n\n## 结论与未决\n\n在这组三项输入上，顺序与补偿都未保住单位增量；更多排列需要后续实验。依据：[SRC-SUMMATION-R01]。",
       "record_reason": "记录第一轮实际经过",
-      "sensitivity": "internal",
       "sources": [
         {
           "target_kind": "file",

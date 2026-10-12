@@ -29,7 +29,7 @@ requires_tools: [memory_owner_route, memory_owners, memory_owner_create, memory_
    - Run 不保存记录：执行得到的知识在第 5 步写进上级对象（独立 Run 按 RULES 第 2 节选对象）并引用该 Run。没有可写成记录的内容时，用 `runs_discard` 丢弃。
    - 没有执行的分析直接写记录，不虚构 Run。
 5. **保存**：
-   - 有用内容按 L0–L4 职责写草案，先调用 `memory_contract(kind)` 查字段和示例。
+   - 有用内容按 L0–L4 职责写草案，先调用 `memory_contract(kind)` 查字段和示例（标 required 的必须写，optional 的可以不写）。
    - 用 `memory_commit` 提交，可以先 `dry_run`。本任务第一次往该对象保存时带 `attribution`（RULES 第 2 节）。
    - 新文件依据先 `sources_register`。
    - 保存顺序：先被引用的，再引用它的。

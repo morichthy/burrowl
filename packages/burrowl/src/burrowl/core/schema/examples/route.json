@@ -5,13 +5,11 @@
     "op": "put_record",
     "client_key": "new-route",
     "draft": {
-      "owner_id": "RES-FLOATING-POINT-SUMMATION",
       "kind": "route",
       "title": "用成对求和作为新对照",
       "keywords": [],
       "body_markdown": "",
       "record_reason": "规划研究路线",
-      "sensitivity": "internal",
       "sources": [
         {
           "target_kind": "record",

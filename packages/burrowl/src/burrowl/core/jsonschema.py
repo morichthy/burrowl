@@ -1,6 +1,7 @@
 """受限 JSON Schema 校验器：只支持记录契约实际用到的关键字子集。
 
 刻意不做通用实现——未知关键字直接报错，避免"看似通过实则未校验"。
+报错写给 AI 看（R20 D-05）：中文说明缺了/错了什么，能列出允许值时放进 expected。
 """
 import math
 from typing import Any
@@ -9,7 +10,8 @@ from .errors import schema_error
 from .hashing import canonical_hash
 
 SUPPORTED = {"type", "const", "enum", "required", "properties", "additionalProperties",
-             "items", "minLength", "minItems", "oneOf", "$defs", "$ref"}
+             "items", "minLength", "minItems", "maxItems", "oneOf", "$defs", "$ref",
+             "description", "examples"}  # description / examples 只是说明，不参与校验
 TYPES = {"object", "array", "string", "integer", "number", "boolean", "null"}
 
 
@@ -34,7 +36,7 @@ def check_schema(schema: dict, defs: dict | None = None, _visiting: frozenset = 
         if not isinstance(required, list) or len(set(required)) != len(required) \
                 or any(not isinstance(n, str) for n in required):
             raise ValueError("required must be an array of unique strings")
-    for key in ("minLength", "minItems"):
+    for key in ("minLength", "minItems", "maxItems"):
         if key in schema and (type(schema[key]) is not int or schema[key] < 0):
             raise ValueError(key + " must be a non-negative integer")
     if "enum" in schema:
@@ -76,6 +78,17 @@ def _type_ok(value: Any, name: str) -> bool:
     return False
 
 
+_TYPE_NAMES = {"object": "对象", "array": "列表", "string": "字符串", "integer": "整数", "number": "数值",
+               "boolean": "布尔值", "null": "null"}
+
+
+def _json_type(value: Any) -> str:
+    for name in ("null", "boolean", "integer", "number", "string", "array", "object"):
+        if _type_ok(value, name):
+            return _TYPE_NAMES[name]
+    return type(value).__name__
+
+
 def _same(a: Any, b: Any) -> bool:
     # Python 中 True == 1；JSON 的 enum/const 必须同时比较类型。
     return type(a) is type(b) and a == b
@@ -88,29 +101,33 @@ def _visit(value: Any, node: dict, defs: dict, path: str) -> list[dict]:
     if "oneOf" in node:
         branches = [_visit(value, branch, defs, path) for branch in node["oneOf"]]
         if sum(not e for e in branches) != 1:
-            errors.append(schema_error(path, "Exactly one schema alternative must match"))
+            errors.append(schema_error(path, "不符合任何一种允许的写法（见下方最接近的一种的具体问题）"))
             if all(branches):
                 errors.extend(min(branches, key=len))
     types = node.get("type", [])
     types = [types] if isinstance(types, str) else types
     if types and not any(_type_ok(value, t) for t in types):
-        return [schema_error(path, "Unexpected value type")]
+        return [schema_error(path, f"类型不对：应为{'或'.join(_TYPE_NAMES[t] for t in types)}，实际是{_json_type(value)}",
+                             expected=types)]
     if "const" in node and not _same(value, node["const"]):
-        errors.append(schema_error(path, "Value does not match const"))
+        errors.append(schema_error(path, f"取值必须是 {node['const']!r}", expected=[node["const"]]))
     if "enum" in node and not any(_same(value, e) for e in node["enum"]):
-        errors.append(schema_error(path, "Value is outside enum"))
+        errors.append(schema_error(path, f"取值 {value!r} 不在允许范围：{' | '.join(map(str, node['enum']))}",
+                                   expected=node["enum"]))
     if isinstance(value, str) and len(value) < node.get("minLength", 0):
-        errors.append(schema_error(path, "String is too short"))
+        errors.append(schema_error(path, "不能为空字符串" if node["minLength"] == 1 else f"至少 {node['minLength']} 个字符"))
     if isinstance(value, list):
         if len(value) < node.get("minItems", 0):
-            errors.append(schema_error(path, "Array is too short"))
+            errors.append(schema_error(path, f"至少需要 {node['minItems']} 项"))
+        if len(value) > node.get("maxItems", len(value)):
+            errors.append(schema_error(path, f"最多 {node['maxItems']} 项，实际 {len(value)} 项"))
         if "items" in node:
             for index, item in enumerate(value):
                 errors.extend(_visit(item, node["items"], defs, pointer(path, index)))
     if isinstance(value, dict):
         for key in node.get("required", []):
             if key not in value:
-                errors.append(schema_error(pointer(path, key), "Required field is missing"))
+                errors.append(schema_error(pointer(path, key), f"缺少必填字段 {key}"))
         properties = node.get("properties", {})
         extra = node.get("additionalProperties")
         for key, item in value.items():
@@ -119,7 +136,8 @@ def _visit(value: Any, node: dict, defs: dict, path: str) -> list[dict]:
             elif isinstance(extra, dict):
                 errors.extend(_visit(item, extra, defs, pointer(path, key)))
             elif extra is False:
-                errors.append(schema_error(pointer(path, key), "Unknown field"))
+                errors.append(schema_error(pointer(path, key), f"未知字段 {key}（可能拼错）",
+                                           expected=sorted(properties)))
     return errors
 
 
@@ -129,5 +147,5 @@ def validate(value: Any, schema: dict, defs: dict | None = None) -> list[dict]:
     try:
         canonical_hash(value)
     except (ValueError, TypeError, UnicodeError):
-        return [schema_error("", "Value must be finite, Unicode JSON")]
+        return [schema_error("", "必须是 JSON 值（有限数值、合法 Unicode 文本）")]
     return _visit(value, schema, defs, "")

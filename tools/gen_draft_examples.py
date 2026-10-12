@@ -1,13 +1,13 @@
 """生成 core/schema/examples/<kind>.json：每类记录一份最小但真实的草案示例（浮点求和样例的固定引用）。
 
-这些示例由 memory.contract 返回给 AI，并由 tests/service/test_draft_examples.py 用真实校验器逐条预检，
+这些示例由 memory_contract 返回给 AI，并由 tests/service/test_draft_examples.py 用真实校验器逐条预检，
 保证示例与契约同步。改了记录契约后：uv run python tools/gen_draft_examples.py && uv run pytest tests/service/test_draft_examples.py
 """
 import json
 from pathlib import Path
 
 OUT = Path(__file__).resolve().parents[1] / "packages/burrowl/src/burrowl/core/schema/examples"
-OWNER = "RES-FLOATING-POINT-SUMMATION"
+OWNER = "RES-FLOATING-POINT-SUMMATION"  # 示例所在的样例对象；草案里不写 owner_id（R20 D-01：由提交补上）
 
 
 def ref(kind, tid, rev, sha, rel, loc=""):
@@ -37,14 +37,14 @@ def claim(cid, statement, scope, refs, kind="fact"):
 
 
 def draft(kind, title, body, payload, sources, reason, keywords=(), gap=None):
-    return {"owner_id": OWNER, "kind": kind, "title": title, "keywords": list(keywords), "body_markdown": body,
-            "record_reason": reason, "sensitivity": "internal", "sources": sources, "provenance_gap": gap,
-            "payload": payload}
+    # owner_id、sensitivity（默认 internal）由服务补上，示例只写 AI 必须写的字段，避免照抄出错
+    return {"kind": kind, "title": title, "keywords": list(keywords), "body_markdown": body,
+            "record_reason": reason, "sources": sources, "provenance_gap": gap, "payload": payload}
 
 
 EXAMPLES = {
     "source": (
-        "L0 原始依据：先用 sources.register 登记文件（得到 SRC-ID 与 sha256），再写这条登记说明。"
+        "L0 原始依据：先用 sources_register 登记文件（得到 SRC-ID 与 sha256），再写这条登记说明。"
         "body_markdown 说明材料是什么、谁产生、怎么解释（列、单位、限制）；原件不改，未展开原件不能声称已核验全文。",
         draft("source", "第一轮原始结果：单位增量与抵消（登记说明）",
               "第一轮实验脚本输出的原始结果表：顺序求和与 Kahan 补偿求和在三项抵消输入上的逐步累加值。"
@@ -166,7 +166,7 @@ EXAMPLES = {
                "reopen_condition": "无", "replacement_ref": None, "missing_refs": []},
               [GOAL], "规划研究路线")),
     "checkpoint": (
-        "检查点（level=null）：交接时点的状态：已完成什么、下一步、前提与停止原因。续接时 memory.resume 会读它。",
+        "检查点（level=null）：交接时点的状态：已完成什么、下一步、前提与停止原因。续接时 memory_resume 会读它。",
         draft("checkpoint", "三轮实验完成，扩展研究待开始", "",
               {"goal_ref": GOAL, "route_refs": [], "completed_refs": [NARR, DETAIL], "question_refs": [],
                "next_step": "设计随机抵消输入的生成方法", "prerequisites": ["确认随机种子与样本量"],
@@ -177,7 +177,7 @@ EXAMPLES = {
     "association": (
         "关联（level=null）：相似、对照、依赖等导航关系，不是证据。analogous_to 必须写 shared_structure 与 "
         "transfer_limits。certainty 写确定度（speculative / plausible / supported），origin 写提出者（human / ai）。"
-        "通常先由 relations.candidates 产生候选，再用 relations.decide 处理；快速添加只给 from/to/explanation，"
+        "通常先由 relations_candidates 产生候选，再用 relations_decide 处理；快速添加只给 from/to/explanation，"
         "自动设为 related_to + speculative。\"A 会影响 B\"这类可验证的判断写成结论，不写成关联。",
         draft("association", "补偿经验与第三轮经过的同一失败模式", "",
               {"from": rel(EXP, "same_failure_mode"), "to": rel(NARR, "same_failure_mode"),
