@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "run_path": "runs/run-20261012t155940z-fcc5a0af0331/run.json",
+  "before_bytes": "ewogICJzY2hlbWFfdmVyc2lvbiI6IDEsCiAgInJ1bl9pZCI6ICJSVU4tMjAyNjEwMTJUMTU1OTQwWi1GQ0M1QTBBRjAzMzEiLAogICJvd25lcl9pZCI6IG51bGwsCiAgInRpdGxlIjogIuagh+acrOeLrOeriyBSdW4iLAogICJxdWVzdGlvbiI6ICLkuLTml7bmtYvor5UiLAogICJrZXl3b3JkcyI6IFtdLAogICJydW5fdHlwZSI6ICJhbmFseXNpcyIsCiAgInN0YXR1cyI6ICJwbGFubmVkIiwKICAic2Vuc2l0aXZpdHkiOiAiaW50ZXJuYWwiLAogICJjcmVhdGVkX2F0IjogIjIwMjYtMTAtMTJUMTU6NTk6NDBaIiwKICAic3RhcnRlZF9hdCI6IG51bGwsCiAgImVuZGVkX2F0IjogbnVsbCwKICAiaW5wdXRzIjogW10sCiAgImFydGlmYWN0cyI6IFtdLAogICJwYXJhbWV0ZXJzIjoge30sCiAgImVudmlyb25tZW50IjogewogICAgInB5dGhvbiI6ICIzLjEyLjE1IiwKICAgICJwbGF0Zm9ybSI6ICJXaW5kb3dzLTExLTEwLjAuMjI2MzEtU1AwIgogIH0sCiAgImNvbmNsdXNpb24iOiAiIiwKICAibGltaXRhdGlvbnMiOiBbXSwKICAicGFyZW50X3J1bl9pZHMiOiBbXQp9Cg==",
+  "after": {
+    "schema_version": 1,
+    "run_id": "RUN-20261012T155940Z-FCC5A0AF0331",
+    "owner_id": null,
+    "title": "标本独立 Run",
+    "question": "临时测试",
+    "keywords": [],
+    "run_type": "analysis",
+    "status": "planned",
+    "sensitivity": "internal",
+    "created_at": "2026-10-12T15:59:40Z",
+    "started_at": null,
+    "ended_at": null,
+    "inputs": [],
+    "artifacts": [
+      {
+        "path": "research/floating-point-summation/compat-note.txt",
+        "sha256": "1c98659c56b3bfafdb9d30b7a6d331e24040a4bde144ff1b61e328e91009293a",
+        "role": "artifact",
+        "registered_at": "2026-10-12T15:59:40.466036Z"
+      }
+    ],
+    "parameters": {},
+    "environment": {
+      "python": "3.12.15",
+      "platform": "Windows-11-10.0.22631-SP0"
+    },
+    "conclusion": "",
+    "limitations": [],
+    "parent_run_ids": []
+  },
+  "created_at": "2026-10-12T15:59:40.476782Z"
+}

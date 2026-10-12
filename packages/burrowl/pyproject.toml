@@ -1,6 +1,6 @@
 [project]
 name = "burrowl"
-version = "0.7.2"
+version = "0.8.0"
 description = "AI 研发工作区：版本化记忆、检索、阅读会话与知识中枢连接"
 requires-python = ">=3.12"
 dependencies = [

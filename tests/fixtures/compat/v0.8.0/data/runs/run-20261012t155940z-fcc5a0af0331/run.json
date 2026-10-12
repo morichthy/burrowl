@@ -1,0 +1,31 @@
+{
+  "artifacts": [
+    {
+      "path": "research/floating-point-summation/compat-note.txt",
+      "registered_at": "2026-10-12T15:59:40.466036Z",
+      "role": "artifact",
+      "sha256": "1c98659c56b3bfafdb9d30b7a6d331e24040a4bde144ff1b61e328e91009293a"
+    }
+  ],
+  "conclusion": "",
+  "created_at": "2026-10-12T15:59:40Z",
+  "ended_at": null,
+  "environment": {
+    "platform": "Windows-11-10.0.22631-SP0",
+    "python": "3.12.15"
+  },
+  "inputs": [],
+  "keywords": [],
+  "limitations": [],
+  "owner_id": null,
+  "parameters": {},
+  "parent_run_ids": [],
+  "question": "临时测试",
+  "run_id": "RUN-20261012T155940Z-FCC5A0AF0331",
+  "run_type": "analysis",
+  "schema_version": 1,
+  "sensitivity": "internal",
+  "started_at": null,
+  "status": "planned",
+  "title": "标本独立 Run"
+}

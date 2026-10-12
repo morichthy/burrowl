@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+  "platform": "Windows-11-10.0.22631-SP0",
+  "source_manifest_sha256": "d7958e2c0b086f312113c95b5b5cd242ad3a83e52d3c22ab67f46e1fa18429f2",
+  "checked_results": 150,
+  "all_saved_results_match": true,
+  "unit": "dimensionless",
+  "ulp_at_1e16": 2.0,
+  "plot_environment": {
+    "matplotlib": "3.10.8",
+    "packages": {
+      "matplotlib": "3.10.8",
+      "numpy": "2.5.3",
+      "pillow": "12.3.0",
+      "contourpy": "1.3.3",
+      "cycler": "0.12.1",
+      "fonttools": "4.64.0",
+      "kiwisolver": "1.5.1",
+      "packaging": "26.3",
+      "pyparsing": "3.3.2",
+      "python-dateutil": "2.9.0.post0",
+      "six": "1.17.0"
+    }
+  }
+}
