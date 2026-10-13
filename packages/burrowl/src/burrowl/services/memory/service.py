@@ -14,7 +14,7 @@ from ...core.clock import Clock, utc_now
 from ...core.errors import BurrowlError, headline, rebase, schema_error
 from ...core.hashing import canonical_hash, sha256_bytes
 from ...core.ports import IndexSink, NullIndex
-from ...core.records import content_hash, record_hash, validate_commit_request, validate_record
+from ...core.records import content_hash, record_hash, same_content, validate_commit_request, validate_record
 from ...storage.memory_store import Snapshot, tombstones
 from ...storage.owners import SENSITIVITY_RANK, Owner, OwnerIndex
 from . import concepts, policy, rules, vocabulary
@@ -201,7 +201,7 @@ class MemoryService:
             if resolved:
                 record["links"] = resolved
             digest = content_hash(record)
-            if old and digest == old["content_hash"]:
+            if old and digest == old["content_hash"] and same_content(record, old):
                 record, status = old, "no_change"
             else:
                 record.update(record_id=rid, revision=old["revision"] + 1 if old else 1,

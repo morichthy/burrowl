@@ -168,10 +168,23 @@ $S_{\mathrm{ref}}=\sum_i \operatorname{Fraction}(x_i)$，$e_{\mathrm{abs}}=|\ope
 - `claim_id`：全库唯一，建议 `CLM-<对象>-<短名>`。
 - `statement`：一句可判断真假、能被单独读懂的话：主体、条件、结果都写出来，例如"在有限 binary64、存在大数抵消的输入下，补偿求和仍可能丢失小量"。不写"如上所述""该方法"这类依赖上下文的指代——结论会被单独检索到。
 - `kind`：fact / calculation / inference / recommendation。
-- `scope`：适用范围。
-- `evidence_refs`：依据的固定引用。relation 只用 supports（能证明）、contradicts（是反例）、input（作为输入的数据）。
+- `scope`：适用范围，也是条件的权威写法。需要被引用、比较的工况写成链接，例如"在 [[工况-满载]] 下"，图上会生成一条"条件"边。
+- `evidence_refs`：依据的固定引用。relation 只用 supports（能证明）、contradicts（是反例）、input（作为输入的数据）。引用可带 `note`，写这份材料的哪部分、怎样支持或反驳；**反例（contradicts）必须写 note**，否则提交返回 `EVIDENCE_NOTE_MISSING` warning。
 
-- 可选 `relation`：结论是"主体—谓词—对象"形式时填写，例如 `{subject: "[[补偿求和]]", predicate: "fails_on", object: "[[大数抵消]]"}`。谓词用 improves / degrades / causes / prevents / fails_on / applies_to / requires / equivalent_to / contradicts / part_of，或以 `x-` 开头自定义。条件始终留在 scope 里，图上的"补偿求和 → 大数抵消"只是由这条结论派生的快捷边。
+判断一项内容放哪里：**去掉它之后结论的意思变了，它属于陈述、参与者或适用范围；只是结论更难让人相信，它属于依据。**
+
+- 可选 `relation`：结论的结构标注，**陈述与 scope 才是权威内容**。能看出谓词与参与者时顺手写，拿不准就不写。它不计入复核指纹：以后发现结构标错，对照陈述只改 `relation`，原复核不失效。写法：
+
+  ```
+  {predicate: "causes", negated: false（可选）, participants: [
+    {role: "cause", value: "[[温漂|温度漂移]]"}, {role: "cause", value: "[[基准电压噪声]]"},
+    {role: "effect", value: "高负载下的瞬态误差"}]}
+  ```
+
+  - 角色由谓词决定（`memory_contract` 的 `claim_relation.frames` 列出每个谓词的必填与可选角色）：improves / degrades（作用方、作用对象，可选基准、指标）、causes（原因、结果，可选机制）、prevents、fails_on（方法、失效情形）、applies_to、requires、equivalent_to（≥2 个比较项）、part_of。框架外的角色与自定义谓词以 `x-` 开头。
+  - **共同作用就让同一角色出现多次**，不要拆成多条二元结论：拆开可能变成两个都不成立的判断。
+  - 参与者能当成"一个东西"的写链接，概念页还没建也照写 `[[名字]]`（收口时建页后自动接上）；只是描述性短语写纯文字。
+  - 条件写在 scope，不是角色；矛盾写进 `evidence_refs`（contradicts）或复核，不是谓词。否定结论写 `negated: true`。
 - **scope 要具体**。"有限 binary64 输入、存在大数抵消"是好的；"一般情况下""大多数场景"不是范围。复核时确认的范围必须与 scope 一致。
 - 改了结论或所在记录的正文，原复核会自动失效，需要重新复核。
 - 成熟度（设想 / 初步 / 重复验证 / 已确立）随复核登记，不写在结论里；谁可以登记见 RULES 第 4 节。
@@ -197,7 +210,7 @@ $S_{\mathrm{ref}}=\sum_i \operatorname{Fraction}(x_i)$，$e_{\mathrm{abs}}=|\ope
 | 结论、L2 阶段的 `evidence_refs` | supports、contradicts、input | supports |
 | 记录的 `sources` 与 payload 中其他固定引用 | supports、contradicts、input、references | references |
 | 关联的 `relation` | related_to、same_problem、same_failure_mode、analogous_to | related_to |
-| 结论的 `relation.predicate` | 开放词表，推荐 improves、degrades、causes、prevents、fails_on、applies_to、requires、equivalent_to、contradicts、part_of | — |
+| 结论的 `relation.predicate` | 谓词框架：improves、degrades、causes、prevents、fails_on、applies_to、requires、equivalent_to、part_of，或以 `x-` 开头自定义 | — |
 | 正文链接、结构关系（归属、包含、块依赖） | 程序决定，不用选 | — |
 
 收到 warning 时改用推荐的关系名；确有理由保留时，在 `record_reason` 或 `change_reason` 中写明。

@@ -1,7 +1,7 @@
 """材料关系图（工作台"材料关系"页）：读取索引中的图投影（R12 T-P2.8，抽边规则见 index/graph.py）。
 
 节点：对象、记录、L1 块、结论、概念、来源；边按 category 分为 structure / evidence / reference /
-navigation / concept / claim_relation，关联边带 certainty，候选关联标记为 candidate。
+navigation / mention / claim_part（R23 D-11），关联边带 certainty，候选关联标记为 candidate。
 图只是导航视图，不改变任何事实记录；投影不新鲜时先补齐（不调用嵌入模型）。
 视图布局、分组名、桥接问题等是本机偏好（.burrowl/workbench/），不是业务数据。
 """
@@ -26,12 +26,31 @@ def build_graph(storage: Storage, index: IndexService) -> dict:
             "owner_id": None if n["node_type"] == "source" else n["owner_id"],
             "record_id": n["record_id"], "block_id": n["block_id"], "domains": n["domains"],
             "review": n["review"], "maturity": n["maturity"], "ref": n["ref"]}
-    edges = [{"source": e["src"], "target": e["dst"], "type": e["type"], "category": e["category"],
-              "certainty": e["certainty"], "state": e["state"], "origin": e["declared_by"],
-              "derived": e["derived"], "candidate": e["state"] == "candidate"}
+    # claim 节点的声明者是 CLM ID；反查它所在的记录，供 UI 在 claim 被隐藏时仍可
+    # 用现有 memory.inspect 读取完整声明上下文。这里只输出已进入可读图投影的记录。
+    record_nodes = {n["id"]: n for n in nodes.values() if n["type"] in {"record", "concept"}}
+
+    def declared_record(edge: dict) -> dict | None:
+        declarer = nodes.get(edge["declared_by"])
+        record_id = (declarer.get("record_id") or declarer["id"]) if declarer else None
+        record = record_nodes.get(record_id) if record_id else None
+        if not record:
+            return None
+        ref = record.get("ref") or {}
+        return {"owner_id": record.get("owner_id"), "record_id": record_id,
+                "revision": ref.get("revision")}
+
+    edges = [{"id": e["edge_id"], "source": e["src"], "target": e["dst"], "type": e["type"],
+              "category": e["category"], "certainty": e["certainty"], "state": e["state"],
+              # 保留旧字段供现有调用方使用；它表达声明者记录，不是 association 的 origin。
+              "origin": e["declared_by"], "declared_by": e["declared_by"],
+              "declared_owner": e["declared_owner"], "declared_rev": e["declared_rev"],
+              "field": e["field"], "association_origin": e["origin"],
+              "declared_record": declared_record(e),
+              "candidate": e["state"] == "candidate"}
              for e in index.db.graph_all_edges() if e["src"] in nodes and e["dst"] in nodes]
     return {"nodes": list(nodes.values()), "edges": edges,
-            "note": "边是作者保存的关系与程序推出的快捷边；可达不代表科学支持"}
+            "note": "边由记录投影得出：作者保存的引用与关联、结论的参与者与条件；可达不代表科学支持"}
 
 
 def subgraph(graph: dict, *, center: str | None = None, hops: int = 2, kinds: list[str] | None = None,
@@ -41,7 +60,7 @@ def subgraph(graph: dict, *, center: str | None = None, hops: int = 2, kinds: li
     """按中心节点 + 跳数、类型/层级、关键词、边类别、领域筛选子图；排除的节点不能成为通往其他节点的桥。
 
     domains / excluded_domains 只作用于带领域的节点（概念页）：没有领域的节点不受影响（D-12：全库一个概念库，
-    按领域筛选或屏蔽）。node_types 为空时显示全部节点类型。"""
+    按领域筛选或屏蔽）。node_types 为 None 时显示全部节点类型，空列表则不显示节点。"""
     blocked = set(excluded or [])
     wanted, masked = set(domains or []), set(excluded_domains or [])
 

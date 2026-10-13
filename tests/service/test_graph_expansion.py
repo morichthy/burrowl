@@ -153,6 +153,7 @@ def test_expands_only_across_owners_from_note_sources(lab):
     packet = next(p for p in result["batch"] if p["owner_id"] == "RES-C")
     relation = next(w for w in packet["windows"] if w["kind"] == "relation")
     assert "矛盾" in relation["title"] and relation["record_id"] is None
+    assert "整数输入" in relation["text"]  # R23 D-14：结论声明的边，窗口带出陈述与适用范围（不只是标题）
     assert len([w for w in packet["windows"] if w["kind"] == "relation"]) <= 3
     # 关系窗口不能作为出处：关系窗口没有可引用身份
     assert view["owners"]["RES-C"]["delivered"] == sorted({w["record_id"] for w in packet["windows"]
@@ -246,3 +247,32 @@ def test_claim_seed_brings_incoming_references_to_its_record(lab):
     assert "RES-E" in owners                           # X1 与 E1 的关联：对称，两个方向都算
     assert "RES-C" in owners                           # 结论自己的矛盾边
     assert "RES-B" not in owners                       # X1 自己引出去的参考不走
+
+
+@pytest.fixture
+def parts_lab(tmp_path):
+    """R23 D-14：A 的结论以另一对象 M 的结论为基准（结论要素边），M 只能经这条边到达。"""
+    lab = Lab(tmp_path)
+    lab.other("m", "对象 M", "M1：降序求和的基线测量")
+    a = lab.owner("a", "求和顺序研究")
+    evidence = register_source(lab.storage, "SRC-A", "work/a.txt", "a" + chr(10))
+    claims = [{"claim_id": "CLM-A-1", "statement": "升序求和误差更小", "kind": "fact", "scope": "整数输入",
+               "evidence_refs": [evidence],
+               "relation": {"predicate": "improves", "participants": [
+                   {"role": "agent", "value": "升序求和"}, {"role": "target", "value": "求和误差"},
+                   {"role": "baseline", "value": "[[!RES-M/CLM-M-1]]"}]}}]
+    lab.ids.update(a=a, x1=put(lab.memory, a, narrative(a, "X1 求和顺序实验", "X1：求和顺序对浮点误差的影响",
+                                                         "CLM-A-1", [evidence], claims=claims)))
+    lab.index.db.embedder = None
+    return lab
+
+
+def test_claim_part_edge_expands_with_statement_scope_and_roles(parts_lab):
+    sid = noted_session(parts_lab)
+    owners, result = candidates(parts_lab, sid)
+    assert owners == ["RES-M"]
+    relation = next(w for w in result["batch"][0]["windows"] if w["kind"] == "relation")
+    assert relation["edge"]["category"] == "claim_part" and relation["edge"]["type"] == "baseline"
+    assert "为基准" in relation["title"]
+    assert "升序求和误差更小" in relation["text"] and "整数输入" in relation["text"]
+    assert "改善｜作用方：升序求和；作用对象：求和误差；基准：" in relation["text"]

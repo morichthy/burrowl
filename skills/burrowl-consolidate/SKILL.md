@@ -65,6 +65,8 @@ requires_tools: [memory_inspect, memory_document, memory_timeline, memory_contra
    - **维护概念库**（全库唯一的 knowledge 对象；配置 `graph.concept_owner_id` 为空时，先问用户后用 `memory_owner_create(owner_type="knowledge")` 建立并用 `config_update` 填入）：
      - `index_gaps` 里的 missing_concept 是写了链接但还没有概念页的名字。只为被实质讨论过、或至少出现在两条记录中的概念建页，正文可以只是一句定义加适用领域（`domains`）。
      - 建页前先查名称、别名和相近概念，按"相关不等于相同"判断：相同就加别名或合并（被并页 `status=merged` + `merged_into`），同名不同义用限定名（如"收敛（数值）"），一个概念其实是两个就拆分（`status=split` + `split_into`）。从不删除概念页。
+     - 建页或合并后不用修订引用它的记录：概念链接在投影时按当前概念库解析，旧链接自动接上，合并跟随重定向。`split_concept_link` 是仍指向已拆分页面的链接，逐条判断该指向哪一个后修订那条记录（只改结论 `relation` 时原复核不失效）。
+     - 结论参与者里写成纯文字、但与已有概念名或别名一致的，可以改写成 `[[概念]]` 链接（只改 `relation`，原复核不失效）。
      - orphan_concept（没有任何记录链接的概念页）检查是否该合并或补链接。
 7. **两层体检与全文一致性检查**：先用 `index_gaps` 看程序能确定的缺口（缺概览、检索说明为空、块过长、结果块没声明依赖、未解析概念、未处理反例、待确认升级），逐项处理或写明暂缓理由；再用新的 revision 读全文，检查：
    - 衔接、重复、术语和单位、公式和数字、结论和限制；

@@ -13,7 +13,7 @@ from typing import Any, Literal
 from ..core import links as link_syntax
 from ..core.config import GraphRoute, IndexConfig
 from ..core.errors import BurrowlError
-from ..core.hashing import sha256_bytes
+from ..core.hashing import canonical_hash, sha256_bytes
 from ..index import extract, projections, query_plan
 from ..index import graph as graph_projection
 from ..index.db import IndexDB
@@ -92,6 +92,8 @@ class IndexService:
     def on_commit(self, owner_id: str, head: dict | None) -> None:
         self.db.mark_pending(owner_id, head)
         self.sync_owner(owner_id)
+        if owner_id == self.concept_owner():  # R23 D-09：概念库变化后，其他对象的概念链接要按新目录重新解析
+            self.ensure_graph()
 
     def on_owner_removed(self, owner_id: str) -> None:
         self.db.drop_owner(owner_id)
@@ -148,13 +150,38 @@ class IndexService:
         """disabled 只在当前确实没有模型时才算正常；装上模型后要补建，并在补建前报告缺口。"""
         return state["channel"] == "vector" and state["status"] == "disabled" and self.db.embedder is None
 
-    def _fresh(self, state: dict, owner: Owner | None, head: dict | None) -> bool:
+    def _fresh(self, state: dict, owner: Owner | None, head: dict | None, concepts_fp: str | None = None) -> bool:
+        if owner is not None and state["corpus"] == "graph":
+            expected = self._graph_fp(owner, concepts_fp if concepts_fp is not None else self._concepts_fp())
+        else:
+            expected = owner.fingerprint if owner is not None else None
         return (owner is not None and state["status"] == "indexed" and json.loads(state["head"] or "null") == head
-                and state["owner_fingerprint"] in (None, owner.fingerprint)
+                and state["owner_fingerprint"] in (None, expected)
                 and state["projection_version"] == VERSIONS.get(state["corpus"]) and self._model_ok(state))
 
-    def _project(self, owner: Owner, graph: ClaimGraph, *,
-                 graph_only: bool = False) -> tuple[dict | None, dict[str, list[dict]], tuple]:
+    # ---------- 概念目录（R23 D-09）----------
+    def _library(self, index: OwnerIndex | None = None) -> Owner | None:
+        index = index or self.storage.owners.scan()
+        library = index.find(self.concept_owner() or "")
+        return library if library is not None and library.readable and library.persisted else None
+
+    def _concepts_fp(self, index: OwnerIndex | None = None) -> str:
+        """图投影的新鲜度要覆盖概念库：概念页新建、合并后，别处未解析或已被合并的链接要重新投影（教训 E7、E9）。"""
+        library = self._library(index)
+        return canonical_hash(self.storage.store.read_head(library).head if library else None)
+
+    def _concepts(self, index: OwnerIndex | None = None) -> graph_projection.Concepts:
+        library = self._library(index)
+        if library is None:
+            return graph_projection.Concepts()
+        return graph_projection.Concepts(*concepts.directory(self.storage.store.read_snapshot(library).records.values()))
+
+    @staticmethod
+    def _graph_fp(owner: Owner, concepts_fp: str | None) -> str:
+        return canonical_hash({"owner": owner.fingerprint, "concepts": concepts_fp})
+
+    def _project(self, owner: Owner, graph: ClaimGraph, *, graph_only: bool = False,
+                 directory: graph_projection.Concepts | None = None) -> tuple[dict | None, dict[str, list[dict]], tuple]:
         snapshot = self.storage.store.read_snapshot(owner) if owner.persisted else None
         records = list(snapshot.records.values()) if snapshot else []
         badges = {cid: graph.badge(cid) for cid, (_c, r) in graph.claims.items() if r["owner_id"] == owner.owner_id}
@@ -176,13 +203,16 @@ class IndexService:
         return (snapshot.head if snapshot else None,
                 {} if graph_only else {corpus: build(info, records, badges, hidden, titles)
                                        for corpus, build in BUILDERS.items()},
-                graph_projection.graph(info, records, badges, hidden, maturity, run_titles))
+                graph_projection.graph(info, records, badges, hidden, maturity, run_titles,
+                                       directory or self._concepts(graph.index)))
 
     def ensure_graph(self) -> dict:
         """只补齐不新鲜的图投影（关系页和图路线用）；不重算检索条目、不调用嵌入模型。"""
         index = self.storage.owners.scan()
         states = {s["owner_id"]: s for s in self.db.states() if s["corpus"] == "graph"}
         graph: ClaimGraph | None = None
+        concepts_fp = self._concepts_fp(index)
+        directory: graph_projection.Concepts | None = None
         synced = []
         for owner in index.owners:
             if not owner.readable:
@@ -191,12 +221,13 @@ class IndexService:
                 continue
             head = self.storage.store.read_head(owner).head if owner.persisted else None
             state = states.get(owner.owner_id)
-            if state and self._fresh(state, owner, head):
+            if state and self._fresh(state, owner, head, concepts_fp):
                 continue
             graph = graph or ClaimGraph(self.storage, index)
-            head, _projected, (nodes, edges) = self._project(owner, graph, graph_only=True)
+            directory = directory or self._concepts(index)
+            head, _projected, (nodes, edges) = self._project(owner, graph, graph_only=True, directory=directory)
             self.db.sync_graph(owner.owner_id, nodes, edges, head=head, version=VERSIONS["graph"],
-                               owner_fingerprint=owner.fingerprint,
+                               owner_fingerprint=self._graph_fp(owner, concepts_fp),
                                signature=graph_projection.signature(nodes, edges))
             synced.append(owner.owner_id)
         known = {o.owner_id for o in index.owners}
@@ -215,7 +246,7 @@ class IndexService:
         result: dict[str, Any] = {"owner_id": owner_id, "generation": head["generation"] if head else 0}
         # R12 T-P2.7：图投影与检索条目同批更新；图只是导航，失败不影响其他通道
         result["graph"] = self.db.sync_graph(owner_id, nodes, edges, head=head, version=VERSIONS["graph"],
-                                             owner_fingerprint=owner.fingerprint,
+                                             owner_fingerprint=self._graph_fp(owner, self._concepts_fp(index)),
                                              signature=graph_projection.signature(nodes, edges))
         for corpus, entries in projected.items():
             signature = projections.signature(entries, VERSIONS[corpus])
@@ -308,6 +339,7 @@ class IndexService:
         index = self.storage.owners.scan()
         count = self.db.embedder.count_tokens if self.db.embedder is not None else len
         library = self.concept_owner()
+        directory = self._concepts(index)  # R23 D-09：按当前概念库判断链接是否仍未解析、是否指向已拆分的页面
         for owner in index.readable():
             if not owner.persisted or owner.owner_type == "run":
                 continue
@@ -324,9 +356,13 @@ class IndexService:
                             out.append(where | {"gap": "long_block", "block_id": block["block_id"]})
                         if block["role"] == "results" and not block["requires_block_ids"]:
                             out.append(where | {"gap": "results_without_dependency", "block_id": block["block_id"]})
-                missing = [x["text"] for x in record.get("links", []) if x["status"] == "unresolved_concept"]
+                links = record.get("links", [])
+                missing = [x["text"] for x in links if x["status"] == "unresolved_concept" and directory.resolve(x) is None]
                 if missing:
                     out.append(where | {"gap": "missing_concept", "names": missing})
+                split = [x["text"] for x in links if x["ref"] is not None and directory.resolve(x) in directory.split]
+                if split:
+                    out.append(where | {"gap": "split_concept_link", "names": split})
         self.ensure_graph()
         if library:
             incoming = {e["dst"] for e in self.db.graph_all_edges() if e["type"] != "belongs_to"}
@@ -594,8 +630,8 @@ class IndexService:
         category = edge["category"]
         if category == "navigation":
             return getattr(weights, f"navigation_{edge['certainty'] or 'plausible'}", weights.navigation_plausible)
-        if category == "claim_relation":
-            return weights.claim_relation * self.MATURITY_FACTOR.get(maturity.get(edge["declared_by"]), 0.5)
+        if category == "claim_part":
+            return weights.claim_part * self.MATURITY_FACTOR.get(maturity.get(edge["declared_by"]), 0.5)
         return getattr(weights, category, 0.0)
 
     def _graph_route(self, fused: list[dict], settings: GraphRoute, *, corpus: str, owner_ids: list[str], key,
@@ -604,7 +640,7 @@ class IndexService:
         r"""从融合结果的前 seeds 名出发沿图走 hops 跳：
         得分 $s(n)=\sum_{种子} \mathrm{RRF}(种子)\cdot\prod_{路径} w_e\cdot\frac{1}{\log_2(2+\deg n)}$，
         $w_e$ 为边类别权重 × 确定度（或结论成熟度）系数，$\deg n$ 为节点度数（热门概念降权）。
-        排除 rejected/withdrawn 关联与失效结论的快捷边；节点映射回当前投影中通过同样过滤的条目，映射不到的丢弃。"""
+        排除 rejected/withdrawn 关联与失效结论的要素边；节点映射回当前投影中通过同样过滤的条目，映射不到的丢弃。"""
 
         self.ensure_graph()
         seeds = {}
@@ -620,7 +656,7 @@ class IndexService:
             if visited_edges + len(edges) > max_edges:
                 edges, truncated = edges[:max(0, max_edges - visited_edges)], True
             visited_edges += len(edges)
-            claim_ids = sorted({e["declared_by"] for e in edges if e["category"] == "claim_relation"})
+            claim_ids = sorted({e["declared_by"] for e in edges if e["category"] == "claim_part"})
             maturity = {n["node_id"]: n["maturity"] for n in self.db.graph_nodes(claim_ids)}
             neighbors: dict[str, list[tuple[float, str, dict]]] = {}
             for edge in edges:

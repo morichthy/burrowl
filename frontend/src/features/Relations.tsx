@@ -9,7 +9,7 @@ import louvain from "graphology-communities-louvain";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useAction, useOp } from "../api";
 import { KINDS, label, MATURITY, REVIEW_BADGES } from "../labels";
-import { Empty, ErrorBox, href, Loading, Panel, Tag, useDebounced } from "../ui";
+import { Empty, ErrorBox, href, linkify, Loading, Markdown, Panel, Tag, useDebounced } from "../ui";
 import { Notes } from "./Notes";
 
 interface GraphNode {
@@ -26,15 +26,24 @@ interface GraphNode {
   maturity?: string | null;
 }
 interface GraphEdge {
+  id?: string;
   source: string;
   target: string;
   type: string;
   origin: string;
   category?: string;
   certainty?: string | null;
-  derived?: boolean;
   state?: string | null;
   candidate?: boolean;
+  declared_owner?: string | null;
+  declared_rev?: number | null;
+  field?: string | null;
+  explanation?: string | null;
+  basis_refs?: FixedRef[] | null;
+  observed_in?: FixedRef | null;
+  association_origin?: string | null;
+  declared_by?: string | null;
+  declared_record?: { owner_id: string; record_id: string; revision: number | null } | null;
 }
 interface GraphData {
   nodes: GraphNode[];
@@ -48,6 +57,7 @@ interface FixedRef {
   sha256: string | null;
   locator: string;
   relation: string;
+  note?: string;
 }
 interface CandidateLink {
   from: FixedRef;
@@ -66,25 +76,37 @@ const TYPE_COLORS: Record<string, string> = {
   concept: "#e0664a",
   block: "#8f9bab",
 };
-const NODE_TYPE_LABELS: Record<string, string> = { owner: "对象", record: "记录", claim: "结论（Claim）", concept: "概念", source: "来源", block: "内容块（L1）" };
+const NODE_TYPE_LABELS: Record<string, string> = { owner: "对象", record: "记录", claim: "结论（独立判断）", concept: "概念", source: "来源", block: "L1 记录内的块" };
+// R23 D-11：类别回答"这条边表达什么"；节点类型回答"这个点是什么"
 const CATEGORIES: { value: string; label: string; color: string }[] = [
   { value: "structure", label: "结构", color: "#c8c8c8" },
-  { value: "evidence", label: "证据", color: "#3d8b5a" },
+  { value: "evidence", label: "依据", color: "#3d8b5a" },
   { value: "reference", label: "引用", color: "#7a8ca8" },
   { value: "navigation", label: "关联", color: "#d08a2c" },
-  { value: "concept", label: "概念", color: "#d0573a" },
-  { value: "claim_relation", label: "结论关系", color: "#a05195" },
+  { value: "claim_part", label: "结论要素", color: "#a05195" },
+  { value: "mention", label: "提及", color: "#d0573a" },
 ];
+// 提及默认关闭（R23 D-12）：材料讨论了哪些概念按需查看，默认只看结论中的角色与条件
+const DEFAULT_CATEGORIES = CATEGORIES.map((c) => c.value).filter((v) => v !== "mention");
 const LINE_STYLE: Record<string, string> = { supported: "solid", plausible: "dashed", speculative: "dotted" };
-// 同一对节点之间有多条边时合并成一条连线，颜色取最"有分量"的类别：证据 > 结论关系 > 关联 > 概念 > 引用 > 结构
-const CATEGORY_PRIORITY = ["evidence", "claim_relation", "navigation", "concept", "reference", "structure"];
+// 同一对节点之间有多条边时合并成一条连线，颜色取最"有分量"的类别：依据 > 结论要素 > 关联 > 提及 > 引用 > 结构
+const CATEGORY_PRIORITY = ["evidence", "claim_part", "navigation", "mention", "reference", "structure"];
 // 边类型（index/graph.py 的 CATEGORY 表）的中文名，用于悬停说明和选中节点时的连线标签
 const EDGE_TYPE_LABELS: Record<string, string> = {
   belongs_to: "属于", contains: "包含", part_of: "组成", depends_on: "依赖", produces: "产出", member_of: "成员", precedes: "先于",
   supports: "支持", input: "输入依据", contradicts: "矛盾", supersedes: "替代",
   references: "引用", background: "背景", derived_from: "派生自", prerequisite: "前提", refines: "细化", used_in: "用于",
   same_problem: "同一问题", same_failure_mode: "同一失败模式", analogous_to: "类比", related_to: "相关", similar_structure: "结构相似",
-  same_entity: "同一实体", mentions: "提及", subject_of: "主体", object_of: "客体",
+  same_entity: "同一实体", mentions: "提及",
+  // 结论要素边的类型是角色名（core/predicates.py 的 ROLE_LABELS）
+  agent: "作用方", target: "作用对象", baseline: "基准", metric: "指标", cause: "原因", effect: "结果", mechanism: "机制",
+  method: "方法", case: "失效情形", domain: "适用对象", dependent: "需求方", requirement: "前提", item: "比较项",
+  part: "部分", whole: "整体", condition: "条件",
+};
+// 结论谓词的读法（core/predicates.py 的 FRAMES），用于连线详情中的结构
+const PREDICATE_LABELS: Record<string, string> = {
+  improves: "改善", degrades: "恶化", causes: "导致", prevents: "阻止", fails_on: "失效于",
+  applies_to: "适用于", requires: "需要", equivalent_to: "等价于", part_of: "组成",
 };
 // 形状区分节点类型（不只靠颜色，色弱也能分辨）；对象另加一圈光环
 const NODE_SHAPES: Record<string, string> = { owner: "ellipse", record: "ellipse", block: "ellipse", source: "round-rectangle", claim: "round-diamond", concept: "round-hexagon" };
@@ -104,7 +126,7 @@ const EMPHASIS: { type: string; label: string; color?: string; dash: number[]; w
 const EMPHASIS_BY_TYPE = new Map(EMPHASIS.map((e, i) => [e.type, { ...e, order: i }]));
 const NODE_TYPES =["owner", "record", "block", "claim", "concept", "source"];
 // 默认隐藏内容块以免图过密；空数组则明确表示不显示任何节点。
-const DEFAULT_NODE_TYPES = NODE_TYPES.filter((type) => type !== "block");
+const DEFAULT_NODE_TYPES = ["owner", "record", "claim", "concept"];  // R23 D-12：结论默认显示
 const PALETTE = ["#4e79a7", "#f28e2b", "#e15759", "#76b7b2", "#59a14f", "#edc948", "#b07aa1", "#ff9da7", "#9c755f", "#bab0ac"];
 const KIND_FILTERS = [
   { value: "overview", label: "概览（L4）" },
@@ -133,16 +155,129 @@ interface View {
   categories?: string[];
 }
 
-const defaultView = (): View => ({ hops: 2, query: "", kinds: [], nodeTypes: [...DEFAULT_NODE_TYPES], excluded: [], communities: false, categories: [] });
+const defaultView = (): View => ({ hops: 2, query: "", kinds: [], nodeTypes: [...DEFAULT_NODE_TYPES], excluded: [], communities: false, categories: [...DEFAULT_CATEGORIES] });
+/** 保存的视图里可能有已改名的类别（R23 前的 concept、claim_relation）：只保留现有类别，全不认识时用默认值。 */
+const knownCategories = (values: string[] | undefined) => {
+  if (values === undefined) return [...DEFAULT_CATEGORIES];
+  if (!values.length) return [];
+  const kept = values.filter((v) => CATEGORIES.some((c) => c.value === v));
+  return kept.length ? kept : [...DEFAULT_CATEGORIES];
+};
 
 /** 画布上的一条连线：同一对节点之间的全部边（不分方向）合并而成。 */
-interface Link {
+export interface Link {
   id: string;
   source: string;
   target: string;
   edges: GraphEdge[];
   forward: boolean; // 存在 source→target 方向的边
   backward: boolean; // 存在 target→source 方向的边
+}
+
+interface DetailRecord {
+  record_id: string;
+  title: string;
+  revision: number;
+  body_markdown?: string;
+  links?: { text: string; ref: FixedRef | null }[];
+  sources?: FixedRef[];
+  provenance_gap?: string | null;
+  payload?: Record<string, unknown>;
+}
+
+/** 固定引用只显示服务端确实给出的定位信息；完整记录由记忆页按权限读取。 */
+interface RefTarget { title: string; owner_id?: string; record_id?: string; kind: string }
+function RefLine({ value, nodes, targets }: { value: FixedRef; nodes: GraphNode[]; targets: Record<string, RefTarget> }) {
+  const node = nodes.find((item) => item.id === value.target_id);
+  const target = targets[value.target_id];
+  const ownerId = target?.owner_id ?? node?.owner_id;
+  const recordId = target?.record_id ?? node?.record_id ?? node?.id;
+  const address = ownerId && recordId && target?.kind !== "file" ? href("memory", ownerId, recordId) : undefined;
+  const title = target?.title ?? node?.title ?? value.target_id;
+  return <span>{address ? <a href={address}>{title}</a> : title}{value.revision != null ? ` · 修订 ${value.revision}` : ""}{value.locator ? ` · ${value.locator}` : ""}
+    {value.note ? <span className="ref-note">：{value.note}</span> : null}</span>;
+}
+
+/** 每条实际边独立读取声明记录：访问控制与记忆页共用 memory.inspect。 */
+function EdgeEntry({ edge, nodes }: { edge: GraphEdge; nodes: GraphNode[] }) {
+  const declaring = nodes.find((node) => node.id === (edge.declared_by ?? edge.origin));
+  const ownerId = edge.declared_record?.owner_id ?? edge.declared_owner ?? declaring?.owner_id;
+  const recordId = edge.declared_record?.record_id ?? (declaring?.type === "claim" ? declaring.record_id : (edge.declared_by ?? edge.origin));
+  const revision = edge.declared_record?.revision ?? edge.declared_rev ?? undefined;
+  const canInspect = !!ownerId && !!recordId && recordId !== ownerId;
+  const detail = useOp<{ record: DetailRecord }>("memory.inspect", { owner_id: ownerId, record_id: recordId, revision }, canInspect);
+  const resolved = useOp<Record<string, RefTarget>>("ui.ref_targets", { owner_id: ownerId, record_id: recordId, revision }, canInspect);
+  const targets = resolved.stale ? {} : (resolved.data ?? {});
+  const record = detail.stale ? undefined : detail.data?.record;
+  const payload = record?.payload ?? {};
+  // 链接目标与记忆页采用同一套权限过滤结果；找不到目标的 [[链接]] 保持原文。
+  const linkTargets = Object.fromEntries((record?.links ?? []).map((item) => {
+    const target = item.ref ? targets[item.ref.target_id] : undefined;
+    const address = target?.owner_id && target.record_id ? href("memory", target.owner_id, target.record_id)
+      : target?.kind === "owner" && target.owner_id ? href("memory", target.owner_id) : undefined;
+    return [item.text, address];
+  }));
+  const claim = Array.isArray(payload.claims) ? (payload.claims as Record<string, unknown>[]).find((item) => item.claim_id === (edge.declared_by ?? edge.origin)) : undefined;
+  const from = nodes.find((node) => node.id === edge.source);
+  const to = nodes.find((node) => node.id === edge.target);
+  const labelNode = (node: GraphNode | undefined, id: string) => node?.title ?? id;
+  const refs = (key: string) => Array.isArray(payload[key]) ? payload[key] as FixedRef[] : [];
+  return <li className="edge-detail-entry">
+    <strong>{labelNode(from, edge.source)} → {labelNode(to, edge.target)}：{edgeTypeLabel(edge.type)}</strong>
+    <p className="hint">类别：{CATEGORIES.find((category) => category.value === edge.category)?.label ?? edge.category ?? "未提供"}；
+      {edge.certainty ? `确定度：${CERTAINTY_LABELS[edge.certainty] ?? edge.certainty}；` : ""}
+      {/* 关联的 accepted 只是采纳导航线索，不能借用结论复核的“已确认”徽标。 */}
+      {edge.state ? `状态：${(edge.category === "navigation" ? { accepted: "已采纳", candidate: "待判断", rejected: "已拒绝", withdrawn: "已撤回" }[edge.state] : undefined) ?? REVIEW_BADGES[edge.state]?.label ?? ({ active: "有效", invalid: "已失效" }[edge.state] ?? edge.state)}；` : ""}
+      声明者：{edge.declared_by ?? edge.origin}{edge.association_origin ? `（来源：${edge.association_origin}）` : ""}
+      {edge.field ? `；声明位置：${edge.field}` : ""}
+    </p>
+    {record ? <>
+      <p>原记录：<a href={href("memory", ownerId!, record.record_id)}>{record.title}</a> · 修订 {record.revision}</p>
+      {claim ? <>
+        {typeof claim.statement === "string" ? <><strong>结论原文</strong><Markdown text={linkify(claim.statement, linkTargets)} /></> : null}
+        {typeof claim.scope === "string" && claim.scope ? <p>适用范围：{claim.scope}</p> : null}
+        {claim.relation && typeof claim.relation === "object" ? <ClaimStructure relation={claim.relation as ClaimRelation} /> : null}
+        {Array.isArray(claim.evidence_refs) && claim.evidence_refs.length ? <><strong>结论依据</strong><ul>{(claim.evidence_refs as FixedRef[]).map((ref, index) => <li key={index}><RefLine value={ref} nodes={nodes} targets={targets} /></li>)}</ul></> : null}
+      </> : null}
+      {typeof payload.explanation === "string" && payload.explanation ? <><strong>关系说明</strong><Markdown text={linkify(payload.explanation, linkTargets)} /></> : null}
+      {typeof payload.shared_structure === "string" && payload.shared_structure ? <p>共享结构：{payload.shared_structure}</p> : null}
+      {Array.isArray(payload.transfer_limits) && payload.transfer_limits.length ? <p>迁移边界：{payload.transfer_limits.join("；")}</p> : null}
+      {Array.isArray(payload.differences) && payload.differences.length ? <p>差异：{payload.differences.join("；")}</p> : null}
+      {refs("basis_refs").length ? <><strong>关系依据</strong><ul>{refs("basis_refs").map((ref, index) => <li key={index}><RefLine value={ref} nodes={nodes} targets={targets} /></li>)}</ul></> : null}
+      {payload.observed_in && typeof payload.observed_in === "object" ? <p>观察于：<RefLine value={payload.observed_in as FixedRef} nodes={nodes} targets={targets} /></p> : null}
+      {refs("missing_refs").length ? <><strong>尚缺的依据</strong><ul>{refs("missing_refs").map((ref, index) => <li key={index}><RefLine value={ref} nodes={nodes} targets={targets} /></li>)}</ul></> : null}
+      {record.sources?.length ? <><strong>原记录来源</strong><ul>{record.sources.map((ref, index) => <li key={index}><RefLine value={ref} nodes={nodes} targets={targets} /></li>)}</ul></> : null}
+      {record.provenance_gap ? <p>依据缺口：{record.provenance_gap}</p> : null}
+      {record.body_markdown ? <details><summary>展开原记录正文</summary><Markdown text={linkify(record.body_markdown, linkTargets)} /></details> : null}
+    </> : canInspect ? <><Loading show={detail.loading} /><ErrorBox error={detail.error} /></> : <p className="hint">图中未提供可读取的声明记录位置，无法在此展开完整依据。</p>}
+  </li>;
+}
+
+interface ClaimRelation { predicate: string; negated?: boolean; participants?: { role: string; value: string }[] }
+
+/** 结论的结构（R23 D-02、D-12）：自动生成的标注，与陈述并排显示，供遇到时对照核验。 */
+export function ClaimStructure({ relation }: { relation: ClaimRelation }) {
+  const predicate = PREDICATE_LABELS[relation.predicate] ?? relation.predicate.replace(/^x-/, "");
+  const grouped = new Map<string, string[]>();
+  for (const part of relation.participants ?? []) grouped.set(part.role, [...(grouped.get(part.role) ?? []), part.value]);
+  return <div className="claim-structure">
+    <strong>结构</strong>（自动生成，以陈述为准）：{relation.negated ? "不" : ""}{predicate}
+    <ul>{[...grouped].map(([role, values]) => <li key={role}>{edgeTypeLabel(role)}：{values.map(shownValue).join("、")}</li>)}</ul>
+  </div>;
+}
+/** 参与者的显示文字：链接取竖线后的原文写法，纯文字原样显示（与 core/predicates.py 的 display 相同）。 */
+const shownValue = (value: string) => {
+  const match = /^\[\[([^\]]+)\]\]$/.exec(value.trim());
+  if (!match) return value;
+  const [name, shown] = match[1].split("|", 2);
+  return (shown ?? name).trim().replace(/^[@!]/, "");
+};
+
+export function EdgeFocus({ link, nodes }: { link: Link; nodes: GraphNode[] }) {
+  return <Panel title="连线详情">
+    <p className="hint">画布将同一对节点的关系合并显示；下面逐条列出原始方向与声明。共 {link.edges.length} 条。</p>
+    <ol className="claims">{link.edges.map((edge, index) => <EdgeEntry key={edge.id ?? index} edge={edge} nodes={nodes} />)}</ol>
+  </Panel>;
 }
 
 /**
@@ -175,7 +310,7 @@ const mainEdge = (link: Link) => [...link.edges].sort((x, y) => rank(x) - rank(y
 /** 节点颜色：按社区着色时取社区色，否则取节点类型色。 */
 const nodeColor = (n: GraphNode, communities: Record<string, number> | null) =>
   communities ? PALETTE[(communities[n.id] ?? 0) % PALETTE.length] : (TYPE_COLORS[n.type] ?? "#888");
-const edgeTypeLabel = (type: string) => EDGE_TYPE_LABELS[type] ?? type;
+const edgeTypeLabel = (type: string) => EDGE_TYPE_LABELS[type] ?? type.replace(/^x-/, "");
 /** 连线上各种关系类型的中文名，去重后按代表性排序。 */
 const linkLabel = (link: Link) => [...new Set([...link.edges].sort((x, y) => rank(x) - rank(y)).map((e) => edgeTypeLabel(e.type)))].join("、");
 
@@ -184,6 +319,7 @@ export function Relations() {
   const [view, setView] = useState<View>(defaultView);
   const [history, setHistory] = useState<string[]>([]);
   const [focus, setFocus] = useState<GraphNode>();
+  const [selectedLinkId, setSelectedLinkId] = useState<string>();
   const [linkFrom, setLinkFrom] = useState<GraphNode>();
   // 隐藏节点的标题只用于"已隐藏"栏显示；不保存到视图，重载后退回显示 ID
   const [hiddenTitles, setHiddenTitles] = useState<Record<string, string>>({});
@@ -197,7 +333,7 @@ export function Relations() {
         center: stored.center ?? null, excluded: stored.excluded ?? [],
         hops: filters?.hops ?? 2, query: filters?.query ?? "", kinds: filters?.kinds ?? [],
         nodeTypes: filters?.nodeTypes ?? [...DEFAULT_NODE_TYPES],
-        communities: filters?.communities ?? false, categories: filters?.categories ?? [],
+        communities: filters?.communities ?? false, categories: knownCategories(filters?.categories),
       });
       setLoadedSaved(true);
     }
@@ -224,6 +360,7 @@ export function Relations() {
   const suggestions = candidates.stale ? [] : (candidates.data?.candidates ?? []);
   const communities = useMemo(() => (view.communities && graph.data ? detect(graph.data) : null), [view.communities, graph.data]);
   const links = useMemo(() => mergeEdges(graph.data), [graph.data]);
+  const selectedLink = links.find((link) => link.id === selectedLinkId);
 
   const setCenter = (id: string | null) => {
     if (view.center && view.center !== id) setHistory((h) => [...h, view.center!]);
@@ -288,17 +425,26 @@ export function Relations() {
           ) : null}
         </div>
         <div className="filter-rows">
-          <span className="filter-label" title="节点类型控制图中实际显示的节点；结论（Claim）是可以单独引用和复核的判断">
+          <span className="filter-label" title="结论是可单独引用、复核的判断；普通关系通过连线查看。来源默认隐藏。">
             节点
           </span>
           <div className="chips" role="group" aria-label="节点类型">
-            {NODE_TYPES.map((type) => (
+            {NODE_TYPES.filter((type) => type !== "block").map((type) => (
               <label key={type} className={view.nodeTypes?.includes(type) ? "on" : ""}>
                 <input type="checkbox" checked={!!view.nodeTypes?.includes(type)} onChange={() => toggle("nodeTypes", type)} />
                 <i className={`shape shape-${type}`} style={{ background: TYPE_COLORS[type] }} />
                 {NODE_TYPE_LABELS[type]}
               </label>
             ))}
+          </div>
+          <span className="filter-label" title="块是 L1 记录内部的小节，不是另一条 L1 记录。">记录内部细节</span>
+          <div className="chips" role="group" aria-label="记录内部细节">
+            <label className={view.nodeTypes?.includes("block") ? "on" : ""}>
+              <input type="checkbox" checked={!!view.nodeTypes?.includes("block")} onChange={() => toggle("nodeTypes", "block")} />
+              <i className="shape shape-block" style={{ background: TYPE_COLORS.block }} />
+              展开 L1 记录内的块
+            </label>
+            <span className="hint">块是记录内部的小节，不是 L1 记录本身。</span>
           </div>
           <span className="filter-label" title="只筛选记录节点；选“全部”或不选任何分类时显示全部记录。结论、来源等其他节点由上一行控制">
             记录分类
@@ -315,7 +461,7 @@ export function Relations() {
               </label>
             ))}
           </div>
-          <span className="filter-label" title="勾选的类别显示在图中；颜色即连线颜色">
+          <span className="filter-label" title="结论要素：结论的参与者（按角色）与适用范围中的条件；提及：材料讨论了哪个概念（默认关闭）。">
             关系类别
           </span>
           <div className="chips" role="group" aria-label="关系类别">
@@ -359,17 +505,19 @@ export function Relations() {
           communities={communities}
           suggestions={suggestions}
           selectedId={focus?.id}
-          onSelect={setFocus}
+          onSelect={(node) => { setFocus(node); setSelectedLinkId(undefined); }}
+          onSelectLink={(link) => { setSelectedLinkId(link?.id); setFocus(undefined); }}
+          selectedLinkId={selectedLinkId}
           onCenter={(id) => setCenter(id)}
         />
         <p className="hint">
           {graph.data?.nodes.length ?? 0} 个节点、{graph.data?.edges.length ?? 0} 条关系
           {links.length && links.length < (graph.data?.edges.length ?? 0) ? `（合并为 ${links.length} 条连线）` : ""}
-          {communities ? `，${new Set(Object.values(communities)).size} 个社区` : ""}。悬停查看名称与关系，双击节点以它为中心展开。连线颜色是关系类别；关联的实线、虚线、点线分别表示有依据、可能、推测；矛盾、替代、支持、输入依据、依赖/前提另有专门的线型和箭头（见图例）；橙色虚线是待判断的候选；节点的红色虚线边框表示复核有问题。
+          {communities ? `，${new Set(Object.values(communities)).size} 个社区` : ""}。点击连线查看每条关系的方向、声明者和依据；双击节点以它为中心展开。连线颜色是关系类别；关联的实线、虚线、点线分别表示有依据、可能、推测；矛盾、替代、支持、输入依据、依赖/前提另有专门的线型和箭头（见图例）；橙色虚线是待判断的候选；节点的红色虚线边框表示复核有问题。
         </p>
       </Panel>
       <aside>
-        <Focus
+        {selectedLink ? <EdgeFocus link={selectedLink} nodes={graph.data?.nodes ?? []} /> : <Focus
           node={focus}
           candidates={suggestions}
           onCenter={(id) => setCenter(id)}
@@ -382,7 +530,7 @@ export function Relations() {
           linkFrom={linkFrom}
           setLinkFrom={setLinkFrom}
           reloadGraph={graph.reload}
-        />
+        />}
         <Notes focus={focus} />
       </aside>
     </div>
@@ -496,6 +644,7 @@ function graphStyle(t: ReturnType<typeof theme>) {
       },
     },
     { selector: "node:selected", style: { "border-width": 3, "border-style": "solid", "border-color": t.accent, "border-opacity": 0.95, "min-zoomed-font-size": 0 } },
+    { selector: "edge:selected", style: { "line-opacity": 1, width: 3 } },
   ] as unknown as cytoscape.StylesheetJson;
 }
 
@@ -561,7 +710,9 @@ function GraphCanvas(props: {
   communities: Record<string, number> | null;
   suggestions: CandidateLink[];
   selectedId: string | undefined;
+  selectedLinkId: string | undefined;
   onSelect: (node: GraphNode | undefined) => void;
+  onSelectLink: (link: Link | undefined) => void;
   onCenter: (id: string) => void;
 }) {
   const container = useRef<HTMLDivElement>(null);
@@ -570,10 +721,12 @@ function GraphCanvas(props: {
   const linksRef = useRef(new Map<string, Link>());
   const onSelect = useRef(props.onSelect);
   onSelect.current = props.onSelect;
+  const onSelectLink = useRef(props.onSelectLink);
+  onSelectLink.current = props.onSelectLink;
   const onCenter = useRef(props.onCenter);
   onCenter.current = props.onCenter;
   const [tip, setTip] = useState<Tip>();
-  const { data, links, communities, suggestions, selectedId } = props;
+  const { data, links, communities, suggestions, selectedId, selectedLinkId } = props;
   const inJsdom = typeof navigator !== "undefined" && navigator.userAgent.includes("jsdom");
 
   // 画布只创建一次：数据、着色、候选、选中都在原实例上增量更新，位置和视野不会被重置
@@ -613,11 +766,18 @@ function GraphCanvas(props: {
       setTip(undefined);
     };
     cy.on("tap", "node", (event) => onSelect.current(nodesRef.current.get(event.target.id())));
+    cy.on("tap", "edge", (event) => {
+      if (!event.target.hasClass("suggest")) onSelectLink.current(linksRef.current.get(event.target.id()));
+    });
     cy.on("tap", (event) => {
-      if (event.target === cy) onSelect.current(undefined); // 点空白处取消选中
+      if (event.target === cy) {
+        onSelect.current(undefined);
+        onSelectLink.current(undefined);
+      }
     });
     cy.on("dbltap", "node", (event) => onCenter.current(event.target.id()));
     cy.on("select", "node", (event) => highlight(cy, event.target));
+    cy.on("select", "edge", (event) => highlight(cy, event.target));
     cy.on("unselect", "node", () => highlight(cy, selected()));
     cy.on("mouseover", "node", (event) => {
       highlight(cy, event.target);
@@ -790,6 +950,14 @@ function GraphCanvas(props: {
     cy.$("node:selected").unselect();
     target.select();
   }, [selectedId, data]);
+
+  // 边选中态与节点相同：点击侧栏或刷新图数据时仍高亮对应连线。
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    cy.$("edge:selected").unselect();
+    if (selectedLinkId) cy.getElementById(selectedLinkId).select();
+  }, [selectedLinkId, data]);
 
   const fit = () => cyRef.current && smoothFit(cyRef.current, 400);
   const focusSelected = () => {

@@ -143,14 +143,26 @@ class RerankerModel(_Model):
 
 class CategoryWeights(_Model):
     """图路线中各类边的权重（R12 §4.4）。关联边按确定度取三档之一。"""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _renamed(cls, data):
+        """R23 D-11 改名：旧配置中的 concept / claim_relation 读作 mention / claim_part（写回时用新名）。"""
+        if isinstance(data, dict):
+            data = dict(data)
+            for old, new in (("concept", "mention"), ("claim_relation", "claim_part")):
+                if old in data:
+                    data.setdefault(new, data.pop(old))
+        return data
+
     structure: float = Field(0.3, ge=0, le=1)
     evidence: float = Field(1.0, ge=0, le=1)
     reference: float = Field(0.6, ge=0, le=1)
     navigation_supported: float = Field(0.7, ge=0, le=1)
     navigation_plausible: float = Field(0.4, ge=0, le=1)
     navigation_speculative: float = Field(0.2, ge=0, le=1)
-    concept: float = Field(0.5, ge=0, le=1)
-    claim_relation: float = Field(0.6, ge=0, le=1, description="再乘结论的成熟度系数")
+    mention: float = Field(0.5, ge=0, le=1)
+    claim_part: float = Field(0.6, ge=0, le=1, description="结论要素边（R23 D-11），再乘所属结论的成熟度系数")
 
 
 class GraphRoute(_Model):

@@ -65,7 +65,7 @@
 
 | 术语 | 定义 | 不是什么 / 注意 | 代码标识 |
 |---|---|---|---|
-| 结论（claim） | 写在记录 `payload.claims` 中、需要复核的一句陈述，带适用范围和证据。L1 只写 fact / calculation，可用 `block_id` 指向结果块；可选 `relation`（主体、谓词、对象） | 记录正文本身不是 claim | `claim_id`、`CLM-…` |
+| 结论（claim） | 写在记录 `payload.claims` 中、需要复核的一句陈述，带适用范围和证据。L1 只写 fact / calculation，可用 `block_id` 指向结果块；可选 `relation`（谓词＋按角色列出的参与者，自动生成的结构标注，不计入指纹） | 记录正文本身不是 claim | `claim_id`、`CLM-…` |
 | 适用范围（scope） | 结论成立的条件和对象范围，写得越具体越好 | "一般情况下"不是范围 | `scope` |
 | 复核 | 对一条结论的判断，绑定当时的记录内容与结论指纹 | 保存、索引、回读都不是复核 | `review.*` |
 | 删除（记录） | 墓碑提交：记录从当前记录中移除，旧修订留在提交历史里，固定引用照常可读，可恢复。只用于不该记的内容，与撤回不同（R22） |
@@ -112,8 +112,8 @@
 | 概念库 / 概念页 | 概念库是配置 `graph.concept_owner_id` 指定的那一个 knowledge 对象；其他 knowledge 对象是通用知识对象，承接不属于具体研究、项目、工具、数据的知识；其中 page_type 为 concept / entity 的 wiki_page 是概念页，标题加别名就是概念的身份。可按领域（`domains`）筛选或屏蔽；合并、拆分用修订表达，从不删除 | 不是证据，也不是结论 | `graph.concept_owner_id`、`KNW-…` |
 | 链接 | 正文里的 `[[概念]]`、`[[@handle]]`、`[[@对象短名/handle]]`、`[[@handle#块]]`、`[[!结论短名]]` 写法；提交时解析并固定版本，存入记录的 `links` | 不是证据，除非另写在依据字段里；未解析的概念不阻塞提交 | `links`、`UNRESOLVED_LINK` |
 | 图投影 | 从记录派生的节点表和边表，存在 index.sqlite 中，带水位，可以重建 | 不是真源；要修改关系应修改记录 | `graph_nodes`、`graph_edges` |
-| 边类别 | 由程序按关系名查表得出：structure 结构、evidence 证据、reference 引用、navigation 关联、concept 概念、claim_relation 结论关系 | AI 不填写类别 | `category` |
-| 快捷边 | 由结论的 `relation` 派生的 主体 → 对象 边，继承该结论的复核状态和成熟度；结论失效时快捷边失效 | 不独立存在，条件留在结论的 scope 里 | `derived=true` |
+| 边类别 | 由程序得出：structure 结构、evidence 依据、reference 引用、navigation 关联、mention 提及（材料讨论了某个概念）、claim_part 结论要素（结论 → 参与者，类型为角色名；结论 → 适用范围中的条件） | AI 不填写类别；类别说明边表达什么，节点类型说明点是什么 | `category` |
+| 谓词框架 | 每个结论谓词预先定义的必填角色、可选角色与方向读法（如 causes：原因、结果，可选机制）；框架外的角色与自定义谓词以 `x-` 开头 | 角色不在每条结论里临时命名；条件不是角色（写在 scope），矛盾不是谓词（写在依据） | `core/predicates.py`、`claim_relation` |
 | 图路线 | 检索融合中的一路：从关键词与向量的前几名出发沿图扩展，热门节点按度数降权；默认关闭 | 只是导航，不是证据；命中仍要回到固定版本核对 | `index.graph_route`、`via` |
 | 关联候选 | 保存后程序算出的线索：正文提到概念却没链接、向量近邻；外部工具也可回流候选 | 不会自动写成记录，需要判断 | `relations.candidates`、`link_candidates` |
 

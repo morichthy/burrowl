@@ -6,14 +6,16 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from ..core import predicates
 from ..core.hashing import canonical_hash
+from ..core.records import claim_hash
 from ..core.technical import description_text
 from . import graph as graph_projection
 
 # v2（R12 P1）：条目带上下文信封 embed_prefix；技术单元的记录级条目包含全部块正文
 # v3（R19 D-04）：发现投影收录结论、已采纳的关联、概念页；关联条目有可检索的文字，只收已采纳的
-FULLTEXT_VERSION = "fulltext-v3"
-DISCOVERY_VERSION = "discovery-v3"
+FULLTEXT_VERSION = "fulltext-v4"  # v4：结论条目的角色读法（R23 D-14）
+DISCOVERY_VERSION = "discovery-v4"  # v4：同上
 SOURCE_VERSION = "source-v2"
 CORPORA = ("fulltext", "discovery", "source")
 # 不进入全文检索的类型：L0 原文只作追溯；文稿只是编排；复核/表示/策略等是元数据。
@@ -152,15 +154,15 @@ def _association_text(record: dict, titles: dict[str, str]) -> str:
 
 
 def _claim_entry(corpus: str, version: str, owner: OwnerInfo, record: dict, claim: dict, badge: str) -> dict:
-    """结论条目：陈述 + 适用范围（+ 有 relation 时"主体 谓词 对象"）。可见范围与敏感级别跟随所在记录。"""
+    """结论条目：陈述 + 适用范围（+ 有 relation 时的角色读法，R23 D-14）。可见范围与敏感级别跟随所在记录。"""
     relation = claim.get("relation")
-    triple = " ".join([relation["subject"], relation["predicate"], relation["object"]]) if relation else ""
-    text = "\n".join(t for t in (claim["statement"], claim["scope"], triple) if t)
+    roles = predicates.reading(relation) if relation else ""
+    text = "\n".join(t for t in (claim["statement"], claim["scope"], roles) if t)
     return _entry(corpus, version, owner, key=claim["claim_id"], record_id=record["record_id"],
                   canonical_id=claim["claim_id"], kind="claim", level=record["level"], revision=record["revision"],
-                  content_hash=canonical_hash(claim), title=claim["statement"], text=text,
+                  content_hash=claim_hash(claim), title=claim["statement"], text=text,
                   fixed_ref={"target_kind": "claim", "target_id": claim["claim_id"], "revision": None,
-                             "sha256": canonical_hash(claim), "locator": "statement", "relation": "references"},
+                             "sha256": claim_hash(claim), "locator": "statement", "relation": "references"},
                   discovery=record["discovery"], sensitivity=_sensitivity(owner, record),
                   review=review_class([badge]), embed_prefix=envelope(owner, record, claim=claim))
 

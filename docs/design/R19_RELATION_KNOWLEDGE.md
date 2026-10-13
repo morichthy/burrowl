@@ -146,6 +146,7 @@
 | concept | mentions、subject_of、object_of | 弱（经低度数概念中转） | 0.5 | A 讨论 [[X]] | — | 概念页定义 |
 | structure | belongs_to、contains、part_of、depends_on、produces、member_of、precedes | 否 | — | — | — | — |
 
+- 2026-10-13：`claim_relation`、`concept` 两行由 [R23](R23_CLAIM_STRUCTURE.md) D-11 改为 `claim_part`（经结论中转）与 `mention`；结论成为中转节点（R23 D-14）。
 - 关联记录中出现的证据类关系名（旧数据）按导航处理，读法取"A 与 B 相关"。
 - 失效结论（disputed、retracted、superseded、stale）声明的边、已拒绝或已撤回的关联不参与扩展，与 R12 §4.11 的排除规则一致。
 
@@ -196,6 +197,7 @@
 ```
 
 - 候选对象的筛选包 = 关系窗口（最多 3 个，与定点目标节点一一对应）+ 目标节点在发现投影中的条目窗口（若有），同样生成 digest。
+- 2026-10-13：经结论中转的关系窗口文字为陈述 + 适用范围 + 角色读法（[R23](R23_CLAIM_STRUCTURE.md) D-14）。
 - 关系窗口是线索：不进入 `delivered`，不能作为笔记出处；读该对象全文后才能引用。
 
 ### 4.6 定点阅读（D-11）

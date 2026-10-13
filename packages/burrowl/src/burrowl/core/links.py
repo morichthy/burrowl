@@ -80,9 +80,10 @@ def parse(text: str) -> list[Link]:
     return list(found.values())
 
 
-def link_texts(record: dict) -> list[str]:
-    """一条记录中会被扫描链接的文字：正文、L1 各块、文稿章节的叙述块、结论陈述与结论 relation 的两端。
-    payload 中其他字符串不扫描（§4.3）。"""
+def link_texts(record: dict, *, claim_parts: bool = True) -> list[str]:
+    """一条记录中会被扫描链接的文字：正文、L1 各块、文稿章节的叙述块、结论的陈述与适用范围、结论 relation 的参与者。
+    payload 中其他字符串不扫描（§4.3）。适用范围中的链接生成条件边（R23 D-06）。
+    claim_parts=False 时不含适用范围与参与者（图投影中它们由结论要素边表达，不再从记录连提及边）。"""
     payload = record.get("payload") or {}
     texts = [record.get("body_markdown") or ""]
     if record.get("kind") == "detail":
@@ -91,8 +92,9 @@ def link_texts(record: dict) -> list[str]:
         texts.extend(b.get("markdown", "") for b in payload.get("blocks", []) if b.get("type") == "prose")
     for claim in payload.get("claims", []) or []:
         texts.append(claim.get("statement", ""))
-        relation = claim.get("relation") or {}
-        texts.extend(relation.get(k, "") for k in ("subject", "object"))
+        if claim_parts:
+            texts.append(claim.get("scope", ""))
+            texts.extend(p.get("value", "") for p in (claim.get("relation") or {}).get("participants", []))
     return [t for t in texts if t]
 
 
@@ -110,8 +112,9 @@ def _text_fields(record: dict) -> list[tuple[str, str]]:
         fields.extend((f"/payload/blocks/{i}/markdown", b.get("markdown", ""))
                       for i, b in enumerate(payload.get("blocks", []))
                       if record.get("kind") == "detail" or b.get("type") == "prose")
-    fields.extend((f"/payload/claims/{i}/statement", c.get("statement", ""))
-                  for i, c in enumerate(payload.get("claims", []) or []))
+    for i, c in enumerate(payload.get("claims", []) or []):
+        fields.extend(((f"/payload/claims/{i}/statement", c.get("statement", "")),
+                       (f"/payload/claims/{i}/scope", c.get("scope", ""))))
     return [(path, text) for path, text in fields if text]
 
 

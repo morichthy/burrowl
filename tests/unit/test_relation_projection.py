@@ -19,7 +19,8 @@ def ref(target: str, locator="record") -> dict:
 NARRATIVE = record("MEM-N", "narrative", {
     "question": "顺序是否影响误差", "stages": [], "limitations": [],
     "claims": [{"claim_id": "CLM-N-1", "statement": "升序求和误差更小", "kind": "fact", "scope": "整数输入",
-                "evidence_refs": [], "relation": {"subject": "[[升序]]", "predicate": "improves", "object": "[[误差]]"}}]},
+                "evidence_refs": [], "relation": {"predicate": "improves", "participants": [
+                    {"role": "agent", "value": "[[升序]]"}, {"role": "target", "value": "[[误差|求和误差]]"}]}}]},
     level="L2", title="顺序实验经过", discovery="owner_only")
 
 
@@ -44,7 +45,7 @@ def test_discovery_includes_claims_associations_and_concepts():
                                            set(), TITLES))
     claim = entries["CLM-N-1"]
     assert claim["kind"] == "claim" and claim["record_id"] == "MEM-N" and claim["level"] == "L2"
-    assert "整数输入" in claim["text"] and "improves" in claim["text"]
+    assert "整数输入" in claim["text"] and "改善｜作用方：升序；作用对象：求和误差" in claim["text"]  # R23 D-14
     assert claim["discovery"] == "owner_only" and claim["review"] == "accepted"  # 可见范围跟随所在记录
     assoc = entries["MEM-ASSOC"]
     assert assoc["title"] == "关联：顺序实验经过 ↔ 对象 X 的实验 › b1"
@@ -72,9 +73,12 @@ def test_phrases_and_weights():
     assert graph.phrase("contradicts", "A", "B") == "A 与 B 矛盾"
     assert graph.phrase("supports", "A", "B") == "A 以 B 为依据"
     assert graph.phrase("contradicts", "A", "B", edge_category="navigation") == "A 与 B 相关"  # 旧关联里的证据类关系名
-    assert graph.phrase("fails_on", "补偿求和", "大数抵消", edge_category="claim_relation") == "补偿求和 fails_on 大数抵消"
+    assert graph.phrase("cause", "结论", "温漂", edge_category="claim_part") == "结论 以 温漂 为原因"  # R23 D-11
+    assert graph.phrase("condition", "结论", "满载", edge_category="claim_part") == "结论 以 满载 为条件"
     assert graph.phrase("x-custom", "A", "B") == "A 参考了 B"  # 未列出的关系名按类别通用读法
     assert graph.expand_weight({"category": "structure"}) == 0
     assert graph.expand_weight({"category": "evidence"}) == 1.0
     assert graph.expand_weight({"category": "navigation", "certainty": "speculative"}) == 0.2
-    assert graph.expand_weight({"category": "claim_relation"}, maturity_factor=1.0) == 0.6
+    assert graph.expand_weight({"category": "claim_part"}, maturity_factor=1.0) == 0.6
+    assert graph.expand_weight({"category": "claim_part"}, maturity_factor=0.5) == 0.3
+    assert graph.expand_weight({"category": "mention"}) == 0.5

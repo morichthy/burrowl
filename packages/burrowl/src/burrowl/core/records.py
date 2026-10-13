@@ -9,6 +9,7 @@ import re
 from collections.abc import Callable
 from typing import Any
 
+from . import predicates
 from .clock import TIME_EXAMPLES, TIME_RULE, is_time_key, is_utc, to_utc
 from .errors import BurrowlError, schema_error
 from .facets import validate_knowledge_facets
@@ -38,9 +39,6 @@ _RECORD_ID = re.compile(r"MEM-[A-Za-z0-9][A-Za-z0-9-]*")
 _WIKI_SLUG = re.compile(r"[a-z][a-z0-9-]*/[a-z0-9][a-z0-9-]*")
 HANDLE_MAX = 64
 HANDLE_FORBIDDEN = set("/#|[]@!")  # 这些字符在链接写法里有语法含义（§4.3）
-# 结论 relation 的谓词：开放词表 + "x-" 前缀的自定义谓词（R12 §4.5）
-PREDICATES = {"improves", "degrades", "causes", "prevents", "fails_on", "applies_to", "requires", "equivalent_to",
-              "contradicts", "part_of"}
 L1_CLAIM_KINDS = {"fact", "calculation"}  # D-07：L1 只写事实与计算类结论
 _ORIGIN = re.compile(r"human|ai|unknown|tool:[A-Za-z0-9][A-Za-z0-9._-]*")
 
@@ -49,8 +47,40 @@ SourceReader = Callable[[dict], str]
 
 
 def content_hash(record: dict) -> str:
-    return canonical_hash({key: record[key] for key in CONTENT_FIELDS
-                           if key not in OPTIONAL_CONTENT_FIELDS or record.get(key)})
+    """复核绑定的内容指纹。结论的 relation 是自动生成的结构标注，不计入（R23 D-02）：
+    去掉每条结论的 relation，以及只出现在 relation 里的链接解析结果；没有 relation 的记录指纹不变（D-16）。"""
+    view = authoritative(record)
+    return canonical_hash({key: view[key] for key in CONTENT_FIELDS
+                           if key in view and (key not in OPTIONAL_CONTENT_FIELDS or view.get(key))})
+
+
+def authoritative(record: dict) -> dict:
+    """去掉结构标注后的记录视图（R23 D-02）：内容指纹与结论指纹都基于它。"""
+    claims = (record.get("payload") or {}).get("claims") or []
+    if not any("relation" in c for c in claims):
+        return record
+    from .links import link_texts, parse  # noqa: PLC0415  links 依赖本模块，延迟导入避免循环
+    payload = {**record["payload"], "claims": [strip_relation(c) for c in claims]}
+    view = {**record, "payload": payload}
+    if record.get("links"):
+        kept = {link.text for text in link_texts(view) for link in parse(text)}
+        view["links"] = [x for x in record["links"] if x["text"] in kept]
+    return view
+
+
+def same_content(a: dict, b: dict) -> bool:
+    """两份记录的内容（含结构标注与链接解析结果）是否完全相同。判断"没有变化"不能只比 content_hash：
+    只改结论 relation 时 content_hash 不变（R23 D-02），但修订必须保存。"""
+    return all(a.get(key) == b.get(key) for key in CONTENT_FIELDS)
+
+
+def strip_relation(claim: dict) -> dict:
+    return {k: v for k, v in claim.items() if k != "relation"}
+
+
+def claim_hash(claim: dict) -> str:
+    """结论指纹（复核与结论引用绑定它）：不含 relation（R23 D-02）。所有计算结论指纹的地方都调用这里。"""
+    return canonical_hash(strip_relation(claim))
 
 
 REF_SHAPE = "{target_kind: record|file|owner|claim, target_id, revision, sha256, locator, relation}"
@@ -250,9 +280,9 @@ def _domain_errors(record: dict, *, allow_review: bool) -> list[dict]:
             add(f"/payload/claims/{index}/kind", "L1 的结论只能是 fact 或 calculation")
         if "block_id" in claim and (kind != "detail" or claim["block_id"] not in block_ids):
             add(f"/payload/claims/{index}/block_id", "block_id 必须是本技术单元里的块")
-        predicate = claim.get("relation", {}).get("predicate")
-        if predicate is not None and predicate not in PREDICATES and not re.fullmatch(r"x-[a-z0-9_-]+", predicate):
-            add(f"/payload/claims/{index}/relation/predicate", "未知谓词：用词表中的谓词，或以 x- 开头自定义")
+        if "relation" in claim:  # R23 D-03、D-04：按谓词框架检查角色
+            for path, message in predicates.validate(claim["relation"]):
+                add(f"/payload/claims/{index}/relation{path}", message)
     if len({c["claim_id"] for c in claims}) != len(claims):
         add("/payload/claims", "结论 ID 重复")
     if "revision" in record:

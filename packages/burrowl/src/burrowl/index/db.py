@@ -24,7 +24,8 @@ from .embed import Embedder, pack
 from .late import late_windows
 from .tokenize import TOKENIZER_VERSION, fts_document, fts_query
 
-SCHEMA_VERSION = 5  # v2：entries.embed_prefix；v3：graph_nodes / graph_edges；v4：link_candidates；v5：graph_nodes.ref
+SCHEMA_VERSION = 6  # v2：entries.embed_prefix；v3：graph_nodes / graph_edges；v4：link_candidates；v5：graph_nodes.ref；
+# v6：graph_edges 去掉 derived（R23 D-11 删除快捷边）
 _ENTRY_COLUMNS = ("entry_id", "corpus", "owner_id", "owner_type", "record_id", "canonical_id", "kind", "level",
                   "revision", "content_hash", "block_id", "title", "text", "fixed_ref", "discovery", "sensitivity",
                   "review", "signature", "embed_prefix")
@@ -34,7 +35,7 @@ NODE_COLUMNS = ("owner_id", "node_id", "node_type", "record_id", "title", "level
                 "discovery", "review", "maturity", "block_id", "ref")
 _JSON_NODE_COLUMNS = {"domains", "ref"}
 EDGE_COLUMNS = ("edge_id", "src", "dst", "category", "type", "certainty", "state", "origin", "declared_by",
-                "declared_owner", "declared_rev", "field", "derived")
+                "declared_owner", "declared_rev", "field")
 _SCHEMA = f"""
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS entries (
@@ -56,7 +57,7 @@ CREATE INDEX IF NOT EXISTS graph_nodes_id ON graph_nodes(node_id);
 CREATE TABLE IF NOT EXISTS graph_edges (
     edge_id TEXT PRIMARY KEY, src TEXT NOT NULL, dst TEXT NOT NULL, category TEXT NOT NULL, type TEXT NOT NULL,
     certainty TEXT, state TEXT, origin TEXT, declared_by TEXT NOT NULL, declared_owner TEXT NOT NULL,
-    declared_rev INTEGER, field TEXT, derived INTEGER NOT NULL);
+    declared_rev INTEGER, field TEXT);
 CREATE INDEX IF NOT EXISTS graph_edges_src ON graph_edges(src);
 CREATE INDEX IF NOT EXISTS graph_edges_dst ON graph_edges(dst);
 CREATE INDEX IF NOT EXISTS graph_edges_owner ON graph_edges(declared_owner);
@@ -252,7 +253,7 @@ class IndexDB:
                                  if c in _JSON_NODE_COLUMNS else n.get(c) for c in NODE_COLUMNS] for n in nodes])
                 db.executemany(f"INSERT OR REPLACE INTO graph_edges ({','.join(EDGE_COLUMNS)}) VALUES "
                                f"({','.join('?' * len(EDGE_COLUMNS))})",
-                               [[int(e[c]) if c == "derived" else e.get(c) for c in EDGE_COLUMNS] for e in edges])
+                               [[e.get(c) for c in EDGE_COLUMNS] for e in edges])
                 self._set_state(db, owner_id, "graph", "edges", head=json.dumps(head),
                                 generation=(head or {}).get("generation", 0), projection_version=version,
                                 owner_fingerprint=owner_fingerprint, signature=signature, status="indexed", error=None)
@@ -277,7 +278,7 @@ class IndexDB:
             rows = db.execute(f"SELECT DISTINCT e.* FROM graph_edges e WHERE {where} "
                               f"AND EXISTS (SELECT 1 FROM graph_nodes a WHERE a.node_id = e.src) "
                               f"AND EXISTS (SELECT 1 FROM graph_nodes b WHERE b.node_id = e.dst)", params).fetchall()
-        return [dict(r) | {"derived": bool(r["derived"])} for r in rows]
+        return [dict(r) for r in rows]
 
     def graph_nodes(self, node_ids: list[str] | None = None) -> list[dict]:
         """节点（同一节点在多个对象下有行时只取一行，优先取其归属对象自己投影的那一行）。"""
@@ -334,7 +335,7 @@ class IndexDB:
     def graph_all_edges(self) -> list[dict]:
         with self.connect() as db:
             rows = db.execute("SELECT * FROM graph_edges").fetchall()
-        return [dict(r) | {"derived": bool(r["derived"])} for r in rows]
+        return [dict(r) for r in rows]
 
     def graph_dangling(self) -> int:
         """另一端节点不存在（或不可读未投影）的边数。"""

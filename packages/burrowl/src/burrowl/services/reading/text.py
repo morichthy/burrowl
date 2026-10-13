@@ -6,7 +6,7 @@ R19 D-12：交付记录时，其中 L1 块（MEM-…#块）与结论（CLM-…�
 R19 D-11：图扩展带来的对象默认定点阅读（target_page_of）：只交付被关系指到的节点及其必要上下文。
 """
 from ...core.errors import BurrowlError
-from ...core.hashing import canonical_hash
+from ...core.records import claim_hash
 from ...core.technical import description_text, render_full
 from ..memory import documents
 from ..memory.context import Storage
@@ -18,7 +18,7 @@ PAGE_CHARS = 8000
 
 
 def claim_ref(claim: dict) -> dict:
-    return {"target_kind": "claim", "target_id": claim["claim_id"], "revision": None, "sha256": canonical_hash(claim),
+    return {"target_kind": "claim", "target_id": claim["claim_id"], "revision": None, "sha256": claim_hash(claim),
             "locator": "statement", "relation": "references"}
 
 

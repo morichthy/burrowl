@@ -107,8 +107,8 @@
         "navigation_supported": 0.7,
         "navigation_plausible": 0.4,
         "navigation_speculative": 0.2,
-        "concept": 0.5,
-        "claim_relation": 0.6
+        "mention": 0.5,
+        "claim_part": 0.6
       },
       "algorithm": "hops"
     },
@@ -357,19 +357,19 @@
           "title": "Navigation Speculative",
           "type": "number"
         },
-        "concept": {
+        "mention": {
           "default": 0.5,
           "maximum": 1,
           "minimum": 0,
-          "title": "Concept",
+          "title": "Mention",
           "type": "number"
         },
-        "claim_relation": {
+        "claim_part": {
           "default": 0.6,
-          "description": "再乘结论的成熟度系数",
+          "description": "结论要素边（R23 D-11），再乘所属结论的成熟度系数",
           "maximum": 1,
           "minimum": 0,
-          "title": "Claim Relation",
+          "title": "Claim Part",
           "type": "number"
         }
       },

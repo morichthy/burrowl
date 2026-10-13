@@ -554,10 +554,12 @@
            "precedes",
            "member_of",
            "similar_structure",
-           "related_to",
-           "subject_of",
-           "object_of"
+           "related_to"
           ]
+         },
+         "note": {
+          "minLength": 1,
+          "type": "string"
          }
         },
         "required": [
@@ -760,10 +762,12 @@
             "precedes",
             "member_of",
             "similar_structure",
-            "related_to",
-            "subject_of",
-            "object_of"
+            "related_to"
            ]
+          },
+          "note": {
+           "minLength": 1,
+           "type": "string"
           }
          },
          "required": [
@@ -1061,8 +1065,8 @@
          "evidence",
          "reference",
          "navigation",
-         "concept",
-         "claim_relation"
+         "mention",
+         "claim_part"
         ],
         "type": "string"
        },
@@ -1319,10 +1323,12 @@
           "precedes",
           "member_of",
           "similar_structure",
-          "related_to",
-          "subject_of",
-          "object_of"
+          "related_to"
          ]
+        },
+        "note": {
+         "minLength": 1,
+         "type": "string"
         }
        },
        "required": [
@@ -1396,10 +1402,12 @@
           "precedes",
           "member_of",
           "similar_structure",
-          "related_to",
-          "subject_of",
-          "object_of"
+          "related_to"
          ]
+        },
+        "note": {
+         "minLength": 1,
+         "type": "string"
         }
        },
        "required": [
@@ -1521,10 +1529,12 @@
            "precedes",
            "member_of",
            "similar_structure",
-           "related_to",
-           "subject_of",
-           "object_of"
+           "related_to"
           ]
+         },
+         "note": {
+          "minLength": 1,
+          "type": "string"
          }
         },
         "required": [
@@ -1647,10 +1657,12 @@
           "precedes",
           "member_of",
           "similar_structure",
-          "related_to",
-          "subject_of",
-          "object_of"
+          "related_to"
          ]
+        },
+        "note": {
+         "minLength": 1,
+         "type": "string"
         }
        },
        "required": [
@@ -2211,10 +2223,12 @@
                  "precedes",
                  "member_of",
                  "similar_structure",
-                 "related_to",
-                 "subject_of",
-                 "object_of"
+                 "related_to"
                 ]
+               },
+               "note": {
+                "minLength": 1,
+                "type": "string"
                }
               },
               "required": [
@@ -2288,10 +2302,12 @@
                  "precedes",
                  "member_of",
                  "similar_structure",
-                 "related_to",
-                 "subject_of",
-                 "object_of"
+                 "related_to"
                 ]
+               },
+               "note": {
+                "minLength": 1,
+                "type": "string"
                }
               },
               "required": [
@@ -2413,10 +2429,12 @@
                   "precedes",
                   "member_of",
                   "similar_structure",
-                  "related_to",
-                  "subject_of",
-                  "object_of"
+                  "related_to"
                  ]
+                },
+                "note": {
+                 "minLength": 1,
+                 "type": "string"
                 }
                },
                "required": [
@@ -2539,10 +2557,12 @@
                  "precedes",
                  "member_of",
                  "similar_structure",
-                 "related_to",
-                 "subject_of",
-                 "object_of"
+                 "related_to"
                 ]
+               },
+               "note": {
+                "minLength": 1,
+                "type": "string"
                }
               },
               "required": [

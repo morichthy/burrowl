@@ -257,9 +257,8 @@ export declare namespace ReviewSubmit {
             | "precedes"
             | "member_of"
             | "similar_structure"
-            | "related_to"
-            | "subject_of"
-            | "object_of";
+            | "related_to";
+          note?: string;
         }[]
       | null;
     /**
@@ -328,9 +327,8 @@ export declare namespace ReviewBatch {
             | "precedes"
             | "member_of"
             | "similar_structure"
-            | "related_to"
-            | "subject_of"
-            | "object_of";
+            | "related_to";
+          note?: string;
         }[];
         replacement_claim_id?: string | null;
         maturity?: "conjecture" | "preliminary" | "replicated" | "established" | null;
@@ -369,9 +367,8 @@ export declare namespace ReviewBatch {
             | "precedes"
             | "member_of"
             | "similar_structure"
-            | "related_to"
-            | "subject_of"
-            | "object_of";
+            | "related_to";
+          note?: string;
         }[];
         replacement_claim_id?: string | null;
         maturity?: "conjecture" | "preliminary" | "replicated" | "established" | null;
@@ -461,7 +458,7 @@ export declare namespace RelationsGraph {
     levels?: string[] | null;
     excluded?: string[] | null;
     limit?: number;
-    categories?: ("structure" | "evidence" | "reference" | "navigation" | "concept" | "claim_relation")[] | null;
+    categories?: ("structure" | "evidence" | "reference" | "navigation" | "mention" | "claim_part")[] | null;
     domains?: string[] | null;
     excluded_domains?: string[] | null;
     node_types?: ("owner" | "record" | "block" | "claim" | "concept" | "source")[] | null;
@@ -542,9 +539,8 @@ export declare namespace RelationsDecide {
           | "precedes"
           | "member_of"
           | "similar_structure"
-          | "related_to"
-          | "subject_of"
-          | "object_of";
+          | "related_to";
+        note?: string;
       };
       to: {
         target_kind: "owner" | "record" | "claim" | "file";
@@ -573,9 +569,8 @@ export declare namespace RelationsDecide {
           | "precedes"
           | "member_of"
           | "similar_structure"
-          | "related_to"
-          | "subject_of"
-          | "object_of";
+          | "related_to";
+        note?: string;
       };
       relation?:
         | "supports"
@@ -628,9 +623,8 @@ export declare namespace RelationsDecide {
           | "precedes"
           | "member_of"
           | "similar_structure"
-          | "related_to"
-          | "subject_of"
-          | "object_of";
+          | "related_to";
+        note?: string;
       }[];
       status?: "candidate" | "accepted" | "rejected" | "withdrawn";
       /**
@@ -670,9 +664,8 @@ export declare namespace RelationsDecide {
           | "precedes"
           | "member_of"
           | "similar_structure"
-          | "related_to"
-          | "subject_of"
-          | "object_of";
+          | "related_to";
+        note?: string;
       };
     };
     /**
@@ -880,9 +873,8 @@ export declare namespace RelationsNoteReply {
                       | "precedes"
                       | "member_of"
                       | "similar_structure"
-                      | "related_to"
-                      | "subject_of"
-                      | "object_of";
+                      | "related_to";
+                    note?: string;
                   };
                   to: {
                     target_kind: "owner" | "record" | "claim" | "file";
@@ -911,9 +903,8 @@ export declare namespace RelationsNoteReply {
                       | "precedes"
                       | "member_of"
                       | "similar_structure"
-                      | "related_to"
-                      | "subject_of"
-                      | "object_of";
+                      | "related_to";
+                    note?: string;
                   };
                   relation?:
                     | "supports"
@@ -966,9 +957,8 @@ export declare namespace RelationsNoteReply {
                       | "precedes"
                       | "member_of"
                       | "similar_structure"
-                      | "related_to"
-                      | "subject_of"
-                      | "object_of";
+                      | "related_to";
+                    note?: string;
                   }[];
                   status?: "candidate" | "accepted" | "rejected" | "withdrawn";
                   /**
@@ -1008,9 +998,8 @@ export declare namespace RelationsNoteReply {
                       | "precedes"
                       | "member_of"
                       | "similar_structure"
-                      | "related_to"
-                      | "subject_of"
-                      | "object_of";
+                      | "related_to";
+                    note?: string;
                   };
                 };
                 reason?: string;
@@ -1083,9 +1072,8 @@ export declare namespace RelationsNoteReply {
                       | "precedes"
                       | "member_of"
                       | "similar_structure"
-                      | "related_to"
-                      | "subject_of"
-                      | "object_of";
+                      | "related_to";
+                    note?: string;
                   };
                   to: {
                     target_kind: "owner" | "record" | "claim" | "file";
@@ -1114,9 +1102,8 @@ export declare namespace RelationsNoteReply {
                       | "precedes"
                       | "member_of"
                       | "similar_structure"
-                      | "related_to"
-                      | "subject_of"
-                      | "object_of";
+                      | "related_to";
+                    note?: string;
                   };
                   relation?:
                     | "supports"
@@ -1169,9 +1156,8 @@ export declare namespace RelationsNoteReply {
                       | "precedes"
                       | "member_of"
                       | "similar_structure"
-                      | "related_to"
-                      | "subject_of"
-                      | "object_of";
+                      | "related_to";
+                    note?: string;
                   }[];
                   status?: "candidate" | "accepted" | "rejected" | "withdrawn";
                   /**
@@ -1211,9 +1197,8 @@ export declare namespace RelationsNoteReply {
                       | "precedes"
                       | "member_of"
                       | "similar_structure"
-                      | "related_to"
-                      | "subject_of"
-                      | "object_of";
+                      | "related_to";
+                    note?: string;
                   };
                 };
                 reason?: string;

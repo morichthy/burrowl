@@ -38,8 +38,8 @@ def lab(tmp_path):
     claim_record = narrative_draft(owner, evidence, "CLM-LAB-补偿抵消失效", "大数抵消时补偿项会被吞没")
     claim_record["title"] = "第三轮经过"
     claim_record["body_markdown"] = "在 [[大数抵消]] 输入下，[[补偿求和]] 仍可能丢失小量。"
-    claim_record["payload"]["claims"][0]["relation"] = {"subject": "[[补偿求和]]", "predicate": "fails_on",
-                                                        "object": "[[大数抵消]]"}
+    claim_record["payload"]["claims"][0]["relation"] = {"predicate": "fails_on", "participants": [
+        {"role": "method", "value": "[[补偿求和]]"}, {"role": "case", "value": "[[大数抵消]]"}]}
     linked = narrative_draft(owner, evidence, "CLM-LAB-2", "排序能减少误差")
     linked["title"] = "排序对照经过"
     linked["body_markdown"] = "对照组只改变求和顺序。"
@@ -59,7 +59,7 @@ def _association(owner, a, b, status, relation="related_to", certainty="speculat
                         "certainty": certainty, "origin": "ai"}}
 
 
-def test_projection_has_concepts_claims_and_shortcut_edge(lab):
+def test_projection_has_concepts_claims_and_claim_parts(lab):
     _storage, _memory, index, _owner, _other, concepts, records, _far = lab
     index.ensure_graph()
     nodes = {n["node_id"]: n for n in index.db.graph_nodes()}
@@ -68,11 +68,12 @@ def test_projection_has_concepts_claims_and_shortcut_edge(lab):
     assert nodes["CLM-LAB-补偿抵消失效"]["node_type"] == "claim"
     edges = index.db.graph_all_edges()
     mentions = [e for e in edges if e["type"] == "mentions" and e["src"] == records["第三轮经过"]["record_id"]]
-    assert {e["dst"] for e in mentions} == set(concepts.values()) and mentions[0]["category"] == "concept"
-    shortcut = next(e for e in edges if e["derived"])
-    assert (shortcut["src"], shortcut["dst"], shortcut["type"], shortcut["category"]) == (
-        concepts["补偿求和"], concepts["大数抵消"], "fails_on", "claim_relation")
-    assert shortcut["declared_by"] == "CLM-LAB-补偿抵消失效" and shortcut["state"] == "not-reviewed"
+    assert {e["dst"] for e in mentions} == set(concepts.values()) and mentions[0]["category"] == "mention"
+    # R23 D-11：结论按角色连向参与者，没有对象间的快捷边
+    parts = {(e["src"], e["type"], e["dst"]) for e in edges if e["category"] == "claim_part"}
+    assert parts == {("CLM-LAB-补偿抵消失效", "method", concepts["补偿求和"]),
+                     ("CLM-LAB-补偿抵消失效", "case", concepts["大数抵消"])}
+    assert not any(e["src"] in concepts.values() and e["dst"] in concepts.values() for e in edges)
     assert index.db.graph_dangling() == 0
 
 

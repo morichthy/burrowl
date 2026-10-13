@@ -106,7 +106,7 @@ def formal(ctx: Ctx, target_ids: Annotated[list[str], Field(description="结论�
 
 
 # ---------- 关联与关系图 ----------
-GraphCategory = Literal["structure", "evidence", "reference", "navigation", "concept", "claim_relation"]
+GraphCategory = Literal["structure", "evidence", "reference", "navigation", "mention", "claim_part"]
 NodeType = Literal["owner", "record", "block", "claim", "concept", "source"]
 
 

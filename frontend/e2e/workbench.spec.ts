@@ -17,22 +17,65 @@ async function op(request: APIRequestContext, name: string, args: object) {
   return response.json();
 }
 
+/** 通过真实 Cytoscape 实例计算连线中点，再以浏览器鼠标点击画布。 */
+async function clickGraphLink(page: import("@playwright/test").Page, source: string, target: string) {
+  await page.locator(".graph").scrollIntoViewIfNeeded();
+  const readPoint = () => page.locator(".graph").evaluate((element, endpoints) => {
+    type Point = { x: number; y: number };
+    type Edge = { empty(): boolean; midpoint(): Point };
+    type Core = { getElementById(id: string): Edge; pan(): Point; zoom(): number };
+    const container = element as HTMLElement & { _cyreg?: { cy?: Core } };
+    const cy = container._cyreg?.cy;
+    if (!cy) return null;
+    const id = [endpoints.source, endpoints.target].sort().join("|");
+    const edge = cy.getElementById(id);
+    if (edge.empty()) return null;
+    const midpoint = edge.midpoint();
+    const pan = cy.pan();
+    const zoom = cy.zoom();
+    const rect = container.getBoundingClientRect();
+    return { x: rect.left + pan.x + midpoint.x * zoom, y: rect.top + pan.y + midpoint.y * zoom };
+  }, { source, target });
+  // Cytoscape 初次布局和筛选变化会移动节点；等连线中点在相邻两次采样中稳定后再点击。
+  let previous = "";
+  await expect.poll(async () => {
+    const point = await readPoint();
+    if (!point) return false;
+    const current = `${point.x.toFixed(1)},${point.y.toFixed(1)}`;
+    const stable = current === previous;
+    previous = current;
+    return stable;
+  }, { timeout: 10_000, intervals: [100, 200, 300] }).toBeTruthy();
+  const point = await readPoint();
+  if (!point) throw new Error(`找不到关系图连线：${source} → ${target}`);
+  await page.mouse.click(point.x, point.y);
+}
+
 test.describe.configure({ mode: "serial" });
 
 test("关系图筛选：分类不重复，节点可见性、空选与保存重载一致", async ({ page, request }) => {
   await page.goto("#/relations");
   const types = page.getByRole("group", { name: "节点类型" });
+  const details = page.getByRole("group", { name: "记录内部细节" });
   const kinds = page.getByRole("group", { name: "记录分类" });
-  await expect(types.getByRole("checkbox")).toHaveCount(6);
+  const categories = page.getByRole("group", { name: "关系类别" });
+  await expect(types.getByRole("checkbox")).toHaveCount(5);
+  await expect(types.getByRole("checkbox", { name: "对象" })).toBeChecked();
+  await expect(types.getByRole("checkbox", { name: "记录" })).toBeChecked();
+  await expect(types.getByRole("checkbox", { name: "概念" })).toBeChecked();
+  await expect(types.getByRole("checkbox", { name: "结论（独立判断）" })).toBeChecked();  // R23 D-12
+  await expect(types.getByRole("checkbox", { name: "来源" })).not.toBeChecked();
+  await expect(details.getByRole("checkbox", { name: "展开 L1 记录内的块" })).not.toBeChecked();
+  await expect(categories.getByRole("checkbox", { name: "结论要素" })).toBeChecked();
+  await expect(categories.getByRole("checkbox", { name: "提及" })).not.toBeChecked();
   // 七个分类外加显式的"全部"；它替代了原先的"不选＝全部"文字提示
   await expect(kinds.getByRole("checkbox")).toHaveCount(8);
-  await expect(types.getByRole("checkbox", { name: "内容块（L1）" })).not.toBeChecked();
   // 筛选区为"组名＋选项"两列：分类只筛选记录的说明放在组名的悬停提示中；未选任何分类时"全部"处于选中态
   await expect(page.locator(".filter-label", { hasText: "记录分类" })).toHaveAttribute("title", /只筛选记录节点/);
   await expect(kinds.getByRole("checkbox", { name: "全部" })).toBeChecked();
   await page.screenshot({ path: "test-results/relations-filters.png", fullPage: true });
 
-  // 浏览器请求走真实服务；检查分类只限制记录，结论仍保留导航上下文。
+  // 浏览器请求走真实服务；分类只限制记录，默认显示的结论仍保留导航上下文。
   const [classified] = await Promise.all([
     page.waitForResponse((response) => response.url().endsWith("/relations.graph") && response.request().postDataJSON().kinds?.includes("experience")),
     kinds.getByRole("checkbox", { name: "经验（L3）" }).check(),
@@ -43,13 +86,14 @@ test("关系图筛选：分类不重复，节点可见性、空选与保存重�
   expect(classified.request().postDataJSON()).not.toHaveProperty("levels");
 
   // 选块后再全部取消，最后一个请求必须保留 []，不能变成代表全选的 null。
-  await types.getByRole("checkbox", { name: "内容块（L1）" }).check();
-  for (const name of ["对象", "记录", "内容块（L1）", "结论（Claim）", "概念"]) {
+  await details.getByRole("checkbox", { name: "展开 L1 记录内的块" }).check();
+  for (const name of ["对象", "记录", "概念"]) {
     await types.getByRole("checkbox", { name, exact: true }).uncheck();
   }
+  await details.getByRole("checkbox", { name: "展开 L1 记录内的块" }).uncheck();
   const [empty] = await Promise.all([
     page.waitForResponse((response) => response.url().endsWith("/relations.graph") && response.request().postDataJSON().node_types?.length === 0),
-    types.getByRole("checkbox", { name: "来源", exact: true }).uncheck(),
+    types.getByRole("checkbox", { name: "结论（独立判断）", exact: true }).uncheck(),
   ]);
   expect((await empty.json()).nodes).toEqual([]);
   await expect(page.getByText(/0 个节点、0 条关系/)).toBeVisible();
@@ -64,12 +108,93 @@ test("关系图筛选：分类不重复，节点可见性、空选与保存重�
   await expect(types.getByRole("checkbox", { checked: true })).toHaveCount(0);
   await expect(page.getByText(/0 个节点、0 条关系/)).toBeVisible();
   const [reset] = await Promise.all([
-    page.waitForResponse((response) => response.url().endsWith("/relations.graph") && response.request().postDataJSON().node_types?.length === 5),
+    page.waitForResponse((response) => response.url().endsWith("/relations.graph") && response.request().postDataJSON().node_types?.length === 4),
     page.getByRole("button", { name: "重置", exact: true }).click(),
   ]);
-  expect(reset.request().postDataJSON()).toMatchObject({ node_types: ["owner", "record", "claim", "concept", "source"], kinds: null });
-  await expect(types.getByRole("checkbox", { checked: true })).toHaveCount(5);
+  expect(reset.request().postDataJSON()).toMatchObject({ node_types: ["owner", "record", "claim", "concept"], kinds: null });
+  await expect(types.getByRole("checkbox", { checked: true })).toHaveCount(4);
   expect((await reset.json()).nodes.some((node: { type: string }) => node.type === "block")).toBeFalsy();
+});
+
+test("关系图连线：点击关联与结论依据显示声明记录和完整声明", async ({ page, request }) => {
+  type Node = { id: string; type: string; owner_id: string; ref?: { target_kind: string; target_id: string; revision?: number; sha256?: string; locator?: string; relation?: string } };
+  type Edge = { source: string; target: string; category: string; type: string; declared_by?: string; field?: string };
+  const graph = await op(request, "relations.graph", { node_types: ["owner", "record", "block", "claim", "concept", "source"], limit: 2000 });
+  const nodes = graph.nodes as Node[];
+  const edges = graph.edges as Edge[];
+  const visibleNodeIds = new Set(nodes.filter((node) => ["owner", "record", "claim", "concept"].includes(node.type)).map((node) => node.id));
+  let association = edges.find((edge) => edge.field === "association" && visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target));
+  if (!association) {
+    const records = nodes.filter((node) => node.type === "record" && node.ref?.target_kind === "record");
+    const existingPairs = new Set(edges.filter((edge) => edge.field === "association")
+      .map((edge) => [edge.source, edge.target].sort().join("|")));
+    const pair = records.flatMap((from, i) => records.slice(i + 1).map((to) => [from, to] as const))
+      .find(([from, to]) => !existingPairs.has([from.id, to.id].sort().join("|")));
+    if (!pair) throw new Error("关系图种子需要两条尚未建关联、可引用的记录");
+    const [from, to] = pair;
+    await op(request, "relations.decide", {
+      owner_id: from.owner_id,
+      payload: { from: from.ref, to: to.ref, explanation: "端到端测试：关系图连线声明详情", certainty: "supported" },
+      reason: "验证关系图关联边点击后的声明详情",
+    });
+    const updated = await op(request, "relations.graph", { node_types: ["owner", "record", "block", "claim", "concept", "source"], limit: 2000 });
+    association = (updated.edges as Edge[]).find((edge) => edge.field === "association");
+    expect(association, "保存的关联应进入真实关系图投影").toBeTruthy();
+  }
+  // R23 D-11：结论按角色连向参与者，没有对象间的快捷边
+  const claimPart = edges.find((edge) => edge.category === "claim_part" && edge.field === "claims.relation.participants"
+    && edge.declared_by?.startsWith("CLM-") && edge.source === edge.declared_by);
+  expect(claimPart, "关系图种子需要一条结论要素边").toBeTruthy();
+  expect(edges.some((edge) => (edge as { derived?: boolean }).derived)).toBeFalsy();
+
+  await page.goto("#/relations");
+  const types = page.getByRole("group", { name: "节点类型" });
+  await page.waitForResponse((response) => response.url().endsWith("/relations.view"));
+  const [defaults] = await Promise.all([
+    page.waitForResponse((response) => response.url().endsWith("/relations.graph") && response.request().postDataJSON().node_types?.length === 4),
+    page.getByRole("button", { name: "重置", exact: true }).click(),
+  ]);
+  expect(defaults.ok()).toBeTruthy();
+  await expect(types.getByRole("checkbox", { name: "结论（独立判断）" })).toBeChecked();
+  await expect(types.getByRole("checkbox", { name: "来源" })).not.toBeChecked();
+  const defaultGraph = await defaults.json();
+  expect((defaultGraph.nodes as Node[]).some((node) => node.id === claimPart!.declared_by)).toBeTruthy();
+  expect((defaultGraph.edges as Edge[]).some((edge) => edge.category === "claim_part"
+    && edge.declared_by === claimPart!.declared_by)).toBeTruthy();
+  await expect(page.locator(".graph canvas").first()).toBeVisible();
+  const openAndCheck = async (edge: Edge, screenshot: string, sectionTitle: string) => {
+    const from = nodes.find((node) => node.id === edge.source);
+    const to = nodes.find((node) => node.id === edge.target);
+    expect(from, "连线起点必须来自服务端关系图投影").toBeTruthy();
+    expect(to, "连线终点必须来自服务端关系图投影").toBeTruthy();
+    await clickGraphLink(page, edge.source, edge.target);
+    const details = page.getByRole("heading", { name: "连线详情" });
+    await expect(details).toBeVisible();
+    const item = page.locator(".edge-detail-entry", { hasText: edge.declared_by ?? "" }).first();
+    await expect(item).toContainText(edge.declared_by ?? "");
+    await expect(item).toContainText("声明位置");
+    await expect(item).toContainText("原记录：");
+    const section = item.getByText(sectionTitle, { exact: true });
+    await expect(section).toBeVisible();
+    const width = await item.evaluate((element) => ({ scroll: element.scrollWidth, client: element.clientWidth }));
+    expect(width.scroll).toBeLessThanOrEqual(width.client + 2);
+    const [declarationBox, sectionBox] = await Promise.all([
+      item.locator("p.hint").first().boundingBox(), section.boundingBox(),
+    ]);
+    expect(declarationBox).toBeTruthy();
+    expect(sectionBox).toBeTruthy();
+    expect(sectionBox!.y).toBeGreaterThanOrEqual(declarationBox!.y + declarationBox!.height - 1);
+    await page.screenshot({ path: screenshot, fullPage: true });
+    return item;
+  };
+
+  const associationItem = await openAndCheck(association!, "test-results/relations-association-detail.png", "关系说明");
+  await expect(associationItem).toContainText("关系说明");
+  const claimItem = await openAndCheck(claimPart!, "test-results/relations-claim-detail.png", "结论原文");
+  await expect(claimItem.getByText("结论原文")).toBeVisible();
+  await expect(claimItem).toContainText("排序后求和误差更小");
+  await expect(claimItem).toContainText("自动生成，以陈述为准");
+  await expect(claimItem).toContainText("结论依据");
 });
 
 test("检索：未索引材料显示非空提示，补齐后原问题恢复命中", async ({ page }) => {

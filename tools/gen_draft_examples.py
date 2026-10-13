@@ -32,8 +32,9 @@ def rel(r, relation):
     return {**r, "relation": relation}
 
 
-def claim(cid, statement, scope, refs, kind="fact"):
-    return {"claim_id": cid, "statement": statement, "kind": kind, "scope": scope, "evidence_refs": refs}
+def claim(cid, statement, scope, refs, kind="fact", relation=None):
+    return {"claim_id": cid, "statement": statement, "kind": kind, "scope": scope, "evidence_refs": refs,
+            **({"relation": relation} if relation else {})}
 
 
 def draft(kind, title, body, payload, sources, reason, keywords=(), gap=None):
@@ -97,8 +98,13 @@ EXAMPLES = {
                     "outcome": "单位增量丢失", "evidence_refs": [rel(FILE_R01, "supports")]},
                    {"situation": "基线丢失", "action": "加入 Kahan 补偿对照", "reason": "检验补偿能否恢复",
                     "outcome": "补偿后仍丢失", "evidence_refs": [rel(FILE_R01, "supports")]}],
+               # R23：relation 是结构标注（角色由谓词框架决定），依据可带 note 说明支持的位置
                "claims": [claim("CLM-EXAMPLE-NARR-1", "在三项抵消输入上 Kahan 补偿未能保住单位增量",
-                                "三项构造的 binary64 抵消输入", [rel(FILE_R01, "supports")])],
+                                "三项构造的 binary64 抵消输入",
+                                [{**rel(FILE_R01, "supports"), "note": "第三轮输出：补偿后仍为 1e16"}],
+                                relation={"predicate": "fails_on", "participants": [
+                                    {"role": "method", "value": "[[补偿求和|Kahan 补偿]]"},
+                                    {"role": "case", "value": "[[大数抵消]]"}]})],
                "experience_refs": [], "process_refs": [], "technical_refs": [DETAIL]},
               [FILE_R01, DETAIL], "记录第一轮实际经过", ["浮点求和", "Kahan"])),
     "experience": (

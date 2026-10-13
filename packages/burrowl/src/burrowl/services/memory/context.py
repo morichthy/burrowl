@@ -5,7 +5,7 @@ from typing import Any
 
 from ...core.errors import BurrowlError
 from ...core.hashing import canonical_hash, sha256_file
-from ...core.records import require_ref
+from ...core.records import claim_hash, require_ref
 from ...storage.layout import Workspace
 from ...storage.memory_store import MemoryStore, tombstones
 from ...storage.owners import SENSITIVITY_RANK, Owner, OwnerIndex, OwnerRegistry
@@ -103,7 +103,7 @@ class RefResolver:
             for record in self.pending.values():  # 同批记录里的结论（链接可以指向同批新写的结论）
                 for claim in (record.get("payload") or {}).get("claims", []) or []:
                     if claim.get("claim_id") == target:
-                        digest = canonical_hash(claim)
+                        digest = claim_hash(claim)
                         if digest != ref["sha256"]:
                             raise BurrowlError("STALE_BASIS", "结论内容已变化", {"target_id": target})
                         return {"sha256": digest, "claim": deepcopy(claim), "record": record,

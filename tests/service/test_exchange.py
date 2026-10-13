@@ -20,7 +20,7 @@ def test_sample_export_matches_graph_and_is_incremental(sample_workspace):
     first = exchange.export(storage, index, "sample")
     target = exchange.export_path(storage, "sample")
     manifest = json.loads((target / "manifest.json").read_text(encoding="utf-8"))
-    assert manifest["format"] == "burrowl-exchange/1" and first["records"] == len(manifest["items"]) > 0
+    assert manifest["format"] == "burrowl-exchange/2" and first["records"] == len(manifest["items"]) > 0
 
     # 图文件与图投影一致：本对象的全部边都在，节点与投影中本对象的节点一致
     nodes = [json.loads(line) for line in (target / "graph/nodes.jsonl").read_text(encoding="utf-8").splitlines()]

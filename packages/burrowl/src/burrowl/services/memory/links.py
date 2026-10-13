@@ -15,7 +15,7 @@ from typing import Any
 
 from ...core import links as syntax
 from ...core.errors import BurrowlError
-from ...core.hashing import canonical_hash
+from ...core.records import claim_hash
 from ...storage.owners import Owner, OwnerIndex
 from .concepts import CONCEPT_PAGE_TYPES
 from .context import Storage
@@ -34,7 +34,7 @@ def record_ref(record: dict, *, pending: bool, block: str | None = None) -> dict
 
 def claim_ref(claim: dict) -> dict:
     return {"target_kind": "claim", "target_id": claim["claim_id"], "revision": None,
-            "sha256": canonical_hash(claim), "locator": "statement", "relation": "references"}
+            "sha256": claim_hash(claim), "locator": "statement", "relation": "references"}
 
 
 class LinkResolver:

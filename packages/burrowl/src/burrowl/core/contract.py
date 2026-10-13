@@ -9,6 +9,7 @@ from functools import cache
 from importlib.resources import files
 from typing import Any
 
+from . import predicates
 from .clock import TIME_RULE, is_time_key
 from .errors import BurrowlError
 from .records import LEVELS, SERVER_FIELDS
@@ -59,14 +60,15 @@ PAYLOAD_LEGEND = ("payload_fields 中标“（可选）”的可以不写，其�
 WRITE_WITH = ("memory_commit 的 operations 中：新建 {op:'put_record', client_key, draft}；"
               "修订 {op:'put_record', record_id, expected_revision（当前修订号，memory_inspect 可见）, draft（完整的新内容）}。"
               "client_key 与 record_id 只能二选一；同批新记录之间用 {client_key: 'x'} 引用")
-REF_NOTE = ("Ref = {target_kind: record|file|owner|claim, target_id, revision, sha256, locator, relation}。"
+REF_NOTE = ("Ref = {target_kind: record|file|owner|claim, target_id, revision, sha256, locator, relation, note（可选）}。"
             "record：revision 与 sha256 取被引记录的 revision 与 record_hash（memory_inspect 可见）；"
             "file：revision=null，sha256 取 sources_list 中登记的指纹；owner（如 Run）：sha256 为业务卡指纹。"
             "relation 按判断问题选，按写在哪里只用这几个："
             "结论与 L2 阶段的 evidence_refs → supports（能证明）/ contradicts（是反例）/ input（作为输入的数据）；"
             "sources 与其他固定引用 → 以上三个或 references（只是参考）。"
             "\"值得放在一起看\"用 relations_decide 写关联（related_to / same_problem / same_failure_mode / analogous_to），"
-            "不是证据；\"A 会影响 B\"写成结论。其他关系名仍可读取，但提交时会返回 warning。")
+            "不是证据；\"A 会影响 B\"写成结论。其他关系名仍可读取，但提交时会返回 warning。"
+            "note 写这份材料的哪部分、怎样支持或反驳：contradicts（反例）必须写，否则返回 warning；supports 建议写。")
 
 
 def _describe(schema: dict, all_defs: dict, depth: int) -> Any:
@@ -154,6 +156,13 @@ def _payload_fields(draft: dict, all_defs: dict) -> Any:
     return described
 
 
+def _has_claims(draft: dict, all_defs: dict) -> bool:
+    payload = draft["properties"]["payload"]
+    if "$ref" in payload:
+        payload = all_defs[payload["$ref"].rsplit("/", 1)[-1]]
+    return "claims" in (payload.get("properties") or {})
+
+
 def contract(kind: str) -> dict[str, Any]:
     versions = current_versions()
     draft = _draft_schema(kind)
@@ -165,7 +174,8 @@ def contract(kind: str) -> dict[str, Any]:
             "draft_fields": draft_fields(kind), "do_not_write": sorted(SYSTEM_FIELDS & set(draft["properties"])),
             "payload_legend": PAYLOAD_LEGEND,
             "payload_fields": _payload_fields(draft, all_defs),
-            "ref": REF_NOTE, "example_operation": example["operation"] if example else None,
+            "ref": REF_NOTE, **({"claim_relation": predicates.guide()} if _has_claims(draft, all_defs) else {}),
+            "example_operation": example["operation"] if example else None,
             "see_also": "skills/RECORDING.md（逐层写作要求）"}
 
 

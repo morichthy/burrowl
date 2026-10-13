@@ -23,7 +23,7 @@ from .memory.claims import BLOCKING, ClaimGraph
 from .memory.context import Storage
 from .render import SKIP_KINDS, Page
 
-FORMAT = "burrowl-exchange/1"
+FORMAT = "burrowl-exchange/2"  # /2：边类别 mention / claim_part，去掉 derived（R23 D-15）
 EXPORTS_DIR = "exports"
 SENSITIVITY_RANK = {"public": 0, "internal": 1, "confidential": 2, "restricted": 3}
 _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
@@ -83,7 +83,7 @@ def graph_files(index: IndexService, records: list[dict], paths: dict[str, str])
                           "path": paths[node["record_id"]] + ".md" if node["record_id"] in paths else None})
     ids = {n["id"] for n in nodes}
     edges = [{"id": e["edge_id"], "src": e["src"], "dst": e["dst"], "category": e["category"], "type": e["type"],
-              "certainty": e["certainty"], "state": e["state"], "declared_by": e["declared_by"], "derived": e["derived"]}
+              "certainty": e["certainty"], "state": e["state"], "declared_by": e["declared_by"]}
              for e in index.db.graph_all_edges() if e["src"] in ids and e["dst"] in ids]
     used = {x for e in edges for x in (e["src"], e["dst"])}
     nodes = [n for n in nodes if n["type"] not in {"owner", "source"} or n["id"] in used]  # 只留被引用的对象与来源

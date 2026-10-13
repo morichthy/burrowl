@@ -25,6 +25,29 @@ def names(record: dict) -> list[str]:
     return [record["title"], *(record.get("payload") or {}).get("aliases", [])]
 
 
+names_of = names
+
+
+def directory(records) -> tuple[dict[str, str], dict[str, str], set[str]]:
+    """投影时解析概念链接用的目录（R23 D-09）：(规范名 → 有效概念页 ID, 被合并页 → 最终保留页 ID, 已拆分页 ID)。
+    拆分的页面不自动改指：旧链接该指向哪一个由收口逐条判断（D-10）。
+    与提交时的解析（services/memory/links.py）同一规则：只看有效页面，受限页面不参与，合并沿 merged_into 走到底。"""
+    pages = {r["record_id"]: r for r in records if is_concept(r) and r["sensitivity"] != "restricted"}
+    names = {syntax.normalize(name): rid for rid, r in pages.items() if status(r) == "active" for name in names_of(r)}
+    merged = {}
+    for rid, record in pages.items():
+        seen, current = {rid}, record
+        while status(current) == "merged":
+            target = current["payload"]["merged_into"]["target_id"]
+            if target in seen or target not in pages:
+                break
+            seen.add(target)
+            current = pages[target]
+        if current is not record and status(current) == "active":
+            merged[rid] = current["record_id"]
+    return names, merged, {rid for rid, r in pages.items() if status(r) == "split"}
+
+
 def check_library(records: dict[str, dict], changed: set[str]) -> None:
     """records：概念库对象提交后的全部记录（含本批）；只报告与本批改动有关的冲突。"""
     concepts = {rid: r for rid, r in records.items() if is_concept(r)}

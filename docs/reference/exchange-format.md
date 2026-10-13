@@ -1,4 +1,4 @@
-# 交换格式 burrowl-exchange/1
+# 交换格式 burrowl-exchange/2
 
 burrowl 把记忆导出为一个**交换包**：Markdown 库 + 图 JSONL + manifest。外部工具（Obsidian、LightRAG、qmd、WeKnora 的文件夹导入……）读取交换包，各自建索引。交换包是**派生数据**：可以删除重建，不是真源（R12 D-01、D-21）。
 
@@ -29,7 +29,7 @@ exports/<名称>/
 
 | 字段 | 含义 |
 |---|---|
-| `format` | 固定为 `burrowl-exchange/1` |
+| `format` | 固定为 `burrowl-exchange/2`（/2：边类别改为 mention / claim_part，去掉 `derived`，R23） |
 | `generated_at` | 最后一次有变化的导出时间（UTC） |
 | `data_dir_id` | 数据目录的稳定标识（路径哈希的前 16 位），用来区分不同来源的包 |
 | `filter` | 本次导出的范围：owner_ids、owner_types、exclude_sensitivity |
@@ -95,11 +95,10 @@ claims: [{"id": "CLM-…", "review": "accepted", "maturity": "replicated"}]   # 
 |---|---|
 | `id` | 边身份（由声明者、来源字段、两端、类型计算） |
 | `src`、`dst`、`type` | 两端与关系名 |
-| `category` | structure / evidence / reference / navigation / concept / claim_relation |
+| `category` | structure / evidence / reference / navigation / mention / claim_part（结论要素边的 `type` 是角色名或 condition） |
 | `certainty` | 关联边的确定度：speculative / plausible / supported |
-| `state` | active；关联边为 candidate / accepted；快捷边为所属结论的复核徽标，失效时为 invalid |
+| `state` | active；关联边为 candidate / accepted；所属结论失效时结论要素边为 invalid |
 | `declared_by` | 声明这条边的记录或结论 |
-| `derived` | 是否由程序推出（结论的快捷边） |
 
 范围：属于导出记录的节点，加上被导出边引用的对象与来源；两端都在范围内的边全部导出。
 

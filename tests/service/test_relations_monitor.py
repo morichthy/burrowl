@@ -14,6 +14,13 @@ def test_graph_and_subgraph(sample_workspace):
     types = {n["type"] for n in graph["nodes"]}
     assert types == {"owner", "record", "source", "block"}   # 样例没有结论和概念页
     assert any(e["type"] == "belongs_to" and e["category"] == "structure" for e in graph["edges"])
+    # 图 API 需要把边的声明身份带到 UI，供它通过 memory.inspect 读取有权限的原始记录。
+    declared = next(e for e in graph["edges"] if e["type"] == "belongs_to")
+    assert declared["id"] and declared["declared_by"] == declared["origin"]
+    assert declared["declared_owner"] == OWNER and declared["declared_rev"] is not None
+    assert declared["field"] == "owner_id" and declared["association_origin"] is None
+    assert declared["declared_record"] == {"owner_id": OWNER, "record_id": declared["declared_by"],
+                                            "revision": declared["declared_rev"]}
     evidence = relations.subgraph(graph, categories=["evidence"], node_types=["record", "source"])
     assert evidence["edges"] and {e["category"] for e in evidence["edges"]} == {"evidence"}
     near = relations.subgraph(graph, center=OWNER, hops=1)
@@ -23,6 +30,30 @@ def test_graph_and_subgraph(sample_workspace):
     prefs = relations.WorkbenchPrefs(storage)
     prefs.save_view({"name": "默认", "mode": "radial", "positions": {}})
     assert prefs.view()["name"] == "默认"
+
+
+def test_hidden_claim_edge_keeps_its_readable_declaring_record(sample_workspace, monkeypatch):
+    storage = Storage.open(sample_workspace)
+    index = IndexService.open(storage, IndexConfig(), fake_vectors=True)
+    index.ensure_graph()
+    nodes = index.db.graph_nodes()
+    record = next(n for n in nodes if n["node_type"] == "record" and n["owner_id"] == OWNER)
+    claim_id = "CLM-RELATIONS-TEST"
+    claim = {**record, "node_id": claim_id, "node_type": "claim", "title": "测试结论",
+             "ref": {"target_kind": "claim", "target_id": claim_id, "revision": None,
+                     "sha256": "claim-hash", "locator": "statement", "relation": "references"}}
+    edge = {"edge_id": "edge-claim-test", "src": claim_id, "dst": record["node_id"],
+            "category": "evidence", "type": "supports", "certainty": None, "state": "active",
+            "origin": None, "declared_by": claim_id, "declared_owner": OWNER,
+            "declared_rev": record["ref"]["revision"], "field": "claims.evidence_refs", "derived": False}
+    monkeypatch.setattr(index.db, "graph_nodes", lambda: nodes + [claim])
+    monkeypatch.setattr(index.db, "graph_all_edges", lambda: [edge])
+
+    graph = relations.build_graph(storage, index)
+    projected = graph["edges"][0]
+    assert projected["declared_by"] == claim_id
+    assert projected["declared_record"] == {"owner_id": OWNER, "record_id": record["record_id"],
+                                             "revision": record["ref"]["revision"]}
 
 
 def test_monitor_detects_source_change(sample_workspace):

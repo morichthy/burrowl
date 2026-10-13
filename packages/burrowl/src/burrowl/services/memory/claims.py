@@ -11,8 +11,9 @@ from collections import deque
 from copy import deepcopy
 from typing import Any
 
+from ...core import records
 from ...core.errors import BurrowlError
-from ...core.hashing import canonical_hash, sha256_file
+from ...core.hashing import sha256_file
 from ...core.jsonschema import validate
 from ...core.records import validate_record
 from ...core.schema import defs
@@ -83,7 +84,7 @@ def citations(graph: "ClaimGraph", target_ids: set[str] | None = None,
 
 
 def claim_hash(claim: dict) -> str:
-    return canonical_hash(claim)
+    return records.claim_hash(claim)
 
 
 class ClaimGraph:

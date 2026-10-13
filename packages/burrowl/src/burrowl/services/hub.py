@@ -46,7 +46,7 @@ SENSITIVITY_RANK = {"public": 0, "internal": 1, "confidential": 2, "restricted":
 DEFAULT_COLLECTION = "burrowl"
 WIKI_PREFIX = "burrowl-"
 # 交给外部图的边类别（R12 T-P4.1）：结构边和证据边留在本地，外部只拿导航与概念关系
-GRAPH_EXPORT_CATEGORIES = {"reference", "navigation", "concept", "claim_relation"}
+GRAPH_EXPORT_CATEGORIES = {"reference", "navigation", "mention", "claim_part"}  # R23 D-15：结论节点与要素边一起外发
 GRAPH_EXCLUDED_STATES = {"rejected", "withdrawn", "invalid"}  # 宿主 AI 编写的页面统一放在 <type>/burrowl-* 命名空间，与外部自动生成的页面分开
 
 

@@ -210,7 +210,7 @@ class Page:
         node_ids = {rid, *(c["claim_id"] for c in record["payload"].get("claims", []) or [])}
         lines = [GENERATED_START, "## 关联与引用（自动生成）"]
         incoming = sorted({e["declared_by"] for e in self.edges if e["dst"] in node_ids
-                           and e["category"] in {"reference", "evidence", "concept"} and e["declared_by"] in self.paths
+                           and e["category"] in {"reference", "evidence", "mention"} and e["declared_by"] in self.paths
                            and e["declared_by"] != rid})
         if incoming:
             lines.append("**被引用**：" + "、".join(f"[[{self.paths[r]}|{self.records[r]['title']}]]" for r in incoming))

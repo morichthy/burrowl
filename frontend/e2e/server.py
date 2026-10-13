@@ -31,9 +31,28 @@ def seed(base: Path) -> dict:
     agent = Ctx(app=app, actor={"kind": "ai", "id": "e2e-agent"}, channel="cli")
     owner = app.storage.owners.create("research", "order-demo", "求和顺序演示")
     evidence = register_source(app.storage, "SRC-ORDER-DEMO", "research/order-demo/data/result.txt", "升序误差 0.0\n")
+
+    # R19 关系图 E2E 种子：准备两页真实概念，让新建结论产生可从概念端点点击的派生关系边。
+    # 结论节点默认关闭；该边仍须借助 declared_record 展示完整的原结论。
+    concepts = app.storage.owners.create("knowledge", "e2e-concepts", "关系图端到端概念库")
+    _config, config_revision = app.config.store.read()
+    app.config.update({"graph": {"concept_owner_id": concepts.owner_id}}, expected_revision=config_revision)
+    concept_drafts = [
+        {"owner_id": concepts.owner_id, "kind": "wiki_page", "title": title,
+         "body_markdown": f"{title}的端到端测试定义。", "record_reason": "关系图端到端测试种子",
+         "sensitivity": "internal", "sources": [evidence],
+         "payload": {"page_type": "concept", "aliases": [], "source_refs": [evidence], "domains": ["端到端测试"]}}
+        for title in ("E2E 主体", "E2E 客体")
+    ]
+    app.memory.commit(request(concepts.owner_id, None,
+                              *({"op": "put_record", "client_key": f"concept-{i}", "draft": draft}
+                                for i, draft in enumerate(concept_drafts))))
+    narrative = narrative_draft(owner.owner_id, evidence)
+    narrative["body_markdown"] = "测试关系：[[E2E 主体]] 在 [[E2E 客体]] 上表现出该结论。"
+    narrative["payload"]["claims"][0]["relation"] = {"predicate": "fails_on", "participants": [
+        {"role": "method", "value": "[[E2E 主体]]"}, {"role": "case", "value": "[[E2E 客体]]"}]}
     app.memory.commit(request(owner.owner_id, None, {"op": "put_record", "client_key": "n",
-                                                     "draft": narrative_draft(owner.owner_id, evidence)
-                                                     | {"discovery": "workspace_summary"}}))
+                                                     "draft": narrative | {"discovery": "workspace_summary"}}))
     app.index.reconcile()
     session = call(agent, "reading.start", {"question": "Kahan 补偿求和的误差界是多少"})
     call(agent, "reading.ask_user", {"session_id": session["session_id"], "kind": "fulltext",
@@ -41,7 +60,10 @@ def seed(base: Path) -> dict:
     current = call(agent, "config.get", {})
     call(agent, "config.update", {"expected_revision": current["revision"], "patch": {"connectors": [
         {"id": "vault", "type": "mdvault", "options": {"path": str(vault)},
-         "publish": {"levels": ["L2", "L3", "L4"], "include_documents": False}}]}})
+         # 概念页只是关系图画布种子；该连接器的发布测试仅包含 order-demo 的一条记录。
+         "wiki": {"mode": "off"},
+         "publish": {"levels": ["L2", "L3", "L4"], "include_documents": False,
+                     "owner_ids": [owner.owner_id]}}]}})
     # 故障种子只在临时库：模拟旧内容已保存，但升级清空派生索引后尚未 reconcile。
     # 使用没有 IndexSink 的记忆服务保存，避免更改真实数据库或伪造 HTTP 返回。
     missing = app.storage.owners.create("research", "venv-demo", "虚拟环境验证")

@@ -260,9 +260,11 @@ def _packet(owner_id: str, owner_row: dict | None, total: float, targets: list[s
 
 
 def _relation_text(edge: dict, node_rows: dict, index: IndexService) -> str:
-    """关系窗口文字（R19 §4.3）：关联取其说明；结论声明的边取结论陈述；其余取声明记录的标题。"""
-    if edge["category"] == "navigation":
-        entry = next(iter(index.db.entries([f"discovery:{edge['declared_owner']}:{edge['declared_by']}"])), None)
+    """关系窗口文字（R19 §4.3）：关联取其说明；结论声明的边取结论条目（陈述 + 适用范围 + 角色读法，R23 D-14），
+    条件不能脱离结论；其余取声明记录的标题。"""
+    if edge["category"] == "navigation" or edge["declared_by"].startswith("CLM-"):
+        ids = [f"{corpus}:{edge['declared_owner']}:{edge['declared_by']}" for corpus in ("discovery", "fulltext")]
+        entry = next(iter(index.db.entries(ids)), None)
         if entry:
             return entry["text"]
     declarer = node_rows.get(edge["declared_by"]) or next(iter(index.db.graph_nodes([edge["declared_by"]])), {})

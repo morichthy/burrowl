@@ -1,4 +1,5 @@
 """两层关系词表（R19 D-09）：AI 面对的推荐关系名按"写在哪里"缩小；超出推荐范围不拒绝，只返回 warning。
+反例引用（contradicts）缺少 note 同样只返回 warning（R23 D-13）。
 
 内部词表（全部关系名）仍由契约校验，旧数据照常读取；图投影按 index/graph.py 的统一边标准把关系名映射到类别。
 AI 真正需要判断的只是类别边界：依据、矛盾、作为输入、只是参考、值得放在一起看。
@@ -51,6 +52,10 @@ def _check(warnings: list[dict], path: str, ref: Any, allowed: tuple[str, ...]) 
     relation = ref.get("relation") if isinstance(ref, dict) else None
     if relation is not None and relation not in allowed:
         warnings.append(_warning(path, relation, allowed, GUIDE))
+    if relation == "contradicts" and not (ref.get("note") or "").strip():  # R23 D-13：反例要说明反驳了什么
+        warnings.append({"code": "EVIDENCE_NOTE_MISSING", "path": path, "relation": relation,
+                         "message": "反例引用没有 note：写明这份材料的哪部分、怎样反驳这条判断，点开依据边时会显示",
+                         "action": "在该引用中补 note 后修订记录"})
 
 
 def _warning(path: str, relation: str, allowed: tuple[str, ...], message: str) -> dict:

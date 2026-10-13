@@ -205,6 +205,13 @@ textarea { width: 100%; min-height: 64px; line-height: 1.55; }
 .claims, .results, .owners, .problems, .sources { list-style: none; padding: 0; margin: 0; }
 .claims li, .results li { display: flex; gap: 12px; padding: 12px 4px; border-bottom: 1px solid var(--line); align-items: flex-start; }
 .claims li:last-child, .results li:last-child { border-bottom: none; }
+/* 连线详情含多个段落和依据列表，按文稿纵向阅读；不能继承候选列表的横向 flex 排版。
+   固定身份和字段路径可能很长，允许就地换行，防止撑破关系图侧栏。 */
+.claims .edge-detail-entry { display: block; min-width: 0; overflow-wrap: anywhere; }
+/* 连线详情里的嵌套列表（结构、依据、来源）不套用外层结论列表的分隔线与间距 */
+.claims .edge-detail-entry li { display: list-item; padding: 2px 0; border-bottom: none; }
+.claim-structure ul { margin: 0.2em 0 0.4em; padding-left: 1.2em; list-style: disc; }
+.ref-note { color: var(--muted, #666); }
 .claim-body { flex: 1; min-width: 0; }
 .owners { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; margin-bottom: 8px; }
 .owners li {
