@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "project_id": "PRJ-COMPAT-PROJECT",
+  "slug": "compat-project",
+  "title": "标本项目",
+  "status": "active",
+  "sensitivity": "internal",
+  "created_at": "2026-10-13T14:05:36.726690Z",
+  "description": "兼容性标本",
+  "keywords": []
+}

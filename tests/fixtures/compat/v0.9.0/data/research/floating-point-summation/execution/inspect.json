@@ -1,0 +1,392 @@
+{
+  "owner": {
+    "schema_version": 1,
+    "owner_id": "RES-FLOATING-POINT-SUMMATION",
+    "owner_type": "research",
+    "native_ref": {
+      "id_field": "research_id",
+      "id_value": "RES-FLOATING-POINT-SUMMATION",
+      "path": "research/floating-point-summation/research.json"
+    },
+    "memory_home": "research/floating-point-summation/memory",
+    "adapter_version": 1,
+    "temporary": false,
+    "persisted": true,
+    "title": "浮点求和的数值稳定性：顺序、补偿与抵消",
+    "fingerprint": "239ab0fcd73db65fe6b72b3cd756cc876a83e0fd264ad5f00f4fced71664aea7",
+    "native_data": {
+      "schema_version": 1,
+      "research_id": "RES-FLOATING-POINT-SUMMATION",
+      "slug": "floating-point-summation",
+      "title": "浮点求和的数值稳定性：顺序、补偿与抵消",
+      "status": "active",
+      "created_at": "2026-09-08",
+      "updated_at": "2026-09-08",
+      "owners": [],
+      "sensitivity": "internal",
+      "related_project_ids": [],
+      "related_module_ids": [],
+      "decision_to_support": "比较有限整数浮点输入上的求和误差，保留反例和复查过程",
+      "target_date": null,
+      "open_evidence_gaps": [
+        "非整数输入、其他平台、极端指数及性能尚未验证"
+      ],
+      "claims": [],
+      "dependencies": [],
+      "exploration_run_ids": [
+        "RUN-20260908T201214Z-D0AB308F66AD",
+        "RUN-20260908T201228Z-A0980824DC18",
+        "RUN-20260908T201240Z-90107A617CF8"
+      ]
+    },
+    "created_at": "2026-09-08T20:15:27.063082Z",
+    "created_by": {
+      "id": "summation-research-assistant",
+      "kind": "ai"
+    }
+  },
+  "head": {
+    "commit_id": "COM-e609b189-e938-433d-968a-0ee5e184f548",
+    "generation": 1,
+    "manifest_hash": "c7917e6f314359a6b6550ca20ffb3a9374f0d17beedad88cd70c576421e5fd0e"
+  },
+  "manifest": {
+    "changed_ids": [
+      "MEM-58fd845a-05a5-516c-8bbe-c88d887cbb91",
+      "MEM-a8226b54-a4cd-545a-8f22-422c2f513bfc"
+    ],
+    "commit_id": "COM-e609b189-e938-433d-968a-0ee5e184f548",
+    "generation": 1,
+    "index_pending": {
+      "fts": true,
+      "generation": 1,
+      "vector": true
+    },
+    "owner_id": "RES-FLOATING-POINT-SUMMATION",
+    "parent_commit_id": null,
+    "parent_manifest_hash": null,
+    "pointers": {
+      "checkpoint": null,
+      "goal": null,
+      "policy": null
+    },
+    "record_heads": {
+      "MEM-58fd845a-05a5-516c-8bbe-c88d887cbb91": {
+        "commit_id": "COM-e609b189-e938-433d-968a-0ee5e184f548",
+        "path": "commits/COM-e609b189-e938-433d-968a-0ee5e184f548/records/MEM-58fd845a-05a5-516c-8bbe-c88d887cbb91.json",
+        "record_hash": "7cad847e8aac600c63fd7b7ba9b1609eba48f061a9d27d5df7a5b406514bb11a",
+        "revision": 1
+      },
+      "MEM-a8226b54-a4cd-545a-8f22-422c2f513bfc": {
+        "commit_id": "COM-e609b189-e938-433d-968a-0ee5e184f548",
+        "path": "commits/COM-e609b189-e938-433d-968a-0ee5e184f548/records/MEM-a8226b54-a4cd-545a-8f22-422c2f513bfc.json",
+        "record_hash": "0542640d90b6ff09b3d9e6bd32c03298831b4d21e36f61ad02d75ca16766a2ad",
+        "revision": 1
+      }
+    },
+    "request_ledger": {
+      "3a4d55f2-8549-4357-bd5e-aa9c7731d055": {
+        "commit_id": "COM-e609b189-e938-433d-968a-0ee5e184f548",
+        "receipt_hash": "d9a170699a48dfe8163a801418a25aae0161821ea8f5d79cb3bb8948445bc925",
+        "request_hash": "419bc40d2aadc3d19e53ab935de340d1e1150a9c0faa88bdf2751027478d5044"
+      }
+    },
+    "schema_version": 1,
+    "source_checks": [
+      {
+        "kind": "owner_access",
+        "owner_id": "RES-FLOATING-POINT-SUMMATION"
+      },
+      {
+        "hash": "cdb1f9e4f0580d5baaea4a09416f75801e6c5d01eab96c601ded00a28e31134d",
+        "kind": "file",
+        "ref": {
+          "locator": "summary and rows",
+          "relation": "input",
+          "revision": null,
+          "sha256": "cdb1f9e4f0580d5baaea4a09416f75801e6c5d01eab96c601ded00a28e31134d",
+          "target_id": "SRC-SUMMATION-R01",
+          "target_kind": "file"
+        }
+      },
+      {
+        "hash": "f5ef99109b146631abf1fc7256fc62287cbf125c6535ba097da4440570fc8247",
+        "kind": "file",
+        "ref": {
+          "locator": "summary and rows",
+          "relation": "input",
+          "revision": null,
+          "sha256": "f5ef99109b146631abf1fc7256fc62287cbf125c6535ba097da4440570fc8247",
+          "target_id": "SRC-SUMMATION-R02",
+          "target_kind": "file"
+        }
+      },
+      {
+        "hash": "693058d77bb3ed61e94535369bbfa4d74b6a2ed7f406a8af0b5782a0dc4fa7ef",
+        "kind": "file",
+        "ref": {
+          "locator": "summary and rows",
+          "relation": "input",
+          "revision": null,
+          "sha256": "693058d77bb3ed61e94535369bbfa4d74b6a2ed7f406a8af0b5782a0dc4fa7ef",
+          "target_id": "SRC-SUMMATION-R03",
+          "target_kind": "file"
+        }
+      }
+    ]
+  },
+  "records": {
+    "MEM-58fd845a-05a5-516c-8bbe-c88d887cbb91": {
+      "body_markdown": "三轮实际计算表明：本研究的显式逐项累加对顺序敏感；Kahan实现未消除所选抵消结构的全部误差；Neumaier与math.fsum在第二轮6种排列和第三轮30种排列中均与精确基准一致。该观察只适用于已保存输入与脚本，不能推出任意浮点输入都准确，也未比较运行时间。",
+      "change_reason": "保存三轮实际探索后的可复查局部观察与适用边界。",
+      "content_hash": "4da1f1b6f91f604c23765cb6be668d443d13969b3b4799ecf43118850938a0f3",
+      "created_at": "2026-09-08T20:15:35.156441Z",
+      "created_by": {
+        "id": "summation-research-assistant",
+        "kind": "ai"
+      },
+      "discovery": "workspace_summary",
+      "keywords": [
+        "浮点求和",
+        "数值稳定性",
+        "抵消误差"
+      ],
+      "kind": "experience",
+      "level": "L2",
+      "owner_id": "RES-FLOATING-POINT-SUMMATION",
+      "payload": {
+        "applicable": [
+          "本研究已保存的有限整数浮点输入与脚本"
+        ],
+        "claim_refs": [],
+        "claims": [],
+        "failure_modes": [
+          "小增量被舍入丢失",
+          "当前Kahan实现仍有抵消反例"
+        ],
+        "missing_refs": [],
+        "problem_structure": "有限精度累加中大数与小量抵消导致顺序误差",
+        "prohibited": [
+          "据少量排列保证任意输入正确",
+          "把精确命中当作性能更快或现实模型有效"
+        ],
+        "recommendation": "在目标输入上比较精确参考，不把单一补偿方法当作无条件保证",
+        "retry_conditions": [
+          "补充非整数、极端指数和跨平台数据"
+        ]
+      },
+      "previous_revision": null,
+      "provenance_gap": "无真实业务数据；仅构造有限整数浮点输入的本机计算。",
+      "record_hash": "7cad847e8aac600c63fd7b7ba9b1609eba48f061a9d27d5df7a5b406514bb11a",
+      "record_id": "MEM-58fd845a-05a5-516c-8bbe-c88d887cbb91",
+      "record_reason": "保存三轮实际探索后的可复查局部观察与适用边界。",
+      "revision": 1,
+      "schema_version": 1,
+      "sensitivity": "internal",
+      "sources": [
+        {
+          "locator": "summary and rows",
+          "relation": "input",
+          "revision": null,
+          "sha256": "cdb1f9e4f0580d5baaea4a09416f75801e6c5d01eab96c601ded00a28e31134d",
+          "target_id": "SRC-SUMMATION-R01",
+          "target_kind": "file"
+        },
+        {
+          "locator": "summary and rows",
+          "relation": "input",
+          "revision": null,
+          "sha256": "f5ef99109b146631abf1fc7256fc62287cbf125c6535ba097da4440570fc8247",
+          "target_id": "SRC-SUMMATION-R02",
+          "target_kind": "file"
+        },
+        {
+          "locator": "summary and rows",
+          "relation": "input",
+          "revision": null,
+          "sha256": "693058d77bb3ed61e94535369bbfa4d74b6a2ed7f406a8af0b5782a0dc4fa7ef",
+          "target_id": "SRC-SUMMATION-R03",
+          "target_kind": "file"
+        }
+      ],
+      "title": "大数抵消场景的求和方法局部比较",
+      "updated_at": "2026-09-08T20:15:35.156441Z",
+      "updated_by": {
+        "id": "summation-research-assistant",
+        "kind": "ai"
+      }
+    },
+    "MEM-a8226b54-a4cd-545a-8f22-422c2f513bfc": {
+      "body_markdown": "第一轮顺序误差 → 第二轮补偿反例 → 第三轮多排列复验。全部Run已固定，下一步考察非整数输入、溢出边界和性能。",
+      "change_reason": "保存三轮实际探索后的可复查局部观察与适用边界。",
+      "content_hash": "c0afe4ab89715e25b22603a9d2b05d992f301caa8a6c9d90763421ffe1ed1ab4",
+      "created_at": "2026-09-08T20:15:35.156441Z",
+      "created_by": {
+        "id": "summation-research-assistant",
+        "kind": "ai"
+      },
+      "discovery": "workspace_summary",
+      "keywords": [
+        "浮点求和",
+        "数值稳定性",
+        "抵消误差"
+      ],
+      "kind": "map",
+      "level": "L3",
+      "owner_id": "RES-FLOATING-POINT-SUMMATION",
+      "payload": {
+        "conflict_refs": [],
+        "coverage": {
+          "missing": [
+            "非整数、溢出和性能未测"
+          ],
+          "owner_ids": [
+            "RES-FLOATING-POINT-SUMMATION",
+            "RUN-20260908T201214Z-D0AB308F66AD",
+            "RUN-20260908T201228Z-A0980824DC18",
+            "RUN-20260908T201240Z-90107A617CF8"
+          ],
+          "source_versions": [
+            {
+              "locator": "summary and rows",
+              "relation": "input",
+              "revision": null,
+              "sha256": "cdb1f9e4f0580d5baaea4a09416f75801e6c5d01eab96c601ded00a28e31134d",
+              "target_id": "SRC-SUMMATION-R01",
+              "target_kind": "file"
+            },
+            {
+              "locator": "summary and rows",
+              "relation": "input",
+              "revision": null,
+              "sha256": "f5ef99109b146631abf1fc7256fc62287cbf125c6535ba097da4440570fc8247",
+              "target_id": "SRC-SUMMATION-R02",
+              "target_kind": "file"
+            },
+            {
+              "locator": "summary and rows",
+              "relation": "input",
+              "revision": null,
+              "sha256": "693058d77bb3ed61e94535369bbfa4d74b6a2ed7f406a8af0b5782a0dc4fa7ef",
+              "target_id": "SRC-SUMMATION-R03",
+              "target_kind": "file"
+            }
+          ]
+        },
+        "goal_refs": [],
+        "missing_refs": [],
+        "next_steps": [
+          "非整数与极端指数测试",
+          "跨平台复算",
+          "单独测量性能"
+        ],
+        "question_refs": [],
+        "result_refs": [
+          {
+            "locator": "summary and rows",
+            "relation": "input",
+            "revision": null,
+            "sha256": "cdb1f9e4f0580d5baaea4a09416f75801e6c5d01eab96c601ded00a28e31134d",
+            "target_id": "SRC-SUMMATION-R01",
+            "target_kind": "file"
+          },
+          {
+            "locator": "summary and rows",
+            "relation": "input",
+            "revision": null,
+            "sha256": "f5ef99109b146631abf1fc7256fc62287cbf125c6535ba097da4440570fc8247",
+            "target_id": "SRC-SUMMATION-R02",
+            "target_kind": "file"
+          },
+          {
+            "locator": "summary and rows",
+            "relation": "input",
+            "revision": null,
+            "sha256": "693058d77bb3ed61e94535369bbfa4d74b6a2ed7f406a8af0b5782a0dc4fa7ef",
+            "target_id": "SRC-SUMMATION-R03",
+            "target_kind": "file"
+          }
+        ],
+        "route_refs": [],
+        "topic": "浮点求和局部稳定性"
+      },
+      "previous_revision": null,
+      "provenance_gap": "无真实业务数据；仅构造有限整数浮点输入的本机计算。",
+      "record_hash": "0542640d90b6ff09b3d9e6bd32c03298831b4d21e36f61ad02d75ca16766a2ad",
+      "record_id": "MEM-a8226b54-a4cd-545a-8f22-422c2f513bfc",
+      "record_reason": "保存三轮实际探索后的可复查局部观察与适用边界。",
+      "revision": 1,
+      "schema_version": 1,
+      "sensitivity": "internal",
+      "sources": [
+        {
+          "locator": "summary and rows",
+          "relation": "input",
+          "revision": null,
+          "sha256": "cdb1f9e4f0580d5baaea4a09416f75801e6c5d01eab96c601ded00a28e31134d",
+          "target_id": "SRC-SUMMATION-R01",
+          "target_kind": "file"
+        },
+        {
+          "locator": "summary and rows",
+          "relation": "input",
+          "revision": null,
+          "sha256": "f5ef99109b146631abf1fc7256fc62287cbf125c6535ba097da4440570fc8247",
+          "target_id": "SRC-SUMMATION-R02",
+          "target_kind": "file"
+        },
+        {
+          "locator": "summary and rows",
+          "relation": "input",
+          "revision": null,
+          "sha256": "693058d77bb3ed61e94535369bbfa4d74b6a2ed7f406a8af0b5782a0dc4fa7ef",
+          "target_id": "SRC-SUMMATION-R03",
+          "target_kind": "file"
+        }
+      ],
+      "title": "求和稳定性三轮探索地图",
+      "updated_at": "2026-09-08T20:15:35.156441Z",
+      "updated_by": {
+        "id": "summation-research-assistant",
+        "kind": "ai"
+      }
+    }
+  },
+  "policy": {
+    "values": {
+      "mode": "explore",
+      "retain": [],
+      "granularity": "normal",
+      "auto_summary": false,
+      "discovery": "owner_only",
+      "auto_deepen": false,
+      "checkpoint": true
+    },
+    "sources": {
+      "mode": "type",
+      "retain": "workspace",
+      "granularity": "workspace",
+      "auto_summary": "workspace",
+      "discovery": "workspace",
+      "auto_deepen": "workspace",
+      "checkpoint": "workspace"
+    }
+  },
+  "owner_id": "RES-FLOATING-POINT-SUMMATION",
+  "generation": 1,
+  "index_status": "indexed",
+  "index_details": {
+    "fts": "indexed",
+    "vector": "indexed",
+    "indexed_generation": 1,
+    "vector_generation": 1,
+    "target_generation": 1,
+    "encoder_version": "memory-record-representation-v1",
+    "collection": "memory_v1_30c2d3be9482",
+    "error": null
+  },
+  "claim_states": {},
+  "omitted": [],
+  "warnings": []
+}
+

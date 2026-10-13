@@ -1,0 +1,50 @@
+{
+  "burrowl_version": "0.9.0",
+  "git_commit": "0b5c343605df962d56a971dd4caf58466aa029e7",
+  "git_dirty": true,
+  "created_at": "2026-10-13T14:05:44.326394Z",
+  "format_fingerprint": "5de110de205b2997ed0ab7ec5d14e042d95c5a4d4725a0b0f83de6f90ba2c19c",
+  "kinds": [
+    "association",
+    "checkpoint",
+    "detail",
+    "document",
+    "document_section",
+    "experience",
+    "goal",
+    "narrative",
+    "overview",
+    "question",
+    "route",
+    "source",
+    "wiki_page"
+  ],
+  "owners": [
+    "KNW-COMPAT-NOTES",
+    "PRJ-COMPAT-PROJECT",
+    "OBJ-fbc6f04e-ff2e-4ca6-a846-6e8b82d24b13"
+  ],
+  "runs": [
+    "RUN-20261013T140536Z-385F702718DF",
+    "RUN-20261013T140537Z-277FD47B6F81",
+    "RUN-20261013T140537Z-8CFD5069DCC7"
+  ],
+  "sources": [
+    "SRC-COMPAT-SAMPLES",
+    "SRC-COMPAT-README",
+    "SRC-COMPAT-INSIDE",
+    "SRC-COMPAT-DOCX",
+    "SRC-ATT-e60fe9fdf8789a8a"
+  ],
+  "transcription": {
+    "owner_id": "KNW-COMPAT-NOTES",
+    "source_id": "SRC-COMPAT-DOCX"
+  },
+  "work_root_id": "ROOT-WORK",
+  "original_work_path": "C:\\Users\\livky\\AppData\\Local\\Temp\\burrowl-compat-5jt8cbk4\\work",
+  "known_problems": [
+    "sources:STALE_BASIS:SRC-SUMMATION-RELOCATED-87fe209f32e34e60",
+    "sources:STALE_BASIS:SRC-SUMMATION-RELOCATED-d526bf0d36560844",
+    "sources:STALE_BASIS:SRC-SUMMATION-RELOCATED-df27dd52e290d0ba"
+  ]
+}

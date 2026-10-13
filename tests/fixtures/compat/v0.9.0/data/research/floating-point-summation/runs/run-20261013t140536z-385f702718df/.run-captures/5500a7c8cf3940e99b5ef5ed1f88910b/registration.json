@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "run_path": "research/floating-point-summation/runs/run-20261013t140536z-385f702718df/run.json",
+  "before_bytes": "ewogICJzY2hlbWFfdmVyc2lvbiI6IDEsCiAgInJ1bl9pZCI6ICJSVU4tMjAyNjEwMTNUMTQwNTM2Wi0zODVGNzAyNzE4REYiLAogICJvd25lcl9pZCI6ICJSRVMtRkxPQVRJTkctUE9JTlQtU1VNTUFUSU9OIiwKICAidGl0bGUiOiAi5qCH5pys5a+56LGhIFJ1biIsCiAgInF1ZXN0aW9uIjogIuagt+acrOacieWHoOihjCIsCiAgImtleXdvcmRzIjogW10sCiAgInJ1bl90eXBlIjogImFuYWx5c2lzIiwKICAic3RhdHVzIjogInBsYW5uZWQiLAogICJzZW5zaXRpdml0eSI6ICJpbnRlcm5hbCIsCiAgImNyZWF0ZWRfYXQiOiAiMjAyNi0xMC0xM1QxNDowNTozNloiLAogICJzdGFydGVkX2F0IjogbnVsbCwKICAiZW5kZWRfYXQiOiBudWxsLAogICJpbnB1dHMiOiBbXSwKICAiYXJ0aWZhY3RzIjogW10sCiAgInBhcmFtZXRlcnMiOiB7fSwKICAiZW52aXJvbm1lbnQiOiB7CiAgICAicHl0aG9uIjogIjMuMTIuMTUiLAogICAgInBsYXRmb3JtIjogIldpbmRvd3MtMTEtMTAuMC4yMjYzMS1TUDAiCiAgfSwKICAiY29uY2x1c2lvbiI6ICIiLAogICJsaW1pdGF0aW9ucyI6IFtdLAogICJwYXJlbnRfcnVuX2lkcyI6IFtdCn0K",
+  "after": {
+    "schema_version": 1,
+    "run_id": "RUN-20261013T140536Z-385F702718DF",
+    "owner_id": "RES-FLOATING-POINT-SUMMATION",
+    "title": "标本对象 Run",
+    "question": "样本有几行",
+    "keywords": [],
+    "run_type": "analysis",
+    "status": "planned",
+    "sensitivity": "internal",
+    "created_at": "2026-10-13T14:05:36Z",
+    "started_at": null,
+    "ended_at": null,
+    "inputs": [
+      {
+        "path": "SRC-COMPAT-SAMPLES",
+        "sha256": "2a2b86e74ffd5e6a9b75e52a105cf9d02920837179f8e8961aa15411d380f7a3",
+        "role": "input",
+        "registered_at": "2026-10-13T14:05:37.016579Z"
+      }
+    ],
+    "artifacts": [],
+    "parameters": {},
+    "environment": {
+      "python": "3.12.15",
+      "platform": "Windows-11-10.0.22631-SP0"
+    },
+    "conclusion": "",
+    "limitations": [],
+    "parent_run_ids": []
+  },
+  "created_at": "2026-10-13T14:05:37.020100Z"
+}

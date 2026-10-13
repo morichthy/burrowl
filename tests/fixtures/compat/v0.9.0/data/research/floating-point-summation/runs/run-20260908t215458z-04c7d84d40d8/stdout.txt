@@ -1,0 +1,1 @@
+{"checked_results": 150, "all_saved_results_match": true, "explicit_trace_groups": 111, "output": "C:\\Users\\livky\\.codex\\worktrees\\cf08\\A_work_auto_flow\\research\\floating-point-summation\\runs\\run-20260908t215458z-04c7d84d40d8\\outputs"}

@@ -1,0 +1,147 @@
+{
+  "collaboration": {
+    "subagent_requirements": "优先使用低成本、较低能力的可用模型，采用低推理深度；须能完成材料检索、完整阅读和结构化笔记。",
+    "subagents": "auto"
+  },
+  "connectors": [],
+  "diagnostics": {
+    "request_log": "off"
+  },
+  "graph": {
+    "concept_owner_id": null
+  },
+  "index": {
+    "embedding": {
+      "chunking": "auto",
+      "dim": 384,
+      "late_context_tokens": 2048,
+      "max_tokens": null,
+      "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+      "passage_prefix": null,
+      "path": null,
+      "provider": "fastembed",
+      "query_prefix": null,
+      "span_tokens": 512
+    },
+    "graph_route": {
+      "algorithm": "hops",
+      "category_weights": {
+        "claim_part": 0.6,
+        "evidence": 1.0,
+        "mention": 0.5,
+        "navigation_plausible": 0.4,
+        "navigation_speculative": 0.2,
+        "navigation_supported": 0.7,
+        "reference": 0.6,
+        "structure": 0.3
+      },
+      "enabled": false,
+      "fanout": 20,
+      "hops": 1,
+      "seeds": 20,
+      "weight": 0.5
+    },
+    "hub_route": {
+      "connectors": [],
+      "limit": 20,
+      "timeout_s": 10.0,
+      "weight": 0.5
+    },
+    "ocr_enabled": true,
+    "path": ".burrowl/index/index.sqlite3",
+    "reranker": {
+      "path": null
+    },
+    "vector": {
+      "kind": "sqlite-vec",
+      "secret_ref": null,
+      "url": null
+    }
+  },
+  "mcp": {
+    "mode": "auto",
+    "toolsets": [
+      "memory",
+      "review",
+      "query",
+      "reading",
+      "provenance",
+      "relations",
+      "maintenance",
+      "monitor",
+      "exchange",
+      "runs",
+      "sources",
+      "index",
+      "hub",
+      "wiki",
+      "config",
+      "system"
+    ]
+  },
+  "query": {
+    "budget": {
+      "candidates": 100,
+      "graph_edges": 100,
+      "graph_hops": 2,
+      "graph_nodes": 50,
+      "model_calls": 1,
+      "model_input_tokens": 512,
+      "model_output_tokens": 0,
+      "model_tokens": 512,
+      "output_chars": 80000,
+      "read_bytes": 16777216,
+      "rerank_items": 0,
+      "wall_ms": 300000
+    },
+    "result_limit": 20,
+    "review_filter": "all"
+  },
+  "reading": {
+    "association": {
+      "concept_max_degree": 20,
+      "enabled": true,
+      "expand_owners": 5,
+      "max_rounds": 3,
+      "min_score": 0.2,
+      "target_nodes": 3,
+      "target_pages": 2
+    },
+    "budget": {
+      "candidates": 1000,
+      "graph_edges": 1000,
+      "graph_hops": 2,
+      "graph_nodes": 50,
+      "model_calls": 20,
+      "model_input_tokens": 65536,
+      "model_output_tokens": 0,
+      "model_tokens": 65536,
+      "output_chars": 80000,
+      "read_bytes": 16777216,
+      "rerank_items": 100,
+      "wall_ms": 300000
+    },
+    "context": {
+      "max_owners": 10,
+      "note_max_tokens": 6000
+    },
+    "reranking": {
+      "candidate_limit": 30,
+      "mode": "auto",
+      "window_tokens": 512
+    },
+    "result_limit": 10,
+    "review_filter": "all",
+    "screening": {
+      "batch_owners": 10,
+      "max_windows": 4,
+      "regular_windows": 3
+    },
+    "strategy": "quick"
+  },
+  "schema_version": 1,
+  "server": {
+    "host": "127.0.0.1",
+    "port": 0
+  }
+}

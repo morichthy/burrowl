@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-20260908T201228Z-A0980824DC18",
+  "project_id": null,
+  "title": "求和探索02：补偿求和的抵消反例",
+  "keywords": [
+    "浮点求和"
+  ],
+  "review_history": [],
+  "claims": [],
+  "dependencies": [],
+  "run_type": "analysis",
+  "status": "succeeded",
+  "created_at": "2026-09-08T20:12:28Z",
+  "started_at": "2026-09-08T20:12:29.088131+00:00",
+  "ended_at": "2026-09-08T20:12:29.365739+00:00",
+  "owner": "AI research assistant",
+  "question": "Kahan补偿能否修复三个数的所有排列？Neumaier与fsum如何？",
+  "hypotheses": [
+    "本轮路线选择依据前轮观察；没有将前轮数值输出作为本轮输入。"
+  ],
+  "inputs": [
+    {
+      "path": "runs/run-20260908t201228z-a0980824dc18/inputs.json",
+      "sha256": "a48c045211280be1e1bb58524a8067598eea6d9d8e964a8b513b4b544e195cd6"
+    }
+  ],
+  "parameters": {
+    "round": 2,
+    "samples": 6,
+    "methods": [
+      "sequential",
+      "kahan",
+      "neumaier",
+      "math.fsum"
+    ]
+  },
+  "code": {
+    "commit": null,
+    "dirty": null,
+    "source_snapshot_sha256": "8dc8cd86e17a2595b0217e9bcef712c5a61db1eec07828fb446ea556657f2284",
+    "source_path": "runs/run-20260908t201228z-a0980824dc18/reproduce.py"
+  },
+  "environment": {
+    "python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "lock_or_image_digest": null,
+    "dependencies": "Python standard library only"
+  },
+  "random_seeds": [],
+  "quality_results": [
+    {
+      "check": "Actual finite-output computation and rational/integer reference cross-check",
+      "required": true,
+      "status": "passed"
+    }
+  ],
+  "metrics": {
+    "sequential": {
+      "cases": 6,
+      "exact_matches": 2,
+      "max_absolute_error": 1.0
+    },
+    "kahan": {
+      "cases": 6,
+      "exact_matches": 2,
+      "max_absolute_error": 1.0
+    },
+    "neumaier": {
+      "cases": 6,
+      "exact_matches": 6,
+      "max_absolute_error": 0.0
+    },
+    "math.fsum": {
+      "cases": 6,
+      "exact_matches": 6,
+      "max_absolute_error": 0.0
+    }
+  },
+  "artifacts": [
+    {
+      "path": "runs/run-20260908t201228z-a0980824dc18/results.json",
+      "sha256": "f5ef99109b146631abf1fc7256fc62287cbf125c6535ba097da4440570fc8247"
+    },
+    {
+      "path": "runs/run-20260908t201228z-a0980824dc18/reproduce.py",
+      "sha256": "8dc8cd86e17a2595b0217e9bcef712c5a61db1eec07828fb446ea556657f2284"
+    },
+    {
+      "path": "runs/run-20260908t201228z-a0980824dc18/execution.json",
+      "sha256": "1d693558847dc790efd19293b0176afa27176d0f1ee9ccfcb1f83e65c4edc496"
+    },
+    {
+      "path": "runs/run-20260908t201228z-a0980824dc18/README.md",
+      "sha256": "08daa0b3fe39eae416aa485d014e6f4ade61ee1237c06071a7e7da7718210344"
+    }
+  ],
+  "lineage_events": "lineage.jsonl",
+  "conclusion": "三项抵消输入揭示Kahan实现仍存在排列反例；下一轮扩大排列数量，检查该限制是否继续出现。",
+  "limitations": [
+    "Constructed dimensionless finite inputs only.",
+    "No overflow, NaN, infinity, timing or proof of universal correctness."
+  ],
+  "parent_run_ids": [],
+  "related_module_ids": [],
+  "related_research_ids": [
+    "RES-FLOATING-POINT-SUMMATION"
+  ],
+  "related_dataset_ids": [],
+  "review": {
+    "status": "not-reviewed",
+    "reviewer": null,
+    "date": null
+  },
+  "sensitivity": "internal",
+  "prior_exploration_run": "RUN-20260908T201214Z-D0AB308F66AD"
+}
