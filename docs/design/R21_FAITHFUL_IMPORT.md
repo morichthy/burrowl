@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 |---|---|
-| 状态 | 用户确认（2026-10-12，三轮讨论；§2 按用户要求扩写各层说明与两张示例表），已实施（2026-10-13）；真实文档导入与安装包实测待用户 |
+| 状态 | 原方案已实施（2026-10-13）；完整转录、逻辑切分与图片保全补充决定 D-16–D-18 已由用户确认并实施（2026-10-14），软件回归见 §8；真实文档逐段逐图导入验收待做 |
 | 适用范围 | 记录标准与工作流（RECORDING、RULES、burrowl-work、burrowl-consolidate）；L0 / L1 契约（`core/schema/`、`core/technical.py`、`core/records.py`）；来源抽取（`index/extract.py`）与来源登记（`storage/sources`）；提交校验（`services/memory/service.py`、`core/links.py`）；维护计划（R16）；工作台（`frontend/src/features/Memory.tsx`、`Home.tsx`、`ui.tsx`）；CLI 与打包（`interfaces/cli.py`、`interfaces/api.py`、`packaging/`） |
 | 关系 | 不改 L0–L4 的层级定义和"层级不是流水线"的原则；补充"每层承担什么"的本质说明和兜底机制。图片显示沿用现有 `figures`；维护计划沿用 R16；工作台笔记沿用 R15 |
 
@@ -157,6 +157,14 @@
 | D-14 | **首页停止 / 重启**：首页显示"运行中的版本 / 已安装的版本"，不一致时提示重启。"重启服务""停止服务"是用户操作（`effect="user"`，AI 调用不到）。重启：服务用已安装的 `current` 启动器拉起新的后台进程，等它接管端口后自己退出；页面轮询，恢复后自动刷新。说明里写明：AI 客户端通过 stdio 运行的 MCP 是另外的进程，需要重启客户端 | 支持版本更新后在页面上完成重启 |
 | D-15 | **开始菜单快捷方式**：setup 在 `%APPDATA%\Microsoft\Windows\Start Menu\Programs\` 下建"burrowl 工作台.lnk"，指向 `burrowl open`；参数 `-NoShortcut` 可以不建。快捷方式只是一个文件，不写注册表 | 用户确认（2026-10-12） |
 
+### 补充决定（2026-10-14，用户确认；优先于 §2 和 D-01 / D-06 的旧表述）
+
+| 决定 | 现行约定 |
+|---|---|
+| D-16 | 授权范围内默认完整转录，不由 AI 先筛“有用部分”。按原文逻辑段落组织；同一逻辑段落中意思或用途差别较大的部分继续拆分。原文章节、标题、编号和论证关系是依据；页码、快照 key、固定长度只是定位或读取边界。L1 开头的整理者注说明原文组织逻辑、位置、切分依据与必要上下文；不因拆分丢掉条件、推导步骤、图注或例子。省略仅限不承载实质信息的部分或用户明确排除的范围，并在 L0 登记位置、范围、理由 |
+| D-17 | 覆盖仍是派生提示，不阻断正常保存，也不判定“完整导入”。文字采用保守的九成阈值，字数比或重合度任一不足都提示，短段不豁免；另现算图片附件、原位置正文引用和展示可用性，附抽取警告。全部原文已读、逐段逐图比对、省略有理由且缺口处理后，AI 才能宣称完整导入；标签和指标都不能代替内容核验 |
+| D-18 | 导入抽取不沿用检索的 40 张图片限制；OCR / 预览缩略图与原始资产分开，PNG/JPEG/WebP 附件保留原始字节、尺寸和透明度，原件变化后拒绝用旧登记提取。补上 DOCX 表格内图片；无法抽取的 PDF 矢量图、DOCX 非正文部分、Markdown 图片等明确警告，并按原件补齐或报告缺口。旧快照和旧附件保持可读，不自动替换历史图 |
+
 ## 5. 不做的
 
 - 不按文档类型强制套模板，不让 AI 先给整篇文档判类型。
@@ -180,6 +188,9 @@
 | T-9 | D-11：工作台引用跳转与正文 `[[…]]` 渲染 |
 | T-10 | D-12–D-15：CLI 命令、`server.json`、固定端口与 token、`burrowl-workbench.exe`、首页按钮与版本显示、setup 快捷方式 |
 | T-11 | 文档：README（启动方式、目录内容）、ARCHITECTURE（状态归属：快照、附件、server.json）、CORE、GLOSSARY（快照、原文展开、覆盖报告、`general`）、TESTING、DEVELOPMENT_HISTORY、docs/README、AGENTS；`gen_reference.py` 与 `npm run ops` |
+| T-12 | D-16：RECORDING、work、consolidate 与用户说明改为完整转录、逻辑切分和上下文说明；明确省略与完成声明边界 |
+| T-13 | D-17：加强文字缺口提示；覆盖报告增加图片状态与警告；工作台分别显示文字、图片提示；补半篇转录、短段和逻辑切分的行为测试 |
+| T-14 | D-18：导入抽取全部图片、保留原始图片字节、拒绝陈旧来源、补 DOCX 表格图片；报告尚未支持的抽取范围并回归旧数据 |
 
 ## 7. 验收
 
@@ -195,6 +206,11 @@
 | 任务 | 状态 | 说明 |
 |---|---|---|
 | 设计稿 | 已确认（2026-10-12） | |
+| T-12 | 已完成（2026-10-14） | RECORDING、work、consolidate：默认完整转录、逻辑段落切分、意思差别较大时继续拆分、开头的切分上下文；依赖上下文的内容块用 `requires_block_ids` 带上，不假定窗口包含记录开头；省略登记与完成声明边界同步 |
+| T-13 | 已完成（2026-10-14） | 覆盖提示改为字数比或重合度低于 0.9 都需核对，短段不豁免；现算图片未登记、缺正文引用、已引用、不可展示和省略状态，附抽取警告；工作台文字、图片分别显示。没有新增“完整导入”的权威状态，仍需实际逐段逐图验收 |
+| T-14 | 已完成（2026-10-14） | 导入不沿用 40 张限制；附件保留 PNG/JPEG/WebP 原始字节、尺寸与透明度，修复损坏的原图缓存，原件改版后拒绝按旧登记提取；附加时不重复全文件 OCR。补 DOCX 表格图片，PDF 矢量图、DOCX 未支持部分、Markdown 图片显式报告缺口；历史快照、附件与记录不自动改写 |
+| 补修文档处置 | 已完成（2026-10-14） | 已修改：README、ARCHITECTURE、CORE、docs/README、TESTING、GLOSSARY、DEVELOPMENT_HISTORY、本设计稿、RECORDING、work、consolidate；工具参考和前端操作类型已重新生成。已核对无需修改：DOCUMENTATION_MAINTENANCE、RULES、read、dev-check（职责、权限与开发流程不变） |
+| 补修验证 | 软件检查通过（2026-10-14） | 单元、服务与来源访问接口回归通过（需要真实模型的测试按默认跳过）；最终定向导入与上下文投影 19 项、前端 50 项、前端类型检查与构建、ruff、lint-imports、Skill 检查、diff 检查通过。未执行真实 AI 文件导入、浏览器端到端或安装打包：本轮验证局部导入行为与页面缺口展示，不宣称实际文档导入或部署已验收 |
 | T-1 | 已完成 | RECORDING §1（本质原则 1–6 与逐层说明）、§2（L1、L4 行）、§3（表 A、表 B 与对象类型表）、§4（`general`、`origin`、`figures`、两种默认顺序）、§6（就近链接 L1、`UNREADABLE_REF`）；burrowl-work"导入已有资料"改为 7 步；burrowl-consolidate 增加 `unlinked_details`、覆盖报告、`source_changes` / `origin_changes`；RULES §0 说明进入数据目录的只有快照与附件 |
 | T-2 | 已完成 | schema 增加 `SourceOrigin`、`OmittedPart`，L1 `origin`（可选）、块 `locators`、`unit_type=general`、L0 `omitted`；`validate_unit`：实验类有 `run_ref` 或 `origin` 即可，`origin` 必须是对 SRC 的固定文件引用，`origin` 也算依据；契约示例说明已更新 |
 | T-3 | 已完成 | `index/extract.py` 增加 docx（标题级别取样式名、大纲级别或常见样式 ID；列表、表格、内嵌图片、OMML 公式按文字并给警告）；`core/segments.py` 分段按标题路径合并；快照存 `.burrowl/snapshots/<SRC>/<sha>.json`；`sources_register(_many)` 增加 `snapshot`，新增 `sources_snapshot` |

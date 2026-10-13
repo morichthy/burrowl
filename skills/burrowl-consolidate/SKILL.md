@@ -33,7 +33,7 @@ requires_tools: [memory_inspect, memory_document, memory_timeline, memory_contra
    - 区分"引用旧版仍然适用"和"还没同步"。
    - `memory_consolidate_prepare` 的 `unfixed_evidence` 列出本对象下没有被任何 L1–L4 引用的 Run 和 L0 记录：逐项补写记录并引用；确实没有知识的 Run 用 `runs_discard` 丢弃；L0 不需要时在处置说明里写明理由。
    - `unlinked_details` 列出没有被任何 L2–L4 或文稿指向的本对象 L1：在概括它的上层记录里就近补 `[[@…]]` 链接，或写明不需要的理由（RECORDING 第 1 节原则 3）。
-   - 转写过外部原件的对象，用 `memory_document(view="coverage", source_id=…)` 查覆盖：未覆盖、偏短的原文段落补写 L1，或在 L0 的 `omitted` 写明理由。
+   - 转写过外部原件的对象，用 `memory_document(view="coverage", source_id=…)` 分别查文字与图片缺口：未覆盖、偏短的原文补写 L1，按原文逻辑组织并交代切分上下文；只对允许的省略在 L0 的 `omitted` 写明范围和理由。逐图核对附件、正文引用与实际显示，并对照原件检查抽取警告和未抽出的内容。`covered` 只是提示，不能代替完整导入验收（work 的“导入已有资料”第 5 步）。
 3. **修订内容与文稿**：
    - 同一内容的演进沿用原记录 ID 修订，新的独立内容才新建；保留失败和适用边界。
    - 先保存被引用的技术内容、经过、经验，再更新概览和受影响章节，最后更新文稿根的 `section_refs`。未变化的内容沿用原修订，不为收口制造全量新版本。

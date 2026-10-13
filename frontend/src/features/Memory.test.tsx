@@ -44,6 +44,18 @@ function mock(name: string, args: Record<string, unknown>): unknown {
       };
     case "review.queue":
       return { items: [], counts: {} };
+    case "ui.transcriptions":
+      return [{ source_id: "SRC-X", title: "原始说明", has_snapshot: true, counts: { covered: 1 } }];
+    case "memory.document":
+      return args.view === "coverage" ? {
+        segments: [{ key: "方法", status: "covered", ratio: 1, overlap: 1 }],
+        assets: [
+          { label: "原图一", segment: "方法", status: "missing" },
+          { label: "原图二", segment: "方法", status: "unreferenced" },
+          { label: "原图三", segment: "方法", status: "linked" },
+        ],
+        warnings: ["原文包含未抽取的矢量图"],
+      } : { file_name: "说明.pdf", sections: [] };
     default:
       return {};
   }
@@ -68,6 +80,15 @@ afterEach(() => {
 });
 
 describe("系统记忆", () => {
+  it("文字已认领仍展示图片缺口和抽取警告，不将覆盖结果当作完整转录", async () => {
+    render(<OwnerView ownerId="RES-X" />);
+    fireEvent.click(await screen.findByRole("tab", { name: "原文展开" }));
+    expect(await screen.findByText("缺图片附件")).toBeInTheDocument();
+    expect(screen.getByText("缺正文引用")).toBeInTheDocument();
+    expect(screen.getByText("附件已引用")).toBeInTheDocument();
+    expect(screen.getByText("原文包含未抽取的矢量图")).toBeInTheDocument();
+    expect(screen.getByText(/文字已认领不代表完整转录/)).toBeInTheDocument();
+  });
   it("按类型筛选记录，计数来自 kind_counts，并把类型传给后端", async () => {
     render(<OwnerView ownerId="RES-X" />);
     expect(await screen.findByText("Kahan 补偿")).toBeInTheDocument();

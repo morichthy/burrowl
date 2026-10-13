@@ -205,6 +205,10 @@ DEFAULT_TOOLSETS = ["memory", "review", "query", "reading", "provenance", "relat
 
 class McpConfig(_Model):
     toolsets: list[str] = Field(default_factory=lambda: list(DEFAULT_TOOLSETS))
+    error_envelope: bool = Field(False, description=(
+        "MCP 错误兼容返回，默认关闭。开启后所有 MCP 调用返回 {ok,result/error} 普通结果包，"
+        "业务失败仍明确为 ok=false，并携带有界错误摘要；用于会隐藏 isError 内容的客户端。"
+        "不改变执行、错误日志或 HTTP/CLI；保存后下一次 MCP 调用生效，可随时关闭"))
     mode: Literal["auto", "manual"] = Field(
         "auto", description="auto：接入 burrowl 的对话默认按 burrowl-work / burrowl-read / burrowl-consolidate 工作，成果存入本数据目录；"
                             "manual：只在用户明确要求时使用。启动参数 --mode 优先；修改后需重启 MCP 服务")

@@ -203,7 +203,7 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | 操作 | 类型 | 说明 | 参数 |
 |---|---|---|---|
 | `sources.add_root` | 写入 | 登记一个工作根。通常不必手动调用：登记本次工作目录里的文件时会自动建根。 | `path`*: string，`title`: string |
-| `sources.attach` | 写入 | 把原件中的图片复制为数据目录内的受控附件并登记为来源，返回固定引用 ref。 L1 的 payload.figures 写 {caption: 照录原文图注, ref}，块正文用 ![图注](figure:序号) 在原位置引用。 附件随数据目录备份和迁移；同一张图重复附加是幂等的。 | `source_id`*: string，`asset_label`: string|null，`title`: string |
+| `sources.attach` | 写入 | 把原件中的 PNG/JPEG/WebP 原始图片字节复制为受控附件并登记，返回固定引用 ref（不以 OCR 缩略图替代）。 L1 的 payload.figures 写 {caption: 照录原文图注, ref}，块正文用 ![图注](figure:序号) 在原位置引用。 附件随数据目录备份和迁移；同一张图重复附加是幂等的。 | `source_id`*: string，`asset_label`: string|null，`title`: string |
 | `sources.list` | 只读 | 已登记的来源文件（file 引用的唯一授权入口），附当前解析出的位置 location。 | 无 |
 | `sources.register` | 写入 | 登记一个来源文件并记录当前字节指纹：L0 原件的唯一授权入口。原件留在原处，不复制、不修改。 工作目录里的文件自动记为"工作根 + 相对路径"，迁移时随根重定向。 同一 ID 重复登记同一文件是幂等的；内容变了请用新 ID；文件搬家用 sources_relocate / sources_relocate_root。 | `source_id`*: string，`path`*: string，`title`: string，`sensitivity`: string，`snapshot`: boolean |
 | `sources.register_many` | 写入 | 批量登记来源（导入已有资料时使用）。 | `items`*: array，`snapshot`: boolean |

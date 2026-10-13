@@ -1,6 +1,7 @@
 """R21 导入不丢细节：docx 抽取、原文快照、图片附件、L1 的 origin、覆盖报告、原文展开、原件变化后的逐段对比。"""
 import io
 import zipfile
+from pathlib import Path
 
 import pytest
 
@@ -79,6 +80,45 @@ def test_segments_diff_by_content():
     assert diff["changed"][0]["old_keys"] == ["B"] and diff["changed"][0]["new_keys"] == ["B", "E"]
 
 
+@pytest.mark.parametrize("length", [20, 200])
+def test_coverage_does_not_accept_half_transcription_or_padding(length):
+    """一小段成立条件也不能因为短而豁免；加整理者注不能掩盖被删掉的原文。"""
+    original = "".join(chr(0x4e00 + i) for i in range(length))
+    segments = seg.build_segments([{"label": "s1", "text": original}])
+    record = {"kind": "detail", "record_id": "test", "payload": {
+        "origin": {"source_ref": {"target_id": "SRC-TEST"}, "locators": ["s1"]},
+        "blocks": [{"block_id": "b", "markdown": original[:length // 2]}]}}
+    assert seg.coverage(segments, [record], "SRC-TEST", [])["segments"][0]["status"] == "thin"
+    record["payload"]["blocks"][0]["markdown"] += "整理者注" * length
+    assert seg.coverage(segments, [record], "SRC-TEST", [])["segments"][0]["status"] == "thin"
+
+
+def test_logical_split_retains_coverage_and_original_order():
+    """一个快照 key 可分给多个逻辑块，一条 L1 也可跨 key；联合核对，不要求机械一段一记录。"""
+    original = "".join(chr(0x4e00 + i) for i in range(200))
+    segments = seg.build_segments([{"label": "page1", "text": original}, {"label": "page2", "text": "后续定义"}])
+    records = [
+        {"kind": "detail", "record_id": "first", "revision": 1, "title": "第一部分", "payload": {
+            "origin": {"source_ref": {"target_id": "SRC-TEST"}, "locators": ["page1"]},
+            "blocks": [{"block_id": "b1", "markdown": original[:100]}]}},
+        {"kind": "detail", "record_id": "second", "revision": 1, "title": "跨页部分", "payload": {
+            "origin": {"source_ref": {"target_id": "SRC-TEST"}, "locators": ["page1", "page2"]},
+            "blocks": [{"block_id": "b2", "markdown": original[100:], "locators": ["page1"]},
+                       {"block_id": "b3", "markdown": "后续定义", "locators": ["page2"]}]}}]
+    assert seg.coverage(segments, records, "SRC-TEST", [])["counts"]["covered"] == 2
+    expanded = seg.expansion(segments, records, "SRC-TEST", [])
+    assert [b["markdown"] for b in expanded[0]["blocks"]] == [original[:100], original[100:]]
+    assert expanded[1]["blocks"][0]["markdown"] == "后续定义"
+
+
+def test_docx_table_images_are_extracted_in_cell_order(tmp_path):
+    table = "<w:tbl><w:tr><w:tc>" + _p("图与图注", image=True) + "</w:tc></w:tr></w:tbl>"
+    out = extract.extract("table.docx", make_docx(table, _png()), cache_dir=tmp_path, ocr_enabled=False)
+    assert len(out["assets"]) == 1
+    assert out["assets"][0]["unit"] == out["units"][0]["label"]
+    assert "图与图注" in out["units"][0]["text"] and "[Image:" in out["units"][0]["text"]
+
+
 @pytest.fixture
 def imported(tmp_path):
     storage, memory, review = services(tmp_path)
@@ -89,6 +129,71 @@ def imported(tmp_path):
     storage.sources.register("SRC-KAHAN", "originals/kahan.docx", title="补偿求和说明")
     snapshots = SnapshotService(storage, ocr_enabled=lambda: False)
     return storage, memory, review, snapshots, owner_id, doc
+
+
+def test_import_preserves_original_image_bytes_and_all_occurrences(imported):
+    storage, _memory, _review, snapshots, _owner_id, doc = imported
+    image = pytest.importorskip("PIL.Image")
+    buffer = io.BytesIO()
+    image.new("RGBA", (2400, 2), (200, 30, 30, 100)).save(buffer, format="PNG")
+    raw = buffer.getvalue()
+    doc.write_bytes(make_docx(_p("图片", image=True) * 41, raw))
+    storage.sources.register("SRC-MANY", "originals/kahan.docx", title="多图原文")
+    taken = snapshots.take("SRC-MANY")
+    assert len(taken["assets"]) == 41   # 导入不沿用检索的 40 张上限。
+    assert not any("上限" in w for w in taken["warnings"])
+    attached = snapshots.attach("SRC-MANY", taken["assets"][0]["label"])
+    saved = storage.ws.path(attached["path"]).read_bytes()
+    assert saved == raw
+    with image.open(io.BytesIO(saved)) as original:
+        assert original.size == (2400, 2) and original.mode == "RGBA"
+
+
+def test_attach_embedded_image_rejects_changed_source(imported):
+    _storage, _memory, _review, snapshots, _owner_id, doc = imported
+    taken = snapshots.take("SRC-KAHAN")
+    doc.write_bytes(make_docx(BODY.replace("一千", "两千"), _png()))
+    with pytest.raises(BurrowlError) as caught:
+        snapshots.attach("SRC-KAHAN", taken["assets"][0]["label"])
+    assert caught.value.code == "STALE_BASIS"
+
+
+def test_attach_repairs_original_asset_cache_before_preserving_image(imported):
+    _storage, _memory, _review, snapshots, _owner_id, doc = imported
+    extracted = snapshots._extract(doc.name, doc.read_bytes(), ocr_enabled=False)
+    asset = extracted["assets"][0]
+    Path(asset["original_path"]).write_bytes(b"broken cache")
+    attached = snapshots.attach("SRC-KAHAN", asset["label"])
+    assert snapshots.storage.ws.path(attached["path"]).read_bytes() == _png()
+
+
+def test_markdown_image_links_report_unsaved_assets(tmp_path):
+    out = extract.extract("images.md", b"# notes\n![inline](picture.png)\n![reference][]\n![shortcut]",
+                          cache_dir=tmp_path, ocr_enabled=False)
+    assert not out["assets"]
+    assert any("未读取或保存图片" in warning for warning in out["warnings"])
+
+
+def test_image_audit_distinguishes_missing_body_and_unavailable_attachment(imported):
+    storage, _memory, _review, snapshots, owner_id, _doc = imported
+    taken = snapshots.take("SRC-KAHAN")
+    assert snapshots.coverage(owner_id, "SRC-KAHAN")["asset_counts"]["missing"] == 1
+    asset = taken["assets"][0]
+    attached = snapshots.attach("SRC-KAHAN", asset["label"])
+    record = {"kind": "detail", "record_id": "test", "payload": {
+        "origin": {"source_ref": {"target_id": "SRC-KAHAN"}, "locators": [asset["segment"]]},
+        "figures": [{"ref": attached["ref"], "caption": "图"}],
+        "blocks": [{"block_id": "b", "markdown": "原文"}]}}
+    def report():
+        return snapshots._asset_coverage(taken["assets"], [record], "SRC-KAHAN", [])
+    assert report()[0]["status"] == "unreferenced"
+    record["payload"]["blocks"][0]["markdown"] += "\n![图](figure:0)"
+    assert report()[0]["status"] == "linked"
+    record["payload"]["origin"]["locators"] = ["其他章节"]
+    assert report()[0]["status"] == "missing"  # 别处的引用不能掩盖原位置的缺口。
+    record["payload"]["origin"]["locators"] = [asset["segment"]]
+    storage.ws.path(attached["path"]).write_bytes(b"changed")
+    assert report()[0]["status"] == "unavailable"
 
 
 def _detail(source, figure, title, unit_type, blocks, locators):
@@ -108,6 +213,11 @@ def test_snapshot_attach_coverage_expansion_and_change(imported):
     assert keys == ["算法说明", "算法说明 › 定义", "算法说明 › 实验", "致谢"]
     view = snapshots.outline(taken, ["算法说明 › 定义"])
     assert view["texts"][0]["key"] == "算法说明 › 定义" and "1000" in view["texts"][0]["text"]
+    assert "texts" not in snapshots.outline(taken)  # 目录不冒充全文。
+    batch = snapshots.outline(taken, keys, max_chars=1)
+    assert batch["truncated_keys"] == keys[1:]
+    # 分批限额只跳过整段；后续读这些 key 能取回全部内容，逻辑单元不被切坏。
+    assert {s["key"] for s in snapshots.outline(taken, batch["truncated_keys"])["texts"]} == set(keys[1:])
     assert taken["assets"][0]["segment"] == "算法说明 › 实验"
     attached = snapshots.attach("SRC-KAHAN", taken["assets"][0]["label"])
     assert attached["path"].startswith("attachments/") and storage.ws.path(attached["path"]).is_file()
@@ -130,7 +240,9 @@ def test_snapshot_attach_coverage_expansion_and_change(imported):
     assert receipt["save_status"] == "committed"
 
     report = snapshots.coverage(owner_id, "SRC-KAHAN")
-    assert report["counts"] == {"covered": 3, "thin": 0, "uncovered": 1, "omitted": 0}
+    # 此样例省去了标题并缩写实验原文；旧的三成阈值将它们判为已覆盖，完整转录规则下必须提示核对。
+    assert report["counts"] == {"covered": 0, "thin": 3, "uncovered": 1, "omitted": 0}
+    assert report["asset_counts"]["linked"] == 1
     assert next(r for r in report["segments"] if r["key"] == "致谢")["excerpt"] == "# 致谢 感谢同事。"
 
     l0 = {"kind": "source", "title": "补偿求和说明（登记）", "body_markdown": "公司补偿求和说明原件。",

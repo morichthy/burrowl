@@ -75,7 +75,7 @@ AI 按任务选择 Skill：
 | 兜底 | 机制 | 适用 |
 |---|---|---|
 | 规则内 | 拿不准就保留、放 L1 | 全部 |
-| 覆盖报告 | 原文快照逐段对比 L1 的 `origin` 与正文，列出未覆盖、明显偏短且未登记省略的段落（只提示） | 导入外部原件 |
+| 覆盖报告 | 快照逐段对比 L1 的 `origin` 与正文，列出未覆盖、偏短或与原文差异较大的内容；另按图片标签核对附件与原位置引用（只提示） | 导入外部原件 |
 | 检索 | 原件分段本来就进 source 投影，L1 漏掉的细节仍能检到原文 | 导入外部原件 |
 | 收口清单 | `unfixed_evidence`（没被引用的 Run、L0）与 `unlinked_details`（没被上层指向的 L1） | 全部 |
 | 人工 | 工作台"原文展开"页按原文顺序核对，简略处写笔记交给 AI，AI 按 `origin` 只重做对应段落 | 全部 |
@@ -83,12 +83,20 @@ AI 按任务选择 Skill：
 ```text
 导入外部原件（burrowl-work "导入已有资料"）：
     sources.register_many(snapshot=true) → 原文快照（.burrowl/snapshots/<SRC>/<sha>.json：分段 key、文本、指纹、图片标签）
-    sources.snapshot(keys) 分批读原文 → 按原文结构写 L1（origin.locators = 分段 key；块上可细到 locators）
-        图片：sources.attach → attachments/<sha256>.<ext>，登记为 SRC-ATT-…，L1 figures 引用、正文 ![图注](figure:N)
+    sources.snapshot(keys) 分批读完原文（不给 keys 只有目录；truncated_keys 继续读）
+        → 按原文逻辑段落完整转录 L1；意思或用途差别较大的部分继续拆分
+        → 整理者注说明原文组织逻辑、切分依据与必要上下文
+        （读取分段不是记录边界；跨页可认领多个 key，同一 key 可由多个 L1 块共同转写）
+        图片：sources.attach → 原始 PNG/JPEG/WebP 字节保存到 attachments/<sha256>.<ext>
+            → 登记为 SRC-ATT-…，L1 figures 引用、正文 ![图注](figure:N)
+            → OCR 缩略图只在缓存中；导入抽取不沿用检索的图片数量上限
         有意省略：L0 payload.omitted = [{locators, reason}]
-    再写 L2–L4（就近链接 L1）→ memory.document(view=coverage) 核对 → 检索验证
+    再写 L2–L4（就近链接 L1）→ memory.document(view=coverage) 文字、图片分别核对 → 检索验证
+    对照原件检查抽取警告与漏抽内容；全部读完并逐段逐图验收后，才声明完整导入
 工作台"原文展开"：memory.document(view=expansion) 按快照顺序拼出认领各段的 L1 块（视图，不是记录）
 ```
+
+覆盖报告的图片状态：`missing` 没有在对应 L1 登记附件，`unreferenced` 有可用附件但缺原位置正文引用，`unavailable` 固定附件不可读或不可展示，`linked` 附件与引用已匹配，`omitted` 对应原文分段已登记省略。标签匹配不证明视觉内容正确；报告也检查不到抽取器漏掉的内容。PDF 矢量图、DOCX 脚注等未支持的内容和 Markdown 图片链接会给出抽取警告，仍需对照原件补齐或报告缺口。
 
 写作标准见 [skills/RECORDING.md](../skills/RECORDING.md)；字段与示例由 `memory.contract(kind)` 返回，示例经 `tests/service/test_draft_examples.py` 校验。
 
@@ -137,6 +145,9 @@ AI 组成提交请求：{owner_id, expected_head, request_id, operations:[put_re
 - 报错结构 `{code, message, details, errors[], retryable}`：顶层 `message` 直接写出第一处错误的路径与原因（有的客户端只显示它）；`errors` 一次列出全部问题，每项的 `path` 从工具参数的根算起（如 `/operations/0/draft/title`），`expected` 给允许的值或字段，`details.hint` 给下一步。
 - 意外异常返回 `INTERNAL_ERROR`（异常类型、一句摘要、`incident_id`），完整堆栈只写入数据目录的 `.burrowl/logs/errors.jsonl`。被拒绝的调用只记工具名、错误码和出错路径（不记参数内容），`system.tool_errors` 按工具汇总，用来发现哪些工具的说明需要改。
 - 请求日志（默认关闭）：`.burrowl/logs/requests.jsonl` 每次调用一行；summary 只记结构，full 另记收到的原样参数、MCP 层从 JSON 字符串解析回来的参数与返回。开启时报错的 `details.request_id` 指向这一行，`system.request_log` 可按它查。开关在工作台设置（`diagnostics.request_log`），`burrowl mcp --request-log` 或环境变量 `BURROWL_REQUEST_LOG` 优先。
+- 请求日志实际级别为 off 时，读接口不返回历史记录；工作台保存后刷新日志视图，显示是否被启动参数或环境变量覆盖。关闭不删除已有日志，也不关闭独立的错误统计。
+- 配置“检查影响”以 `dry_run=true` 校验草稿和预览后续动作，不保存；“保存设置”写入配置并明确显示是否仍待重启、重建索引等。后续动作不会自动执行；工作台直接用回执更新基线，避免异步重载覆盖紧接着输入的新草稿。运行模式与工具组改变需重启，错误兼容开关则每次调用即时读取。
+- MCP 兼容返回（`mcp.error_envelope`，默认 false）：标准模式保持 `isError` 错误结果；兼容模式只在 MCP 适配器包装 `{ok:true,result}` / `{ok:false,error}`，业务失败仍经统一调用边界写错误统计。错误摘要有界，最多 3 项字段错误，保留错误码、路径、提示及关联编号，更多问题给计数；不读取历史日志、不返回堆栈。保存后的下一次调用生效，本次固定返回格式，关闭后恢复标准模式。连接与协议层错误不在包装范围内，HTTP/CLI 不变。
 
 **删除与恢复（R22）**
 

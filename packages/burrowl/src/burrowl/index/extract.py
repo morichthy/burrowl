@@ -10,6 +10,7 @@ import io
 import posixpath
 import re
 import zipfile
+from collections.abc import Callable
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
@@ -49,14 +50,15 @@ def _member(package: zipfile.ZipFile, name: str) -> bytes:
 
 
 class _Extraction:
-    def __init__(self, cache_dir: Path, ocr_enabled: bool, max_assets: int):
+    def __init__(self, cache_dir: Path, ocr_enabled: bool, max_assets: int | None, preserve_assets: bool = False):
         self.cache_dir, self.ocr_enabled, self.max_assets = cache_dir, ocr_enabled, max_assets
         self.units: list[tuple[str, ...]] = []  # (标签, 文本[, 标题路径])
         self.assets: list[dict] = []
         self.warnings: list[str] = []
+        self.preserve_assets = preserve_assets
 
     def asset(self, data: bytes, label: str, unit: str) -> str:
-        if len(self.assets) >= self.max_assets:
+        if self.max_assets is not None and len(self.assets) >= self.max_assets:
             self.warnings.append(f"图片数量达到上限：{label}")
             return "[visual omitted by asset limit]"
         try:
@@ -77,8 +79,16 @@ class _Extraction:
         if not target.exists():
             target.write_bytes(converted)
         text, state = _ocr(converted, self.ocr_enabled)
-        self.assets.append({"path": str(target), "unit": unit, "label": label, "ocr_status": state,
-                            "has_text": bool(text.strip())})
+        asset = {"path": str(target), "unit": unit, "label": label, "ocr_status": state,
+                 "has_text": bool(text.strip())}
+        if self.preserve_assets:
+            # OCR 与屏幕预览使用缩略图；永久附件另取原始字节，避免分辨率和透明度丢失。
+            original = self.cache_dir / (hashlib.sha256(data).hexdigest() + ".original")
+            # 缓存可被清理或损坏；不可把同名缓存当成保全原图的证据。
+            if not original.exists() or original.read_bytes() != data:
+                original.write_bytes(data)
+            asset["original_path"] = str(original)
+        self.assets.append(asset)
         if not text.strip():
             self.warnings.append(f"{unit}/{label}: 图中没有可检索文字，需按缓存路径人工查看")
         return f"[Image: {label}; {state}; visual semantics not interpreted]\n{text}"
@@ -129,6 +139,7 @@ class _Extraction:
             if not any(p.strip() for p in parts):
                 self.warnings.append(f"{unit}: 未提取到文字或图片，可能是矢量图或特殊字体，需查看原页")
             self.units.append((unit, "\n".join(parts)))
+        self.warnings.append("PDF 仅抽取文字与内嵌图片，未渲染完整页面；矢量图、公式和版面关系需对照原页核对")
 
     def docx(self, raw: bytes) -> None:
         """按标题切成章节（标签 Section n，路径为标题路径）；段落保留列表符号，表格转为 Markdown 表格，
@@ -144,6 +155,9 @@ class _Extraction:
                         for r in ET.fromstring(_member(package, "word/_rels/document.xml.rels"))
                         if r.attrib.get("TargetMode") != "External"}
             body = ET.fromstring(_member(package, "word/document.xml")).find("w:body", _NS_W)
+            unhandled = sorted(n for n in names if re.fullmatch(r"word/(?:footnotes|endnotes|comments|header\d+|footer\d+)\.xml", n))
+            if unhandled:
+                self.warnings.append("DOCX 未抽取脚注、尾注、批注或页眉页脚中的内容，需对照原件：" + "、".join(unhandled))
             stack: list[tuple[int, str]] = []
             lines: list[str] = []
             has_math = False
@@ -155,10 +169,19 @@ class _Extraction:
                 lines.clear()
 
             for child in body if body is not None else []:
+                has_math = has_math or child.find(f".//{_M}oMath") is not None
                 if child.tag == _W + "tbl":
-                    lines.append(_docx_table(child))
+                    # 表格内的图片同样属于原文；按单元格顺序提取并保留所在表格的位置。
+                    unit = f"Section {len(self.units) + 1}"
+                    def table_image(paragraph: ET.Element, *, unit_label: str = unit) -> str:
+                        parts = []
+                        for blip in (n for n in paragraph.iter() if n.tag.endswith("}blip")):
+                            target = rels.get(blip.attrib.get(_REL_EMBED, ""))
+                            if target in names:
+                                parts.append(self.asset(_member(package, target), target, unit_label))
+                        return "\n".join(parts)
+                    lines.append(_docx_table(child, image_text=table_image))
                 elif child.tag == _W + "p":
-                    has_math = has_math or child.find(f".//{_M}oMath") is not None
                     text = _docx_text(child)
                     unit = f"Section {len(self.units) + 1}"
                     for blip in (n for n in child.iter() if n.tag.endswith("}blip")):
@@ -175,6 +198,8 @@ class _Extraction:
                         text = "- " + text
                     lines.append(text)
                 else:
+                    if _docx_text(child).strip():
+                        self.warnings.append("DOCX 含未抽取的非标准正文容器，需对照原件：" + child.tag.rsplit("}", 1)[-1])
                     continue
                 if len(lines) >= DOCX_CHUNK:
                     flush()
@@ -229,6 +254,8 @@ class _Extraction:
         text = raw.decode("utf-8-sig")
         if "\x00" in text:
             raise BurrowlError("INVALID_ARGUMENT", "不是文本文件")
+        if markdown and re.search(r"!\[[^\]]*\]|<img\b", text, flags=re.IGNORECASE):
+            self.warnings.append("Markdown 图片仅保留链接文字，未读取或保存图片；需在授权范围内单独登记图片并附加")
         lines = text.splitlines()
         sections = _markdown_sections(lines) if markdown else [(0, len(lines), "")]
         for begin, end, path in sections or [(0, 0, "")]:
@@ -281,10 +308,11 @@ def _docx_text(node: ET.Element) -> str:
     return "".join(parts)
 
 
-def _docx_table(table: ET.Element) -> str:
+def _docx_table(table: ET.Element, *, image_text: Callable[[ET.Element], str] | None = None) -> str:
     rows = []
     for row in table.findall("w:tr", _NS_W):
-        cells = [" ".join(_docx_text(p).strip() for p in cell.findall(".//w:p", _NS_W)).replace("|", "\\|")
+        cells = [" ".join((_docx_text(p) + ("\n" + image_text(p) if image_text else "")).strip()
+                          .replace("\n", "<br>") for p in cell.findall(".//w:p", _NS_W)).replace("|", "\\|")
                  for cell in row.findall("w:tc", _NS_W)]
         rows.append("| " + " | ".join(cells) + " |")
     if not rows:
@@ -316,11 +344,12 @@ def _markdown_sections(lines: list[str]) -> list[tuple[int, int, str]]:
     return [b for b in bounds if b[1] > b[0] and any(line.strip() for line in lines[b[0]:b[1]])]
 
 
-def extract(name: str, raw: bytes, *, cache_dir: Path, ocr_enabled: bool = True, max_assets: int = 40) -> dict:
+def extract(name: str, raw: bytes, *, cache_dir: Path, ocr_enabled: bool = True,
+            max_assets: int | None = 40, preserve_assets: bool = False) -> dict:
     """返回 {"units": [{label, text, path}], "assets": [...], "warnings": [...]}；不支持的格式抛 INVALID_ARGUMENT。
     path 是 Markdown / docx 的标题路径（其他格式为空），用于上下文信封和原文快照的分段（R21）。"""
     suffix = Path(name).suffix.lower()
-    job = _Extraction(cache_dir / hashlib.sha256(raw).hexdigest()[:24], ocr_enabled, max_assets)
+    job = _Extraction(cache_dir / hashlib.sha256(raw).hexdigest()[:24], ocr_enabled, max_assets, preserve_assets)
     if suffix == ".pptx":
         job.pptx(raw)
     elif suffix == ".docx":

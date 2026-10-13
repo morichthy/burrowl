@@ -13,9 +13,8 @@ from difflib import SequenceMatcher
 from typing import Any
 
 NGRAM = 4            # 字符 n-gram 长度：中文按字、英文按字母，都比较稳定
-THIN_RATIO = 0.3     # 认领正文字数 / 原文字数低于此值……
-THIN_OVERLAP = 0.3   # ……且原文 n-gram 在认领正文中出现的比例也低于此值，标为"偏短"
-MIN_CHARS = 80       # 短于此的段落不判偏短（标题、一句话说明）
+THIN_RATIO = 0.9     # 默认完整转录：长度不足九成时提示核对，而不是容许大幅摘要化。
+THIN_OVERLAP = 0.9   # 长度足够也可能遗漏原文；重合度单独触发提示，不与长度条件互相抵消。
 EXCERPT = 200
 
 
@@ -93,7 +92,8 @@ def coverage(segments: list[dict], records: list[dict], source_id: str, omitted:
     """逐段覆盖：status = covered / thin / uncovered / omitted；附认领它的块与原文开头（未覆盖、偏短时）。
 
     指标：ratio = 认领正文字数 / 原文字数（块同时认领多段时按原文字数比例分摊）；
-    overlap = 原文的字符 n-gram 在认领正文中出现的比例。两者都低于阈值才算偏短。"""
+    overlap = 原文的字符 n-gram 在认领正文中出现的比例。任一指标低于阈值都提示核对。
+    这些指标无法证明逐句完整、数字正确或图片保全；公式重排也可能触发提示，仍需对照原件。"""
     by_key = claims(records, source_id)
     reasons = {key: item["reason"] for item in omitted for key in item["locators"]}
     claimed_total: dict[int, int] = {}  # 块被多少原文字数认领，用来分摊
@@ -114,7 +114,8 @@ def coverage(segments: list[dict], records: list[dict], source_id: str, omitted:
             grams = _grams(segment["text"])
             row["ratio"] = round(share / max(1, segment["chars"]), 2)
             row["overlap"] = round(len(grams & _grams(text)) / max(1, len(grams)), 2)
-            thin = segment["chars"] >= MIN_CHARS and row["ratio"] < THIN_RATIO and row["overlap"] < THIN_OVERLAP
+            # 不豁免短段落：一句条件或一个数值同样可能是原文的重要内容。
+            thin = bool(segment["chars"]) and (row["ratio"] < THIN_RATIO or row["overlap"] < THIN_OVERLAP)
             row["status"] = "thin" if thin else "covered"
         elif segment["key"] in reasons:
             row |= {"status": "omitted", "reason": reasons[segment["key"]]}

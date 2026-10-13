@@ -75,6 +75,7 @@ def test_runs_sources_and_state_files_load(opened):
         assert w.app.storage.sources.resolve(source_id).path.is_file()
     assert w.call("reading.list") and w.call("relations.notes")       # 阅读会话与工作台笔记
     assert w.call("config.get")["config"]["reading"]["strategy"] == "quick"
+    assert w.call("config.get")["config"]["mcp"]["error_envelope"] is False  # 旧配置缺字段时兼容默认关闭。
 
 
 def test_transcription_state_reads(opened):

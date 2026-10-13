@@ -43,6 +43,29 @@ def test_stdio_launch(sample_workspace):
     anyio.run(scenario)
 
 
+def test_stdio_error_envelope_is_delivered_as_normal_content(sample_workspace):
+    """真实子进程与 stdio 验证返回包；不依赖客户端读取日志，也不改变被拒操作的业务状态。"""
+    import os
+    import sys
+
+    from mcp import StdioServerParameters
+
+    app = App.open(sample_workspace, fake_vectors=True)
+    app.config.update({"mcp": {"error_envelope": True}}, expected_revision=app.config.get()["revision"])
+    params = StdioServerParameters(command=sys.executable,
+        args=["-m", "burrowl.interfaces.cli", "mcp", "--data-dir", str(sample_workspace)],
+        env={"PYTHONUTF8": "1", "SYSTEMROOT": os.environ.get("SYSTEMROOT", "")})
+
+    async def scenario():
+        async with Client(params) as client:
+            result = await client.call_tool("memory_inspect", {"ownerid": "wrong"})
+            assert not result.is_error
+            body = json.loads(text_of(result))
+            assert body["ok"] is False and body["error"]["code"] == "INVALID_ARGUMENT"
+            assert body["error"]["errors"]
+    anyio.run(scenario)
+
+
 def test_tools_calls_and_errors(server):
     async def scenario():
         async with Client(server) as client:

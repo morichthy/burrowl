@@ -142,6 +142,7 @@
       "config",
       "system"
     ],
+    "error_envelope": false,
     "mode": "auto"
   },
   "connectors": [],
@@ -784,6 +785,12 @@
           },
           "title": "Toolsets",
           "type": "array"
+        },
+        "error_envelope": {
+          "default": false,
+          "description": "MCP 错误兼容返回，默认关闭。开启后所有 MCP 调用返回 {ok,result/error} 普通结果包，业务失败仍明确为 ok=false，并携带有界错误摘要；用于会隐藏 isError 内容的客户端。不改变执行、错误日志或 HTTP/CLI；保存后下一次 MCP 调用生效，可随时关闭",
+          "title": "Error Envelope",
+          "type": "boolean"
         },
         "mode": {
           "default": "auto",

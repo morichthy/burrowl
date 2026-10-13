@@ -30,6 +30,8 @@ from .ops.registry import Ctx, OpSpec, call, load
 COMMON = """工作流说明（burrowl-work / burrowl-read / burrowl-consolidate 及公共规则）：客户端已加载 burrowl 的 Skill 就按 Skill 执行；
 否则调用本服务的工具 system_guide 读取——开始实质工作前读 name=rules，再按任务读 burrowl-work / burrowl-read / burrowl-consolidate，
 写记忆记录前读 recording，并用 memory_contract(kind) 查该类记录的字段与示例。
+MCP 错误兼容返回由工作台设置控制，默认关闭。开启时每次结果为 {{ok:true,result:…}} 或 {{ok:false,error:…}}；
+ok=false 明确表示业务操作失败，不得当成保存或执行成功。直接按 error 的错误码、路径和提示处理，不必遍历错误日志。
 用户查询某主题的相关知识、找已有经验，默认先 reading_start 建立可见阅读会话：简查用 strategy=quick，完整阅读用 standard。
 只有用户明确只要片段/候选列表，或直接查看已知源码、配置、开发状态时，才直接使用低层查询或读取工具。
 query_*、memory_owners、memory_owner_route、memory_resume 不会建立阅读会话，不会出现在工作台的当前阅读或阅读会话中。
@@ -138,15 +140,41 @@ def _pre_parse(spec: OpSpec, arguments: dict[str, Any]) -> dict[str, Any]:
     return parsed
 
 
+def _error_envelope(exc: BurrowlError) -> dict:
+    """兼容层只成功交付诊断包，业务状态始终为失败；摘要有界，不读取历史日志或暴露堆栈。
+
+    兼容功能隔离在 MCP 适配器中，后续可以关闭或移除，不影响真实操作与统一错误统计。
+    """
+    problem = exc.problem()
+    error = {"code": problem["code"], "message": problem["message"][:800],
+             "retryable": problem.get("retryable", False)}
+    details = problem.get("details", {})
+    error["details"] = {k: str(details[k])[:500] for k in ("hint", "request_id", "incident_id") if k in details}
+    issues = problem.get("errors", [])
+    caps = {"code": 80, "path": 220, "message": 260, "hint": 260, "expected": 260}
+    error["errors"] = [{k: str(issue[k])[:cap] for k, cap in caps.items() if k in issue}
+                       for issue in issues[:3]]
+    if len(issues) > 3:
+        error["errors_truncated"] = len(issues) - 3
+        error["details"].setdefault("hint", "先修正已列出的参数；完整字段说明按需调用对应契约工具")
+    return {"ok": False, "error": error}
+
+
 def _tool(app: App, spec: OpSpec, actor: dict):
     params = list(inspect.signature(spec.fn).parameters.values())[1:]
 
     async def tool(context: Context | None = None, **kwargs: Any) -> Any:
         ctx = Ctx(app=app, actor=actor, channel="mcp", elicit=_elicitor(context))
         arguments = _pre_parse(spec, kwargs)
+        envelope = False
         try:
-            return await to_thread.run_sync(lambda: call(ctx, spec.name, arguments, raw=kwargs))
+            # 每次调用读取开关，无需重建服务器；本次固定模式，避免关闭开关的回执中途换格式。
+            envelope = app.config.current().mcp.error_envelope
+            result = await to_thread.run_sync(lambda: call(ctx, spec.name, arguments, raw=kwargs))
+            return {"ok": True, "result": result} if envelope else result
         except BurrowlError as exc:
+            if envelope:
+                return _error_envelope(exc)
             raise ToolError(json.dumps(exc.problem(), ensure_ascii=False)) from exc
 
     context_param = inspect.Parameter("context", inspect.Parameter.KEYWORD_ONLY, annotation=Context | None,

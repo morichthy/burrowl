@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "knowledge_id": "KNW-COMPAT-NOTES",
+  "slug": "compat-notes",
+  "title": "标本知识",
+  "status": "active",
+  "sensitivity": "internal",
+  "created_at": "2026-10-13T19:33:35.441424Z",
+  "description": "兼容性标本",
+  "keywords": []
+}

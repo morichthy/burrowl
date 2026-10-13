@@ -1,0 +1,16 @@
+{
+  "next_seq": 2,
+  "notes": [
+    {
+      "created_at": "2026-10-13T19:33:46.185717Z",
+      "id": "WN-1",
+      "kind": "relation-idea",
+      "refs": [],
+      "status": "open",
+      "text": "标本",
+      "thread": [],
+      "title": "标本笔记",
+      "updated_at": "2026-10-13T19:33:46.185717Z"
+    }
+  ]
+}

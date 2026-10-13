@@ -77,6 +77,14 @@ Ref 模型在 `memory_commit` 之外复用于 `relations_decide`、`review_submi
 
 说明：strict 模式（约束解码，保证参数符合 schema）由调用模型的客户端开启，MCP 服务端控制不了；服务端能做的是让 schema 本身严格（D-03 的嵌套模型拒绝未知字段、用枚举），使开启 strict 的客户端直接受益，并且始终自己校验（D-08）。
 
+### 补充决定（2026-10-14，用户要求修复诊断与配置反馈，并增加可关闭的 MCP 错误兼容方式）
+
+| 决定 | 内容 |
+|---|---|
+| D-11 | 请求日志实际为 off 时停止写入，查询接口不返回旧内容；文件保留，重开可看。工作台保存后重建日志视图；启动参数或环境变量覆盖时明确显示配置值与实际值，不把独立错误统计当作请求日志 |
+| D-12 | 配置保存与预览用可读回执：“已保存”“检查通过，尚未保存”“仍需后续动作”。影响检查只做校验与预览，不保存、不执行重启或重建；再次编辑使旧回执失效。用保存回执更新版本基线，避免异步重载覆盖新草稿，保留并发冲突拒绝 |
+| D-13 | 新增 `mcp.error_envelope`，默认关闭。开启时 MCP 适配器成功交付统一结果包 `{ok:true,result}` / `{ok:false,error}`；包内业务失败不能冒充成功，执行与日志保持原样。错误只包含本次有界摘要，最多 3 项字段错误，更多给计数，不依赖历史日志。每次调用读取开关，本次固定格式；保存后下一次生效，无需重启。关闭恢复 D-08 的标准 `isError`；协议、连接失败、超时不在处理范围。HTTP/CLI 不变，后续客户端修复后可关闭或移除这个适配层 |
+
 ## 4. 不做的
 
 - 不把整份记录 schema 塞进 `memory_commit` 的参数 schema：随 kind 变化，体积大，仍由 `memory_contract(kind)` 按需查询。
@@ -96,6 +104,9 @@ Ref 模型在 `memory_commit` 之外复用于 `relations_decide`、`review_submi
 | T-5 | D-06 / D-10：`INTERNAL_ERROR` 错误码与 `registry.call` 边界；`.burrowl/logs/errors.jsonl`（轮转）；`warnings` 统一格式、`action`、条数上限；索引/向量等降级边界补摘要 |
 | T-6 | D-07 测试；前端调用适配（`npm --prefix frontend run ops` 后类型检查）；`gen_reference.py`、`gen_draft_examples.py` |
 | T-7 | 规则与文档：RECORDING §7（草案最小清单与修订的 `change_reason`）、burrowl-work / consolidate 中草案相关句、RULES 工作台方案、MCP 服务说明；CORE、ARCHITECTURE（错误结构、日志文件的状态归属）、TESTING、GLOSSARY（如新增术语）、DEVELOPMENT_HISTORY、docs/README |
+| T-8 | D-11 / D-12：请求日志关闭查询、设置页可读回执、日志视图刷新、启动覆盖提示及保存后草稿不被异步重载覆盖；组件与真实浏览器回归 |
+| T-9 | D-13：仅在 MCP 适配器实现可热切换、有界的业务结果包；记录错误统计不变；真实 stdio 与 HTTP 边界验证 |
+| T-10 | 新配置字段兼容与 v0.9.1 标本；生成操作、配置参考与前端类型；同步公共规则和文档 |
 
 ## 6. 验收
 
@@ -111,6 +122,8 @@ Ref 模型在 `memory_commit` 之外复用于 `relations_decide`、`review_submi
 | 任务 | 状态 | 说明 |
 |---|---|---|
 | 设计稿 | 已确认（2026-10-12） | |
+| T-8–T-10 | 已完成（2026-10-14） | 日志查询与设置回执已修复，兼容开关默认关闭、仅 MCP 包装、业务失败与错误统计保留；版本为 0.9.1，新增该版本兼容性标本，旧标本不动。配置、错误、真实 stdio、HTTP、兼容标本回归 55 项通过、3 项按默认跳过；前端 53 项、类型检查、构建、ruff、lint-imports、Skill 检查与 diff 检查通过；真实浏览器设置场景 1 项通过。本机 Playwright 收尾未自行终止临时服务，经核对测试端口与 Python 进程后清理，原有 e2e 状态文件已恢复。文档处置：README、ARCHITECTURE、CORE、TESTING、GLOSSARY、RULES、本设计稿、DEVELOPMENT_HISTORY 与 docs/README 已修改；操作与配置参考、前端类型已重新生成；DOCUMENTATION_MAINTENANCE、RECORDING 与三个工作流 Skill 已核对无需修改。未更新本机安装、未启用真实数据目录的开关；未实测用户的其他 agent 客户端 |
+| 0.9.1 发布文档核对 | 已完成（2026-10-14） | 六份必读文档与全部四个 Skill、公共 RULES / RECORDING 已完整核对。README、ARCHITECTURE、CORE、docs/README、TESTING、RULES、RECORDING、work、consolidate 按本次两项修复维护；DOCUMENTATION_MAINTENANCE、read、dev-check 核对后无需修改。补齐 README 不带模型升级说明与页面状态用词，收紧 RECORDING 表中的省略示例。模型、检索模型配置与模型下载逻辑未变；发布程序包不重复携带权重。真实 AI 导入与其他客户端的显示行为仍待实际验收；发布验证结果另见 Release 说明 |
 | T-1 | 已完成 | `MemoryService._check_request` 补 `owner_id`、不一致时逐条报出；`prepare` 中 `sensitivity` 新记录取 internal、修订沿用原值（与 discovery 同理，避免把 confidential 悄悄降级）；`workflow.save_summary` 同样处理并一次列出 kind、owner_id、change_reason、record_id/expected_revision 的问题；示例草案去掉 `owner_id` 与 `sensitivity` 后重新生成 |
 | T-2 | 已完成 | `core/contract.py`：`DEFAULTED`（服务补的字段）、`CONDITIONAL`（change_reason）、`SYSTEM_FIELDS = SERVER_FIELDS ∪ {level, schema_version}`；输出 `fill` / `default` / `do_not_write` / `payload_legend`；`payload.missing_refs` 标可选；`write_with` 写全新建与修订的键 |
 | T-3 | 已完成 | `interfaces/ops/shapes.py`：15 个结构化参数的形状（Operation、Attribution、Ref、AssociationPayload 取自记录契约；草案只发布为"对象 + 说明"）；Skill 提到的工具除 limit/offset 外每个参数都有说明；`memory_commit`、`memory_summary_save` 的工具说明给最小清单；说明里的工具名统一为下划线形式 |

@@ -7,6 +7,7 @@ import { ErrorBox, Loading, Panel, Tag } from "../ui";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Config = Record<string, any>;
+type ConfigEffect = { action: string; reason: string };
 
 const TOOLSETS = ["memory", "review", "query", "reading", "provenance", "relations", "runs", "sources", "maintenance",
   "monitor", "hub", "wiki", "index", "config", "system"];
@@ -34,15 +35,21 @@ const NEW_CONNECTOR = {
 
 export function Settings() {
   const loaded = useOp<{ config: Config; revision: string; secrets: Record<string, { set: boolean; error?: string }> }>("config.get");
-  const update = useAction<{ revision: string; effects: unknown }>("config.update");
+  const update = useAction<{ config: Config; revision: string; effects: ConfigEffect[] }>("config.update");
   const [config, setConfig] = useState<Config>();
-  const [saved, setSaved] = useState<unknown>();
+  const [baseline, setBaseline] = useState<{ config: Config; revision: string }>();
+  const [saved, setSaved] = useState<{ dryRun: boolean; effects: ConfigEffect[] }>();
   useEffect(() => {
-    if (loaded.data) setConfig(structuredClone(loaded.data.config));
+    if (loaded.data) {
+      setConfig(structuredClone(loaded.data.config));
+      setBaseline({ config: structuredClone(loaded.data.config), revision: loaded.data.revision });
+    }
   }, [loaded.data]);
 
   if (!config || !loaded.data) return <Loading show={loaded.loading} />;
-  const set = (path: string[], value: unknown) =>
+  const set = (path: string[], value: unknown) => {
+    // 草稿再次编辑时，旧的“保存成功 / 检查通过”不能代表当前内容。
+    setSaved(undefined);
     setConfig((current) => {
       const next = structuredClone(current!);
       let node = next;
@@ -50,17 +57,20 @@ export function Settings() {
       node[path[path.length - 1]] = value;
       return next;
     });
+  };
   const save = async (dryRun: boolean) => {
+    setSaved(undefined);
     const { schema_version: _ignored, ...patch } = config;
-    const result = await update.run({ patch, expected_revision: loaded.data!.revision, dry_run: dryRun });
+    const result = await update.run({ patch, expected_revision: baseline!.revision, dry_run: dryRun });
     if (result) {
       setSaved({ dryRun, effects: result.effects });
-      if (!dryRun) loaded.reload();
+      // 直接采用已保存的回执基线，避免异步重新加载覆盖用户紧接着输入的新草稿。
+      if (!dryRun) setBaseline({ config: structuredClone(result.config), revision: result.revision });
     }
   };
 
   return (
-    <>
+    <fieldset disabled={update.busy} style={{ border: 0, padding: 0, minWidth: 0 }}>
       <ErrorBox error={loaded.error} />
       <Panel title="存储与检索">
         <div className="form">
@@ -260,7 +270,20 @@ export function Settings() {
           排查“AI 传来的参数和服务看到的不一样”时打开，用完关闭。写在数据目录的 .burrowl/logs/requests.jsonl，不进备份包。保存后立即生效；
           MCP 启动参数 --request-log（或环境变量 BURROWL_REQUEST_LOG）优先于这里。
         </p>
-        <RequestLog />
+        <RequestLog key={baseline!.revision} configuredLevel={baseline!.config.diagnostics?.request_log ?? "off"} />
+      </Panel>
+
+      <Panel title="MCP 错误兼容返回">
+        <label className="check">
+          <input type="checkbox" checked={config.mcp.error_envelope ?? false}
+            onChange={(e) => set(["mcp", "error_envelope"], e.target.checked)} />
+          开启兼容返回
+        </label>
+        <p className="hint">
+          客户端隐藏工具报错详情时开启。成功返回 ok=true 与结果，业务失败返回 ok=false 与简短错误码、参数路径和处理提示；
+          AI 无需翻查堆积的日志。仅改变 MCP 返回格式，错误仍按失败记录。保存后下一次调用生效，无需重启；
+          客户端修复后可关闭，恢复标准报错方式。
+        </p>
       </Panel>
 
       <Panel
@@ -284,14 +307,24 @@ export function Settings() {
 
       <div className="savebar">
         <ErrorBox error={update.error} />
-        {saved ? <pre className="notice">{JSON.stringify(saved, null, 2)}</pre> : null}
-        <button type="button" onClick={() => save(true)} disabled={update.busy}>
+        {saved ? (
+          <div className="notice" role="status">
+            <strong>{saved.dryRun ? "检查通过，尚未保存配置。" : "配置已保存。"}</strong>
+            {saved.effects.length ? (
+              <><p>{saved.dryRun ? "保存后还需要完成以下动作：" : "以下设置还需要后续动作才会生效："}</p>
+                <ul>{saved.effects.map((effect, i) => <li key={i}>{effect.reason}</li>)}</ul>
+                <p>这些动作不会由保存按钮自动执行。</p></>
+            ) : <p>{saved.dryRun ? "未发现需要重启或重建索引的后续动作。" : "无需重启或重建索引；启动参数覆盖的设置以实际生效值为准。"}</p>}
+          </div>
+        ) : null}
+        {!saved && JSON.stringify(config) !== JSON.stringify(baseline!.config) ? <p className="hint">有未保存的修改。</p> : null}
+        <button type="button" onClick={() => save(true)} disabled={update.busy} title="只校验草稿并预览后续动作，不保存，也不执行这些动作">
           检查影响
         </button>
         <button type="button" className="primary" onClick={() => save(false)} disabled={update.busy}>
           保存设置
         </button>
-        <button type="button" onClick={() => setConfig(structuredClone(loaded.data!.config))}>
+        <button type="button" disabled={update.busy} onClick={() => { setSaved(undefined); setConfig(structuredClone(baseline!.config)); }}>
           放弃修改
         </button>
         <button
@@ -300,16 +333,16 @@ export function Settings() {
             // 用预检（不保存）取得各节的出厂默认值，只放进草稿；连接器配置保持不变
             const result = await update.run({
               patch: { index: null, query: null, reading: null, collaboration: null, mcp: null },
-              expected_revision: loaded.data!.revision,
+              expected_revision: baseline!.revision,
               dry_run: true,
             });
-            if (result) setConfig({ ...(result as unknown as { config: Config }).config, connectors: config.connectors });
+            if (result) { setSaved(undefined); setConfig({ ...(result as unknown as { config: Config }).config, connectors: config.connectors }); }
           }}
         >
           恢复默认（仅草稿）
         </button>
       </div>
-    </>
+    </fieldset>
   );
 }
 
@@ -463,7 +496,7 @@ interface RequestRow {
 }
 
 /** 最近的请求（新的在前）；点开一行看收到的参数、预处理后的参数与返回。 */
-function RequestLog() {
+function RequestLog({ configuredLevel }: { configuredLevel: string }) {
   const [errorsOnly, setErrorsOnly] = useState(false);
   const log = useOp<{ level: string; path: string; items: RequestRow[] }>("system.request_log", { limit: 50, errors_only: errorsOnly });
   const [open, setOpen] = useState<string>();
@@ -479,10 +512,14 @@ function RequestLog() {
         {log.data ? <span className="hint">当前生效：{log.data.level}</span> : null}
       </div>
       <ErrorBox error={log.error} />
-      {log.data && !log.data.items.length ? <p className="hint">还没有记录。</p> : null}
+      {log.data && log.data.level !== configuredLevel ? <p className="notice">
+        工作台保存的日志级别为 {configuredLevel}，实际生效为 {log.data.level}；启动参数或环境变量覆盖了这里的设置。
+      </p> : null}
+      {log.data?.level === "off" ? <p className="hint">请求日志已关闭：停止记录并隐藏历史内容；已有日志文件保留，重新开启后可查看。</p> : null}
+      {log.data && log.data.level !== "off" && !log.data.items.length ? <p className="hint">还没有记录。</p> : null}
       <table className="table">
         <tbody>
-          {log.data?.items.map((r) => (
+          {(log.data?.level === "off" ? [] : log.data?.items)?.map((r) => (
             <tr key={r.request_id} onClick={() => setOpen(open === r.request_id ? undefined : r.request_id)} style={{ cursor: "pointer" }}>
               <td>
                 <code>{r.op}</code> <Tag tone={r.status === "ok" ? "muted" : "bad"}>{r.status}</Tag>

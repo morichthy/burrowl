@@ -36,7 +36,7 @@ def effects(before: BurrowlConfig, after: BurrowlConfig) -> list[dict[str, str]]
         out.append({"action": "index.rebuild", "reason": "嵌入模型改变；向量按模型指纹隔离，需要重建向量投影"})
     if before.index.vector != after.index.vector:
         out.append({"action": "index.rebuild", "reason": "向量后端改变；需要在新后端重建向量投影"})
-    if before.mcp != after.mcp:
+    if (before.mcp.toolsets, before.mcp.mode) != (after.mcp.toolsets, after.mcp.mode):
         out.append({"action": "mcp.restart", "reason": "MCP 工具组或运行模式改变；宿主重启 MCP 服务（或新开对话）后生效"})
     before_hubs = {c.id: c for c in before.connectors}
     for connector in after.connectors:

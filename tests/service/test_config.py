@@ -42,3 +42,13 @@ def test_conflict_and_validation(config):
     assert caught.value.code == "INVALID_ARGUMENT" and caught.value.errors
     with pytest.raises(BurrowlError):
         config.update({"unknown": 1}, expected_revision=first["revision"])
+
+
+def test_mcp_error_envelope_is_default_off_and_hot_switchable(config):
+    assert config.get()["config"]["mcp"]["error_envelope"] is False
+    saved = config.update({"mcp": {"error_envelope": True}}, expected_revision="default")
+    assert saved["effects"] == []  # 返回格式即时读取；不能误报必须重启。
+    assert config.current().mcp.error_envelope is True
+    preview = config.update({"mcp": {"toolsets": ["memory"]}}, expected_revision=saved["revision"], dry_run=True)
+    assert preview["effects"][0]["action"] == "mcp.restart"
+    assert config.current().mcp.toolsets != ["memory"]

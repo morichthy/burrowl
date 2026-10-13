@@ -121,9 +121,11 @@ def request_log(ctx: Ctx, limit: Annotated[int, Field(ge=1, le=500, description=
     """请求日志（新的在前）：每次工具调用收到的参数、MCP 层预处理后的参数（json_decoded 列出被从 JSON 字符串解析回来的）、
     返回内容与耗时。用来排查"传过来的和服务看到的不一样"这类问题；报错里带 request_id 时直接按它查。
     默认关闭（level=off 时为空），由用户在工作台设置或 MCP 启动参数 --request-log 打开。"""
-    return {"level": reqlog.level(ctx.app), "path": str(reqlog.path(ctx.app.root)),
-            "items": reqlog.read(ctx.app.root, limit=limit, op=op_name, errors_only=errors_only,
-                                 request_id=request_id)}
+    active = reqlog.level(ctx.app)
+    # 关闭后既不写也不展示历史内容，保留磁盘文件便于再次启用；不把关闭操作当作清空日志。
+    return {"level": active, "path": str(reqlog.path(ctx.app.root)),
+            "items": [] if active == "off" else reqlog.read(
+                ctx.app.root, limit=limit, op=op_name, errors_only=errors_only, request_id=request_id)}
 
 
 # ---------- 工作台进程（R21 D-14；只在工作台提供） ----------

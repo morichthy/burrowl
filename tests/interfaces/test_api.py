@@ -28,6 +28,17 @@ def test_ops_and_errors(client):
     assert invalid.status_code == 400 and invalid.json()["errors"]
 
 
+def test_mcp_compatibility_does_not_wrap_http_errors(client):
+    http, base = client
+    current = http.post(f"{base}/ops/config.get", json={}).json()
+    saved = http.post(f"{base}/ops/config.update", json={"expected_revision": current["revision"],
+                      "patch": {"mcp": {"error_envelope": True}}})
+    assert saved.status_code == 200 and saved.json()["effects"] == []
+    bad = http.post(f"{base}/ops/memory.inspect", json={"owner": 1})
+    assert bad.status_code == 400 and bad.json()["code"] == "INVALID_ARGUMENT"
+    assert "ok" not in bad.json()
+
+
 def test_security_boundaries(client):
     http, base = client
     assert http.get("/api/v1/ops").status_code == 404  # 没有 token 前缀

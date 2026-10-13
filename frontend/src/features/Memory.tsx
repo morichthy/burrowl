@@ -779,8 +779,8 @@ interface ExpansionSection {
 }
 
 const COVERAGE_TONES: Record<string, { label: string; tone: string }> = {
-  covered: { label: "已转写", tone: "good" },
-  thin: { label: "偏短", tone: "warn" },
+  covered: { label: "文字已认领", tone: "good" },
+  thin: { label: "需核对原文", tone: "warn" },
   uncovered: { label: "未覆盖", tone: "bad" },
   omitted: { label: "已省略", tone: "muted" },
 };
@@ -793,8 +793,8 @@ function Expansion({ ownerId }: { ownerId: string }) {
   return (
     <>
       <p className="hint">
-        按原文顺序展开转写它的技术单元（L1），用来核对导入是否完整。只有导入时保存了原文快照的原件才能展开；“偏短”“未覆盖”只是提示，
-        觉得哪里简略，可以在关系图页写笔记交给 AI 补写。
+        按原文顺序展开转写它的技术单元（L1）。记录按原文逻辑组织，可以跨页或拆分同一节；开头的整理者注说明位置与切分依据。
+        文字与图片分别核对，文字已认领不代表完整转录。快照未抽出的内容需对照原件检查；缺口可以写笔记交给 AI 补写。
       </p>
       <ErrorBox error={list.error} />
       <Loading show={list.loading} />
@@ -829,7 +829,11 @@ function ExpansionView({ ownerId, sourceId }: { ownerId: string; sourceId: strin
     view: "expansion",
     source_id: sourceId,
   });
-  const coverage = useOp<{ segments: { key: string; status: string; ratio?: number; overlap?: number }[] }>("memory.document", {
+  const coverage = useOp<{
+    segments: { key: string; status: string; ratio?: number; overlap?: number }[];
+    assets?: { label: string; segment: string; status: string; problems?: string[]; reason?: string }[];
+    warnings?: string[];
+  }>("memory.document", {
     owner_id: ownerId,
     view: "coverage",
     source_id: sourceId,
@@ -839,6 +843,27 @@ function ExpansionView({ ownerId, sourceId }: { ownerId: string; sourceId: strin
     <>
       <ErrorBox error={doc.error ?? coverage.error} />
       <Loading show={doc.loading} />
+      {coverage.data?.warnings?.length ? (
+        <details>
+          <summary>原件抽取警告（{coverage.data.warnings.length}）</summary>
+          <ul>{coverage.data.warnings.map((warning, i) => <li key={i}>{warning}</li>)}</ul>
+        </details>
+      ) : null}
+      {coverage.data?.assets?.length ? (
+        <section aria-label="图片保存核对">
+          <p className="hint">图片附件与原位置引用核对；已引用仍需检查实际显示和图注。</p>
+          <ul>{coverage.data.assets.map((asset, i) => (
+            <li key={i}>
+              <Tag tone={asset.status === "linked" ? "good" : asset.status === "omitted" ? "muted" : "warn"}>
+                {({ linked: "附件已引用", unreferenced: "缺正文引用", missing: "缺图片附件",
+                  unavailable: "附件不可展示", omitted: "已登记省略" } as Record<string, string>)[asset.status] ?? asset.status}
+              </Tag> {asset.segment} · {asset.label}
+              {asset.problems?.length ? ` · ${asset.problems.join("；")}` : ""}
+              {asset.reason ? ` · ${asset.reason}` : ""}
+            </li>
+          ))}</ul>
+        </section>
+      ) : null}
       <article className="document">
         {doc.data?.sections.map((s) => {
           const row = status.get(s.key);

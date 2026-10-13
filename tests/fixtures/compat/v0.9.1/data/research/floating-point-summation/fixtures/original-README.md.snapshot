@@ -1,0 +1,39 @@
+# 浮点求和的数值稳定性
+
+研究ID：`RES-FLOATING-POINT-SUMMATION`。用户授权自选主题并开展多轮探索；全部输入由本研究构造，是实际执行的数值计算，未使用业务测量数据。
+
+| 轮次 | 探索问题 | 已保存内容 |
+|---|---|---|
+| 1 | 顺序影响 | [详细计算、公式与图表](details/round-01.md) · [原过程](rounds/01.md) · [完整Run](../../runs/run-20260908t201214z-d0ab308f66ad/README.md) |
+| 2 | 补偿反例 | [详细计算、公式与图表](details/round-02.md) · [原过程](rounds/02.md) · [完整Run](../../runs/run-20260908t201228z-a0980824dc18/README.md) |
+| 3 | 多排列复验 | [详细计算、公式与图表](details/round-03.md) · [原过程](rounds/03.md) · [完整Run](../../runs/run-20260908t201240z-90107a617cf8/README.md) |
+
+三轮实际计算表明：本研究的显式逐项累加对顺序敏感；Kahan实现未消除所选抵消结构的全部误差；Neumaier与math.fsum在第二轮6种排列和第三轮30种排列中均与精确基准一致。该观察只适用于已保存输入与脚本，不能推出任意浮点输入都准确，也未比较运行时间。
+
+## 从哪里开始读
+
+当前阅读入口是两份独立文档：**完整研究过程**保留问题、独立方法章、三组完整实验、讨论、结论与复核附录，共8章4图；**简版研究报告**用4章概括方法、关键结果、适用边界和下一步。工作台“系统记忆”选择本研究后，可切换两种文档。固定文档ID分别为`MEM-ab9db095-2545-594c-9e94-f72bab43c464`和`MEM-21132a5c-2477-50ea-ad28-2244de823f4f`，本次均为修订1。
+
+公开CLI也可读取[完整过程请求](../../projects/memory-layers-v2/runs/run-20260909t055625z-b13c2fc3994f/production-v3/read-process.request.json)或[简版请求](../../projects/memory-layers-v2/runs/run-20260909t055625z-b13c2fc3994f/production-v3/read-report.request.json)：
+
+```powershell
+.\workbench.cmd memory document --request "projects/memory-layers-v2/runs/run-20260909t055625z-b13c2fc3994f/production-v3/read-process.request.json"
+```
+
+原[计划](PLAN.md)、[三篇详细说明](details/README.md)、[综合结果](SYNTHESIS.md)和[证据台账](EVIDENCE_LEDGER.md)继续作为已有材料入口，不被新排版覆盖。需要复核原始数组时进入固定Run；[原脚本](experiment.py)只用Python标准库。新文档是既有证据的写作整理，没有重跑原实验；保存、AI内容检查和人工科学复核仍分别记录。
+
+后续已有两次实际复核：[首次绘图环境失败](runs/run-20260908t214955z-2273015d2cef/README.md)与[独立复试成功](runs/run-20260908t215458z-04c7d84d40d8/README.md)。后者核对150个方法结果和精确误差，保存111组显式算法轨迹；第三轮30组采样配方与保存数组一致。详细说明标记了事后补写时间，未将此次整理冒充重新计算。
+
+## 保存与维护
+
+研究目录保存计划、综合、详细说明、来源与记忆。历史三轮 Run 保持根目录原位以保护固定引用；新的独立计算通过 `new-run --owner RES-FLOATING-POINT-SUMMATION` 保存到本研究 `runs/`，跨对象只引用，不复制执行记录。
+
+L0存完整输入/输出与日志；L1有一个独立方法单元及三个固定真实Run的实验单元，完整正文保存为可选择的技术块；L2记录观察与决策，L3保留带条件的原经验，L4只维护研究地图与文档导航。章节和文档是独立记录，通过固定修订引用技术单元。局部修订后先检查文档影响，再更新相关章节和文档，已发布旧文档不会静默换成新正文。
+
+memory目录只由公共CLI维护。旧v1/v2记录、原实验、经验和检查点的固定依据仍保留；旧`map.report`修订继续兼容读取，当前新入口优先采用独立文档，不混拼两种正文。实现与回读证据见[本轮固定Run](../../projects/memory-layers-v2/runs/run-20260909t055625z-b13c2fc3994f/README.md)。
+
+## 当前状态
+
+本轮三轮探索完成；仍待非整数输入、极端指数、跨平台和性能验证。研究结论未人工复核，不晋升为公司核心算法或正式业务依据。
+
+[查看已保存记忆与实际CLI回执](MEMORY.md)。旧v1经验/地图分别投影到新L3/L4，原历史仍可按修订读取。

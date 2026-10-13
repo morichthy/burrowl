@@ -263,3 +263,50 @@ def test_request_log_summary_has_no_content_and_config_switch(app, monkeypatch):
     monkeypatch.setenv(reqlog.ENV, "off")                                             # 环境变量优先于配置
     call(_ctx(app), "memory.records", {"owner_id": OWNER})
     assert reqlog.path(app.root).read_text(encoding="utf-8") == text
+    assert call(_ctx(app), "system.request_log", {})["items"] == []
+    monkeypatch.delenv(reqlog.ENV)
+    saved = app.config.get()
+    app.config.update({"diagnostics": {"request_log": "off"}}, expected_revision=saved["revision"])
+    assert call(_ctx(app), "system.request_log", {})["items"] == []
+    assert reqlog.path(app.root).read_text(encoding="utf-8") == text  # 隐藏不等于删除。
+    app.config.update({"diagnostics": {"request_log": "summary"}}, expected_revision=app.config.get()["revision"])
+    assert call(_ctx(app), "system.request_log", {})["items"]
+
+
+def test_mcp_error_envelope_hot_switch_and_business_failure_stays_logged(app):
+    """一个正在运行的 MCP 服务可以开关兼容模式；拒绝的写入不产生提交，日志仍记真实失败。"""
+    server = mcp_module.build_server(app, skills_dir=SKILLS)
+
+    async def scenario():
+        async with Client(server) as client:
+            before = app.memory.inspect(OWNER)["head"]["commit_id"]
+            bad_args = {"owner_id": OWNER, "expected_head": before, "operations": [1]}
+            standard = await client.call_tool("memory_commit", bad_args)
+            assert standard.is_error and _problem(standard)["code"] == "INVALID_ARGUMENT"
+            app.config.update({"mcp": {"error_envelope": True}}, expected_revision=app.config.get()["revision"])
+            bad = await client.call_tool("memory_commit", bad_args)
+            assert not bad.is_error  # 成功交付诊断包；业务状态在包内明确失败。
+            wrapped = _problem(bad)
+            assert wrapped["ok"] is False and wrapped["error"]["code"] == "INVALID_ARGUMENT"
+            assert wrapped["error"]["errors"][0]["path"] == "/operations/0"
+            ok = _problem(await client.call_tool("config_get", {}))
+            assert ok["ok"] is True and ok["result"]["config"]["mcp"]["error_envelope"] is True
+            assert app.memory.inspect(OWNER)["head"]["commit_id"] == before
+            stats = call(_ctx(app), "system.tool_errors", {})
+            assert next(row for row in stats["by_op"] if row["op"] == "memory.commit")["input"] == 2
+            app.config.update({"mcp": {"error_envelope": False}}, expected_revision=app.config.get()["revision"])
+            restored = await client.call_tool("memory_commit", bad_args)
+            assert restored.is_error and _problem(restored)["code"] == "INVALID_ARGUMENT"
+    anyio.run(scenario)
+
+
+def test_mcp_error_envelope_is_bounded_and_does_not_include_traceback():
+    exc = BurrowlError("INVALID_ARGUMENT", "错误" * 2000,
+                       {"hint": "修正" * 2000, "traceback": "private stack", "request_id": "REQ-1"},
+                       [{"code": "INVALID_ARGUMENT", "path": "/operations/0", "message": "缺字段" * 2000,
+                         "hint": "请查契约" * 2000} for _ in range(40)])
+    wrapped = mcp_module._error_envelope(exc)
+    text = json.dumps(wrapped, ensure_ascii=False)
+    assert len(text) < 5000 and "private stack" not in text
+    assert wrapped["error"]["errors_truncated"] == 37
+    assert wrapped["error"]["details"]["request_id"] == "REQ-1"

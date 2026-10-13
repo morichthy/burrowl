@@ -1774,7 +1774,7 @@ export declare namespace SourcesSnapshot {
 
 export declare namespace SourcesAttach {
   /**
-   * 把原件中的图片复制为数据目录内的受控附件并登记为来源，返回固定引用 ref。
+   * 把原件中的 PNG/JPEG/WebP 原始图片字节复制为受控附件并登记，返回固定引用 ref（不以 OCR 缩略图替代）。
    * L1 的 payload.figures 写 {caption: 照录原文图注, ref}，块正文用 ![图注](figure:序号) 在原位置引用。
    * 附件随数据目录备份和迁移；同一张图重复附加是幂等的。
    */

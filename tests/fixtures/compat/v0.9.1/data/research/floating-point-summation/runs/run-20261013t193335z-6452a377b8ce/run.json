@@ -1,0 +1,58 @@
+{
+  "artifacts": [
+    {
+      "path": "research/floating-point-summation/runs/run-20261013t193335z-6452a377b8ce/.run-captures/a4e2b5e42b35428084feba3918804730/stdout.txt",
+      "registered_at": "2026-10-13T19:33:36.264746Z",
+      "role": "execution_log",
+      "sha256": "9d88a83f12826a58bb34eee1c5e6f5a20e8684c66cbf09a826b29c6356635659"
+    },
+    {
+      "path": "research/floating-point-summation/runs/run-20261013t193335z-6452a377b8ce/.run-captures/a4e2b5e42b35428084feba3918804730/stderr.txt",
+      "registered_at": "2026-10-13T19:33:36.272157Z",
+      "role": "execution_log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "research/floating-point-summation/runs/run-20261013t193335z-6452a377b8ce/.run-captures/a4e2b5e42b35428084feba3918804730/execution.json",
+      "registered_at": "2026-10-13T19:33:36.287013Z",
+      "role": "execution_log",
+      "sha256": "08c24a582999db813c23cf738704a832564a90d6f7f2e34942ad82b0e3ebaf4f"
+    }
+  ],
+  "conclusion": "执行成功，输出行数",
+  "created_at": "2026-10-13T19:33:35Z",
+  "ended_at": "2026-10-13T19:33:36.234661Z",
+  "environment": {
+    "platform": "Windows-11-10.0.22631-SP0",
+    "python": "3.12.15"
+  },
+  "inputs": [
+    {
+      "path": "SRC-COMPAT-SAMPLES",
+      "registered_at": "2026-10-13T19:33:36.018293Z",
+      "role": "input",
+      "sha256": "2a2b86e74ffd5e6a9b75e52a105cf9d02920837179f8e8961aa15411d380f7a3"
+    },
+    {
+      "path": "research/floating-point-summation/compat_analyze.py",
+      "registered_at": "2026-10-13T19:33:36.083690Z",
+      "role": "script",
+      "sha256": "47ddf3ba24322f2e2ea5923bb14dfc95003b551bb2b85a9031739e0fb33e25b9"
+    }
+  ],
+  "keywords": [],
+  "limitations": [
+    "合成数据"
+  ],
+  "owner_id": "RES-FLOATING-POINT-SUMMATION",
+  "parameters": {},
+  "parent_run_ids": [],
+  "question": "样本有几行",
+  "run_id": "RUN-20261013T193335Z-6452A377B8CE",
+  "run_type": "analysis",
+  "schema_version": 1,
+  "sensitivity": "internal",
+  "started_at": "2026-10-13T19:33:36.097104Z",
+  "status": "succeeded",
+  "title": "标本对象 Run"
+}

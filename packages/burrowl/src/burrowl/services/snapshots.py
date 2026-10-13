@@ -6,6 +6,7 @@
 登记为来源（`SRC-ATT-<sha 前 16 位>`），供 L1 的 figures 固定引用；迁移时随数据目录一起走。
 覆盖报告与展开视图只读，从快照与对象的当前记录现算，不保存。
 """
+import re
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +14,7 @@ from ..core import segments as seg
 from ..core.atomic import read_json, write_json_atomic
 from ..core.clock import utc_now
 from ..core.errors import BurrowlError
-from ..core.hashing import sha256_bytes
+from ..core.hashing import sha256_bytes, sha256_file
 from ..core.refs import make_ref
 from ..index import extract
 from .memory.context import Storage
@@ -45,9 +46,12 @@ class SnapshotService:
             raise BurrowlError("INVALID_ARGUMENT", "原件超过 50 MiB，无法生成快照", {"source_id": source_id})
         return source, source.path.read_bytes()
 
-    def _extract(self, name: str, raw: bytes) -> dict:
+    def _extract(self, name: str, raw: bytes, *, ocr_enabled: bool | None = None) -> dict:
+        # 检索投影可限制视觉数量；导入保全不能沿用默认的 40 张截断。
+        # 原件仍受 50 MiB 限制，抽取失败与不可展示的格式必须通过警告或报错显式交付。
         return extract.extract(name, raw, cache_dir=self.storage.ws.state("index/assets"),
-                               ocr_enabled=self.ocr_enabled())
+                               ocr_enabled=self.ocr_enabled() if ocr_enabled is None else ocr_enabled,
+                               max_assets=None, preserve_assets=True)
 
     def load(self, source_id: str, sha: str | None = None) -> dict | None:
         """读取快照；sha 不给时取登记指纹对应的那一份。"""
@@ -121,21 +125,23 @@ class SnapshotService:
     def attach(self, source_id: str, asset_label: str | None = None, *, title: str = "") -> dict:
         """把原件中提取的一张图片（asset_label），或本身就是图片的已登记来源，复制为受控附件并登记。"""
         source, raw = self._read_source(source_id)
+        if sha256_bytes(raw) != source.entry["sha256"]:
+            raise BurrowlError("STALE_BASIS", "原件已在登记后变化", {"source_id": source_id})
         if asset_label is None:
             data = raw
-            if sha256_bytes(raw) != source.entry["sha256"]:
-                raise BurrowlError("STALE_BASIS", "原件已在登记后变化", {"source_id": source_id})
         else:
-            extracted = self._extract(source.path.name, raw)
+            # 附加只需要图片字节，文字已在快照阶段抽取；避免逐张保存时反复执行全文件 OCR。
+            extracted = self._extract(source.path.name, raw, ocr_enabled=False)
             match = [a for a in extracted["assets"] if a["label"] == asset_label]
             if not match:
                 raise BurrowlError("NOT_FOUND", "原件中没有这张图片；可选的标签见 sources_snapshot 返回的 assets",
                                    {"asset_label": asset_label,
                                     "available": [a["label"] for a in extracted["assets"]][:40]})
-            data = Path(match[0]["path"]).read_bytes()
+            data = Path(match[0]["original_path"]).read_bytes()
         suffix = _image_suffix(data)
         if suffix is None:
-            raise BurrowlError("INVALID_ARGUMENT", "只能附加 PNG / JPEG / WebP 图片", {"source_id": source_id})
+            raise BurrowlError("INVALID_ARGUMENT", "只能附加 PNG / JPEG / WebP 原图；其他格式需显式转换并说明缺口",
+                               {"source_id": source_id})
         sha = sha256_bytes(data)
         relative = f"attachments/{sha}{suffix}"
         target = self.storage.ws.path(relative)
@@ -190,9 +196,74 @@ class SnapshotService:
     def coverage(self, owner_id: str, source_id: str) -> dict:
         snapshot, details, omitted = self._owner_material(owner_id, source_id)
         report = seg.coverage(snapshot["segments"], details, source_id, omitted)
+        assets = self._asset_coverage(snapshot["assets"], details, source_id, omitted)
         return {"owner_id": owner_id, "source_id": source_id, "sha256": snapshot["sha256"], **report,
+                "assets": assets,
+                "asset_counts": {status: sum(a["status"] == status for a in assets)
+                                 for status in ("linked", "unreferenced", "missing", "unavailable", "omitted")},
+                "warnings": snapshot.get("warnings", []),
                 "meaning": "覆盖度是提示不是判定：uncovered = 没有 L1 认领也没登记省略；thin = 认领了但正文明显偏短"
-                           "（字数比与原文字符 4-gram 重合度都低于 0.3）。逐项补写 L1，或在 L0 的 omitted 写明省略理由"}
+                           "或与原文差异较大（字数比或字符 4-gram 重合度低于 0.9）。"
+                           "图片按原文标签核对附件与所在分段的正文引用，linked 不等于视觉内容已核验。"
+                           "报告不包含抽取时漏掉的内容；对照原件逐段逐图验收后才能声明完整导入"}
+
+    def _asset_coverage(self, assets: list[dict], records: list[dict], source_id: str, omitted: list[dict]) -> list[dict]:
+        """只读现算图片缺口，不另存完成状态；旧快照只有标签时也能检查。
+
+        标签只能关联附件，不能证明视觉内容与原图相同。用同一原件的 L1、分段定位与图号
+        三者一起匹配，避免另一章节的一次引用掩盖原位置遗漏；附件还需可读且固定指纹有效。
+        """
+        claims = seg.claims(records, source_id)
+        reasons = {key: item["reason"] for item in omitted for key in item["locators"]}
+        health: dict[tuple, str | None] = {}
+        rows = []
+        for asset in assets:
+            matches = []
+            for hit in claims.get(asset["segment"], []):
+                figures = hit["record"]["payload"].get("figures", [])
+                mentioned = {int(m[1]) for m in re.finditer(r"!\[[^\]]*\]\(figure:(\d+)\)", hit["block"]["markdown"])}
+                for index, figure in enumerate(figures):
+                    ref = figure["ref"]
+                    if ref.get("target_kind") != "file" or ref.get("locator") != asset["label"]:
+                        continue
+                    key = (ref["target_id"], ref.get("sha256"))
+                    if key not in health:
+                        health[key] = self._attachment_problem(ref)
+                    matches.append({"record_id": hit["record"]["record_id"], "index": index,
+                                    "in_body": index in mentioned, "problem": health[key]})
+            row = {"label": asset["label"], "segment": asset["segment"]}
+            valid = [m for m in matches if m["problem"] is None]
+            if any(m["in_body"] for m in valid):
+                row["status"] = "linked"
+            elif valid:
+                row["status"] = "unreferenced"
+            elif matches:
+                row |= {"status": "unavailable", "problems": sorted({m["problem"] for m in matches})}
+            elif asset["segment"] in reasons:
+                row |= {"status": "omitted", "reason": reasons[asset["segment"]]}
+            else:
+                row["status"] = "missing"
+            rows.append(row)
+        return rows
+
+    def _attachment_problem(self, ref: dict) -> str | None:
+        """与图片展示边界一致地检查附件；只回传错误类别，不泄露受限来源的位置或内容。"""
+        try:
+            source = self.storage.sources.resolve(ref["target_id"])
+            if not source.path.is_relative_to(self.storage.ws.root):
+                return "不是数据目录内的受控附件"
+            with source.path.open("rb") as stream:
+                if _image_suffix(stream.read(16)) is None:
+                    return "不是可展示的 PNG / JPEG / WebP"
+            if sha256_file(source.path) != ref.get("sha256"):
+                return "固定图片指纹不匹配"
+            if source.path.stat().st_size > 8 * 1024 * 1024:
+                return "原图已保存，但超过 8 MiB 展示上限"
+        except BurrowlError as exc:
+            return exc.code
+        except OSError:
+            return "图片文件不可读"
+        return None
 
     def expansion(self, owner_id: str, source_id: str) -> dict:
         snapshot, details, omitted = self._owner_material(owner_id, source_id)

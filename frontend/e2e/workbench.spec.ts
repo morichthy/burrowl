@@ -53,6 +53,30 @@ async function clickGraphLink(page: import("@playwright/test").Page, source: str
 
 test.describe.configure({ mode: "serial" });
 
+test("设置保存与影响预览清晰，关闭请求日志隐藏历史，兼容开关可保存", async ({ page, request }) => {
+  const original = await op(request, "config.get", {});
+  await op(request, "config.update", { expected_revision: original.revision, patch: { diagnostics: { request_log: "summary" } } });
+  await op(request, "memory.owners", {});
+  await page.goto("#/settings");
+  await expect(page.getByText("memory.owners", { exact: true })).toBeVisible();
+  await page.getByRole("radio", { name: "关闭", exact: true }).check();
+  await page.getByRole("checkbox", { name: "开启兼容返回" }).check();
+  await page.getByRole("button", { name: "检查影响", exact: true }).click();
+  await expect(page.getByText("检查通过，尚未保存配置。", { exact: true })).toBeVisible();
+  const preview = await op(request, "config.get", {});
+  expect(preview.config.diagnostics.request_log).toBe("summary");
+  expect(preview.config.mcp.error_envelope).toBe(false);
+  await page.getByRole("button", { name: "保存设置", exact: true }).click();
+  await expect(page.getByText("配置已保存。", { exact: true })).toBeVisible();
+  await expect(page.getByText(/请求日志已关闭：停止记录/)).toBeVisible();
+  await expect(page.getByText("memory.owners", { exact: true })).toHaveCount(0);
+  const saved = await op(request, "config.get", {});
+  expect(saved.config.mcp.error_envelope).toBe(true);
+  expect((await op(request, "system.request_log", {})).items).toEqual([]);
+  // 测试只改变临时库；恢复基线，避免影响同文件的其他场景。
+  await op(request, "config.update", { expected_revision: saved.revision, patch: original.config });
+});
+
 test("关系图筛选：分类不重复，节点可见性、空选与保存重载一致", async ({ page, request }) => {
   await page.goto("#/relations");
   const types = page.getByRole("group", { name: "节点类型" });
