@@ -1,7 +1,7 @@
 // 共享界面组件：徽标、Markdown、错误、加载、路由。
 import "katex/dist/katex.min.css";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
-import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
+import { type ComponentPropsWithoutRef, type ReactNode, useEffect, useMemo, useState } from "react";
+import ReactMarkdown, { defaultUrlTransform, type ExtraProps } from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -25,8 +25,8 @@ export type LinkTargets = Record<string, string | undefined>;
 const CODE = /(^ {0,3}(```|~~~)[\s\S]*?^ {0,3}\2[^\n]*$|`[^`\n]*`)/gm;
 const WIKI = /\[\[([^[\]\n]+?)\]\]/g;
 
-/** 把 [[文字|显示]] 换成 Markdown 链接；没有地址的保留为 [[文字]] 原样文字。 */
-export function linkify(text: string, targets: LinkTargets): string {
+/** 只处理代码以外的 [[文字|显示]]；替换策略由普通链接或编号视图提供。 */
+export function mapWikiLinks(text: string, replace: (key: string, label: string, whole: string) => string): string {
   return text
     .split(CODE)
     .map((part, i) => {
@@ -34,25 +34,37 @@ export function linkify(text: string, targets: LinkTargets): string {
       return part.replace(WIKI, (whole, inner: string) => {
         const [raw, shown] = inner.split("|", 2);
         const key = raw.trim();
-        const url = targets[key];
         const label = (shown ?? key.replace(/^[@!]/, "")).trim().replace(/[[\]]/g, "");
-        return url ? `[${label}](${url})` : whole;
+        return replace(key, label, whole);
       });
     })
     .join("");
 }
 
+export function linkify(text: string, targets: LinkTargets): string {
+  return mapWikiLinks(text, (key, label, whole) => targets[key] ? `[${label}](${targets[key]})` : whole);
+}
+
 export function Markdown({
   text,
   figure,
+  anchors,
 }: {
   text: string | null | undefined;
   /** 技术单元正文中的 ![图注](figure:N)：在原位置显示第 N 张登记的图 */
   figure?: (index: number, alt: string) => ReactNode;
+  /** 仅用于本次渲染生成的引用占位地址；原文中的普通 Markdown 链接仍正常渲染。 */
+  anchors?: Record<string, ReactNode>;
 }) {
   // 组件表必须稳定：每次渲染换一个新的 img 组件，React 会卸载重建图片（图片的读取请求随之反复发出）
   const components = useMemo(
     () => ({
+      // figure 是块级元素，不能嵌在 Markdown 自动生成的 p 内；同段的文字与出处仍保留。
+      p: ({ node, children }: ComponentPropsWithoutRef<"p"> & ExtraProps) => {
+        const hasFigure = node?.children.some((child) => child.type === "element" && child.tagName === "img" &&
+          typeof child.properties.src === "string" && /^figure:\d+$/.test(child.properties.src));
+        return hasFigure && figure ? <div className="figure-paragraph">{children}</div> : <p>{children}</p>;
+      },
       img: ({ src, alt }: { src?: string | Blob; alt?: string }) => {
         const match = typeof src === "string" ? /^figure:(\d+)$/.exec(src) : null;
         if (match && figure) return <>{figure(Number(match[1]), alt ?? "")}</>;
@@ -61,14 +73,19 @@ export function Markdown({
     }),
     [figure],
   );
+  // 更换引用名称时保留上面的 img 函数身份，避免名称查询完成后再次加载图片。
+  const linkedComponents = useMemo(() => ({ ...components,
+    a: ({ href, children, title }: ComponentPropsWithoutRef<"a">) =>
+      (href && anchors && Object.hasOwn(anchors, href) ? anchors[href] : undefined) ?? <a href={href} title={title}>{children}</a>,
+  }), [components, anchors]);
   if (!text) return null;
   return (
     <div className="markdown">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
-        urlTransform={(url) => (url.startsWith("figure:") || url.startsWith("#/") ? url : defaultUrlTransform(url))}
-        components={components}
+        urlTransform={(url) => ((anchors && Object.hasOwn(anchors, url)) || url.startsWith("figure:") || url.startsWith("#/") ? url : defaultUrlTransform(url))}
+        components={linkedComponents}
       >
         {text}
       </ReactMarkdown>

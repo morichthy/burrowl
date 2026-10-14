@@ -1754,6 +1754,7 @@ export declare namespace SourcesSnapshot {
   /**
    * 原文快照：没有就先生成（只读原件、核对登记指纹）。返回分段目录（key 与字数）、提取出的图片（assets 的 label）
    * 与抽取警告；给 keys 时附这些分段的全文。转写时 L1 的 origin.locators 与块的 locators 写这里的 key；
+   * PDF 图片标签带页码（如 Page 2/Im0.jpg），因为不同页可有同名图片；附加时原样使用该标签，不能去掉页码。
    * 图片用 sources_attach 复制为附件后再引用。
    */
   export interface Args {

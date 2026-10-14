@@ -103,6 +103,9 @@ class SnapshotService:
             out["texts"] = texts
             if truncated:
                 out["truncated_keys"] = truncated
+        if snapshot["file_name"].lower().endswith(".pdf"):
+            # PDF 的资源名只在页内唯一；例如多页都含 Im0.jpg。对外加页码，不改历史快照。
+            out["assets"] = [{**a, "label": f"{a['segment']}/{a['label']}"} for a in snapshot["assets"]]
         return out
 
     def compare(self, source_id: str) -> dict:
@@ -132,11 +135,16 @@ class SnapshotService:
         else:
             # 附加只需要图片字节，文字已在快照阶段抽取；避免逐张保存时反复执行全文件 OCR。
             extracted = self._extract(source.path.name, raw, ocr_enabled=False)
-            match = [a for a in extracted["assets"] if a["label"] == asset_label]
+            match = [a for a in extracted["assets"] if asset_label in {a["label"], f"{a['unit']}/{a['label']}"}]
+            # 同一原图重复出现仍可幂等附加；不同原图同名才有取错内容的风险。
+            if len({a["original_path"] for a in match}) > 1:
+                raise BurrowlError("INVALID_ARGUMENT", "图片标签在多页重复；请用页码/标签明确选择，不按第一张猜",
+                                   {"asset_label": asset_label,
+                                    "available": [f"{a['unit']}/{a['label']}" for a in match]})
             if not match:
                 raise BurrowlError("NOT_FOUND", "原件中没有这张图片；可选的标签见 sources_snapshot 返回的 assets",
                                    {"asset_label": asset_label,
-                                    "available": [a["label"] for a in extracted["assets"]][:40]})
+                                    "available": [f"{a['unit']}/{a['label']}" for a in extracted["assets"]][:40]})
             data = Path(match[0]["original_path"]).read_bytes()
         suffix = _image_suffix(data)
         if suffix is None:
@@ -224,7 +232,8 @@ class SnapshotService:
                 mentioned = {int(m[1]) for m in re.finditer(r"!\[[^\]]*\]\(figure:(\d+)\)", hit["block"]["markdown"])}
                 for index, figure in enumerate(figures):
                     ref = figure["ref"]
-                    if ref.get("target_kind") != "file" or ref.get("locator") != asset["label"]:
+                    if ref.get("target_kind") != "file" or ref.get("locator") not in {
+                            asset["label"], f"{asset['segment']}/{asset['label']}"}:
                         continue
                     key = (ref["target_id"], ref.get("sha256"))
                     if key not in health:

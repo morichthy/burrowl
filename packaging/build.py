@@ -146,7 +146,7 @@ def main(argv: list[str] | None = None) -> None:
     run("uv", "pip", "install", "--python", str(python), "--quiet",
         "-r", str(requirements), *map(str, sorted(wheels.glob("*.whl"))))
     run(str(python), "-c", "import burrowl.interfaces.cli, burrowl_connector_weknora, burrowl_connector_lightrag, "
-        "lightrag, fastembed, sqlite_vec")
+        "lightrag, fastembed, sqlite_vec, pypdf, fontTools, PIL, rapidocr_onnxruntime")
 
     # 3. 前端、Skill、文档
     if not options.skip_frontend:

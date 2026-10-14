@@ -17,7 +17,7 @@ from ...core.ports import IndexSink, NullIndex
 from ...core.records import content_hash, record_hash, same_content, validate_commit_request, validate_record
 from ...storage.memory_store import Snapshot, tombstones
 from ...storage.owners import SENSITIVITY_RANK, Owner, OwnerIndex
-from . import concepts, policy, rules, vocabulary
+from . import citations, concepts, policy, rules, vocabulary
 from .claims import ClaimGraph, blocked_records
 from .context import RefResolver, Storage
 from .links import LinkResolver
@@ -361,9 +361,14 @@ class MemoryService:
         resolver.recheck()
         result = {"valid": True, "dry_run": True, "owner_id": owner.owner_id, "head": snapshot.head,
                   "record_results": results, "writes": 0}
-        if warnings := vocabulary.relation_warnings(request["operations"]):  # R19 D-09：只提示，不拒绝
+        if warnings := self._warnings(request["operations"]):
             result["warnings"] = warnings
         return result
+
+    @staticmethod
+    def _warnings(operations: list[dict]) -> list[dict]:
+        """预检、提交和幂等重试共用提示；不成为规范记录的一部分。"""
+        return vocabulary.relation_warnings(operations) + citations.citation_warnings(operations)
 
     def basis_checks(self, basis_heads: dict[str, str | None]) -> list[dict]:
         """材料包依据：列出的对象 HEAD 必须与准备材料时一致，否则拒绝（不能用旧材料覆盖新结果）。"""
@@ -394,7 +399,7 @@ class MemoryService:
         owner = self._target(index, request["owner_id"])
         digest = hash_override or request_hash(request)
         snapshot = self.snapshot(owner)
-        warnings = vocabulary.relation_warnings(request["operations"])  # R19 D-09：只提示，不拒绝
+        warnings = self._warnings(request["operations"])
         if prior := self.storage.store.find_receipt(owner, snapshot, request["request_id"], digest):
             return self._with_index(prior, notify=False, warnings=warnings)
         # 先在锁外完整预检：无效输入不会创建任何目录或锁。

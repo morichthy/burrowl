@@ -8,6 +8,11 @@ from pathlib import Path
 
 OUT = Path(__file__).resolve().parents[1] / "packages/burrowl/src/burrowl/core/schema/examples"
 OWNER = "RES-FLOATING-POINT-SUMMATION"  # 示例所在的样例对象；草案里不写 owner_id（R20 D-01：由提交补上）
+# 可读出处与固定 Ref 成对使用；这些短名来自测试样例，实际写作替换为当前回执的 handle。
+RAW_LINK = "[[@第一轮原始结果:单位增量顺序与抵消|第一轮原始结果]]"
+METHOD_LINK = "[[@浮点求和方法:精确基准、递推与适用条件#reference|精确基准定义]]"
+PROCESS_LINK = "[[@三项反例扩展到30项:固定排列复验的研究经过|固定排列复验]]"
+EXPERIENCE_LINK = "[[@抵消求和如何验证:精确基准、失败轨迹与算法选择边界|已测边界]]"
 
 
 def ref(kind, tid, rev, sha, rel, loc=""):
@@ -58,7 +63,8 @@ EXAMPLES = {
         "L1 技术单元：完整正文只放 payload.blocks，body_markdown 必须为空字符串；retrieval_description 是检索用摘要，"
         "不是正文。unit_type=experiment 时 run_ref 必须是真实 Run；结果块用 requires_block_ids 声明依赖的定义块。"
         "转写外部原件时写 origin={source_ref: 原件的固定引用, locators: [原件分段标签]}（块上可再写 locators），"
-        "按原文顺序接近原文保留细节，原文中的实验可用 origin 代替 run_ref；不属于实验/方法/推导/分析的内容用 "
+        "按原文顺序逐字保留原文与原语言，只做必要排版修复；总结、改写与矛盾分析放 L2–L4（L2 只记真实过程）。"
+        "共同出处在块开头引用 L0，其他块声明依赖；写完即引用，不只填 sources。原文中的实验可用 origin 代替 run_ref；不属于实验/方法/推导/分析的内容用 "
         "unit_type=general。"
         "L1 可以写 fact / calculation 类结论并用 block_id 指向结果块；块正文里用 [[概念]] 链接概念库中的概念，"
         "handle 是给 [[@handle]] 链接用的可读短名（不填按标题生成，创建后不能改）。",
@@ -76,22 +82,23 @@ EXAMPLES = {
                    {"block_id": "definitions", "role": "definitions", "requires_block_ids": [],
                     "markdown": "## 定义\n\n$x_i$ 为程序实际收到的 binary64 数，$\\widehat S$ 为浮点求和结果，"
                                 "精确参考 $S_{\\mathrm{ref}}=\\sum_i \\operatorname{Fraction}(x_i)$，"
-                                "绝对误差 $e=|\\operatorname{Fraction}(\\widehat S)-S_{\\mathrm{ref}}|$，均无量纲。"},
+                                "绝对误差 $e=|\\operatorname{Fraction}(\\widehat S)-S_{\\mathrm{ref}}|$，均无量纲。" + METHOD_LINK},
                    {"block_id": "method", "role": "methods", "requires_block_ids": ["definitions"],
                     "markdown": "## 方法\n\n逐项读取输入，分别用顺序求和与 [[补偿求和]] 得到 $\\widehat S$，"
-                                "再与 $S_{\\mathrm{ref}}$ 比较。依据：第一轮原始结果 [SRC-SUMMATION-R01]。"}],
+                                "再与 $S_{\\mathrm{ref}}$ 比较。依据：" + RAW_LINK + "。"}],
                "claims": [claim("CLM-FP-精确基准分离误差", "用有理数精确基准可以把求和误差与输入表示误差分开",
                                 "有限 binary64 输入、无量纲数列", [rel(FILE_R01, "supports")], kind="calculation")
                           | {"block_id": "method"}]},
               [FILE_R01], "保存可复用的基准计算方法", ["浮点求和", "精确基准"]) | {"handle": "精确基准计算方法"}),
     "narrative": (
         "L2 经过：body_markdown 写 背景 → 实际尝试、选择理由、观察与转折 → 简单结论和未决问题；"
-        "stages 至少一段（situation/action/reason/outcome/evidence_refs）。需要复核的结论写进 claims。",
+        "stages 至少一段（situation/action/reason/outcome/evidence_refs）。需要复核的结论写进 claims。"
+        "每个实际步骤或结果写完即就近链接 L1 / L0，结构化 evidence_refs 不代替正文引用。",
         draft("narrative", "从单位增量丢失到补偿比较的第一轮经过",
               "## 背景\n\n研究要比较求和顺序对抵消输入的影响。\n\n## 经过\n\n先用顺序求和处理三项抵消输入，"
               "单位增量完全丢失；随后加入 Kahan 补偿作对照，补偿后仍丢失，说明补偿不能覆盖所有抵消情形。\n\n"
               "## 结论与未决\n\n在这组三项输入上，顺序与补偿都未保住单位增量；更多排列需要后续实验。"
-              "依据：[SRC-SUMMATION-R01]。",
+              "依据：" + RAW_LINK + "；精确基准见 " + METHOD_LINK + "。",
               {"question": "求和顺序与补偿能否保住被大数抵消的单位增量", "limitations": ["只有三项构造输入"],
                "stages": [
                    {"situation": "三项抵消输入", "action": "顺序求和", "reason": "建立基线",
@@ -109,11 +116,13 @@ EXAMPLES = {
               [FILE_R01, DETAIL], "记录第一轮实际经过", ["浮点求和", "Kahan"])),
     "experience": (
         "L3 可复用认识：写 适用问题 → 认识/做法 → 依据 → 反例与不适用边界。knowledge_type 区分 "
-        "observation/conclusion/hypothesis/recommendation，它不是复核状态；假设不能写成结论。",
+        "observation/conclusion/hypothesis/recommendation，它不是复核状态；假设不能写成结论。"
+        "原文主张与 AI 归纳分别标明，写完判断即链接具体 L1 / 结论，sources 与正文一并填。",
         draft("experience", "补偿求和不能替代抵消场景的精确基准",
               "## 适用问题\n\n判断浮点求和结果在大数抵消输入上是否可信时。\n\n## 认识\n\n补偿求和能减小一般舍入误差，"
-              "但在大数抵消、小量夹在中间的输入上仍可能丢失小量；下结论前应先用有理数精确基准核对。\n\n"
-              "## 依据与边界\n\n依据第一轮与第三轮实验经过。只在有限 binary64 抵消输入上观察到；"
+              "但在大数抵消、小量夹在中间的输入上仍可能丢失小量。" + PROCESS_LINK +
+              " AI 归纳：下结论前应先用有理数精确基准核对。" + METHOD_LINK + "\n\n"
+              "## 依据与边界\n\n只在有限 binary64 抵消输入上观察到；"
               "不能推出补偿求和在一般输入上无效。",
               {"problem_structure": "大数抵消导致小量丢失",
                "recommendation": "抵消场景先用精确基准核对，再判断补偿是否足够",
@@ -126,11 +135,13 @@ EXAMPLES = {
               [NARR, DETAIL], "提炼可迁移到其他求和问题的经验", ["浮点求和", "补偿求和"])),
     "overview": (
         "L4 概览：对象的发现入口，不读下层也能知道 用途与范围 → 主要方法 → 当前结果/状态 → 限制与未决。"
-        "长期复用的 Owner 至少维护一条；短经验可以只有一条自足的 L4。",
+        "长期复用的 Owner 至少维护一条；短经验可以只有一条自足的 L4。"
+        "每项方法、结果与边界分别就近引用，展开字段不能替代正文链接。",
         draft("overview", "浮点求和数值稳定性研究概览",
               "## 用途与范围\n\n研究有限 binary64 数列求和时顺序与补偿对误差的影响，重点是大数抵消场景。\n\n"
-              "## 当前结果\n\n顺序与 Kahan 补偿在构造的抵消输入上都可能丢失小量；以有理数精确基准为判断依据。\n\n"
-              "## 限制与未决\n\n只覆盖构造输入；随机输入与成对求和尚未研究。",
+              "## 当前结果\n\n顺序与 Kahan 补偿在构造的抵消输入上都可能丢失小量。" + PROCESS_LINK +
+              " 以有理数精确基准为判断依据。" + METHOD_LINK + "\n\n"
+              "## 限制与未决\n\n只覆盖构造输入。" + EXPERIENCE_LINK + " 随机输入与成对求和尚未研究。",
               {"question": "求和顺序与补偿如何影响抵消场景的误差", "methods": ["有理数精确基准", "顺序与补偿对照"],
                "results": ["抵消输入上补偿仍可能丢失小量"], "current_stage": "三轮实验已完成，扩展研究未开始",
                "limitations": ["仅构造输入"], "open_questions": ["成对求和是否更稳健"], "claims": [],
@@ -142,7 +153,7 @@ EXAMPLES = {
         draft("document_section", "方法：精确基准", "",
               {"section_key": "methods-baseline", "title": "方法：精确基准", "role": "methods",
                "watch_refs": [], "missing_refs": [],
-               "blocks": [{"type": "prose", "markdown": "本节说明误差的计算基准。",
+               "blocks": [{"type": "prose", "markdown": "本节说明误差的计算基准。" + METHOD_LINK,
                            "evidence_refs": [rel(DETAIL, "supports")]},
                           {"type": "unit", "ref": rel(DETAIL, "contains"), "block_ids": ["definitions", "reference"]}]},
               [DETAIL], "为文稿组织方法章节")),

@@ -30,7 +30,7 @@
         "blocks": [
           {
             "type": "prose",
-            "markdown": "本节说明误差的计算基准。",
+            "markdown": "本节说明误差的计算基准。[[@浮点求和方法:精确基准、递推与适用条件#reference|精确基准定义]]",
             "evidence_refs": [
               {
                 "target_kind": "record",

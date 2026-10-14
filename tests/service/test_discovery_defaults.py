@@ -88,11 +88,13 @@ def test_non_recommended_relation_warns_but_commits(env):
     draft = narrative_draft(OWNER, evidence, claim_id="CLM-ORDER-9") | {"sources": [evidence, ref]}
     dry = memory.commit(request(OWNER, head_of(memory, OWNER), {"op": "put_record", "client_key": "b", "draft": draft},
                                 dry_run=True))
-    assert [w["relation"] for w in dry["warnings"]] == ["background"]
+    # R21 D-20：这条旧式正文也缺可读出处，现在应同时返回两种提醒，不能假设 warning 只有关系名。
+    assert [w["code"] for w in dry["warnings"]] == ["RELATION_NOT_RECOMMENDED", "INLINE_CITATION_MISSING"]
+    assert dry["warnings"][0]["relation"] == "background"
     receipt = memory.commit(request(OWNER, head_of(memory, OWNER),
                                     {"op": "put_record", "client_key": "b", "draft": draft}))
     assert receipt["save_status"] == "committed"
-    assert [w["code"] for w in receipt["warnings"]] == ["RELATION_NOT_RECOMMENDED"]
+    assert receipt["warnings"] == dry["warnings"]
     prepared = consolidation.prepare(memory, OWNER)
     flagged = [c for c in prepared["candidates"] if c["kind"] == "relation_vocabulary"]
     assert len(flagged) == 1 and flagged[0]["relations"] == ["background"]

@@ -3774,10 +3774,10 @@
   "name": "sources.snapshot",
   "group": "sources",
   "effect": "write",
-  "summary": "原文快照：没有就先生成（只读原件、核对登记指纹）。返回分段目录（key 与字数）、提取出的图片（assets 的 label） 与抽取警告；给 keys 时附这些分段的全文。转写时 L1 的 origin.locators 与块的 locators 写这里的 key； 图片用 sources_attach 复制为附件后再引用。",
+  "summary": "原文快照：没有就先生成（只读原件、核对登记指纹）。返回分段目录（key 与字数）、提取出的图片（assets 的 label） 与抽取警告；给 keys 时附这些分段的全文。转写时 L1 的 origin.locators 与块的 locators 写这里的 key； PDF 图片标签带页码（如 Page 2/Im0.jpg），因为不同页可有同名图片；附加时原样使用该标签，不能去掉页码。 图片用 sources_attach 复制为附件后再引用。",
   "input": {
    "additionalProperties": false,
-   "description": "原文快照：没有就先生成（只读原件、核对登记指纹）。返回分段目录（key 与字数）、提取出的图片（assets 的 label）\n与抽取警告；给 keys 时附这些分段的全文。转写时 L1 的 origin.locators 与块的 locators 写这里的 key；\n图片用 sources_attach 复制为附件后再引用。",
+   "description": "原文快照：没有就先生成（只读原件、核对登记指纹）。返回分段目录（key 与字数）、提取出的图片（assets 的 label）\n与抽取警告；给 keys 时附这些分段的全文。转写时 L1 的 origin.locators 与块的 locators 写这里的 key；\nPDF 图片标签带页码（如 Page 2/Im0.jpg），因为不同页可有同名图片；附加时原样使用该标签，不能去掉页码。\n图片用 sources_attach 复制为附件后再引用。",
    "properties": {
     "source_id": {
      "description": "已登记的来源 ID（SRC-…）",
@@ -4470,7 +4470,7 @@
   "name": "memory.commit",
   "group": "memory",
   "effect": "write",
-  "summary": "保存一批记录到一个对象（同一对象内原子提交，要么全写入要么都不写）。dry_run=true 只预检不写入。 草案必须写 kind、title、body_markdown、payload、sources、record_reason；owner_id、sensitivity、discovery、 keywords、provenance_gap、handle 可省略（由服务补上，修订时沿用原值）；修订已有记录时写 change_reason。 payload 结构随 kind 不同，写之前用 memory_contract(kind) 查字段与示例。引用一律写固定引用 （刚保存的记录用回执的 fixed_ref）。出错时 errors 一次列出所有问题，path 指向要改的参数位置。",
+  "summary": "保存一批记录到一个对象（同一对象内原子提交，要么全写入要么都不写）。dry_run=true 只预检不写入。 草案必须写 kind、title、body_markdown、payload、sources、record_reason；owner_id、sensitivity、discovery、 keywords、provenance_gap、handle 可省略（由服务补上，修订时沿用原值）；修订已有记录时写 change_reason。 payload 结构随 kind 不同，写之前用 memory_contract(kind) 查字段与示例。引用一律写固定引用 （刚保存的记录用回执的 fixed_ref）。正文写完即用 [[@短名#块|出处]] 就近引用，sources / evidence_refs 仍填写固定依据。只有概念链接、origin 或展开字段不算正文出处；有依据却无可读引用时返回 INLINE_CITATION_MISSING warning（预检与正式提交都有，不阻断保存）；按 path 修订，不重复创建。 无警告不证明逐句引用齐全。导入 L1 保留原文与原语言，归纳和矛盾分析放 L2–L4，L2 只记真实过程。 出错时 errors 一次列出所有问题，path 指向要改的参数位置。",
   "input": {
    "additionalProperties": false,
    "description": "保存一批记录到一个对象（同一对象内原子提交，要么全写入要么都不写）。dry_run=true 只预检不写入。",

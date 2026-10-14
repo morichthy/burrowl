@@ -1,6 +1,6 @@
 {
   "kind": "narrative",
-  "note": "L2 经过：body_markdown 写 背景 → 实际尝试、选择理由、观察与转折 → 简单结论和未决问题；stages 至少一段（situation/action/reason/outcome/evidence_refs）。需要复核的结论写进 claims。",
+  "note": "L2 经过：body_markdown 写 背景 → 实际尝试、选择理由、观察与转折 → 简单结论和未决问题；stages 至少一段（situation/action/reason/outcome/evidence_refs）。需要复核的结论写进 claims。每个实际步骤或结果写完即就近链接 L1 / L0，结构化 evidence_refs 不代替正文引用。",
   "operation": {
     "op": "put_record",
     "client_key": "new-narrative",
@@ -11,7 +11,7 @@
         "浮点求和",
         "Kahan"
       ],
-      "body_markdown": "## 背景\n\n研究要比较求和顺序对抵消输入的影响。\n\n## 经过\n\n先用顺序求和处理三项抵消输入，单位增量完全丢失；随后加入 Kahan 补偿作对照，补偿后仍丢失，说明补偿不能覆盖所有抵消情形。\n\n## 结论与未决\n\n在这组三项输入上，顺序与补偿都未保住单位增量；更多排列需要后续实验。依据：[SRC-SUMMATION-R01]。",
+      "body_markdown": "## 背景\n\n研究要比较求和顺序对抵消输入的影响。\n\n## 经过\n\n先用顺序求和处理三项抵消输入，单位增量完全丢失；随后加入 Kahan 补偿作对照，补偿后仍丢失，说明补偿不能覆盖所有抵消情形。\n\n## 结论与未决\n\n在这组三项输入上，顺序与补偿都未保住单位增量；更多排列需要后续实验。依据：[[@第一轮原始结果:单位增量顺序与抵消|第一轮原始结果]]；精确基准见 [[@浮点求和方法:精确基准、递推与适用条件#reference|精确基准定义]]。",
       "record_reason": "记录第一轮实际经过",
       "sources": [
         {

@@ -8,8 +8,37 @@ interface State {
   vault: string;
   session_id: string;
   owner_id: string;
+  citation_owner: string;
+  citation_record: string;
 }
 const state = (): State => JSON.parse(readFileSync(new URL("./.state.json", import.meta.url), "utf8"));
+
+test("引用编号：长名称移到悬停和文末，重复引用共用号码且不改正文与导出", async ({ page, request }) => {
+  const { citation_owner: owner_id, citation_record: record_id } = state();
+  const args = { owner_id, record_id };
+  const before = await op(request, "memory.inspect", args);
+  await page.goto(`#/memory/${owner_id}/${record_id}`);
+  const markers = page.locator(".citation-marker > a");
+  await expect(markers).toHaveCount(2);
+  await expect(markers.first()).toHaveText("〔引1〕");
+  await expect(markers.last()).toHaveText("〔引1〕");
+  await expect(page.getByRole("region", { name: "引用对照" }).locator("li")).toHaveCount(1);
+  await expect(page.locator(".markdown")).toContainText("原文 [1]");
+  await markers.first().hover();
+  const tooltip = page.locator(".citation-marker").first().getByRole("tooltip");
+  await expect(tooltip).toBeVisible();
+  await expect(tooltip).toContainText("名称较长的原始论文记录用于编号显示验收");
+  await expect(tooltip).toContainText("固定修订 1");
+  await page.getByRole("heading", { name: "引用编号阅读测试" }).hover();
+  await expect(tooltip).toBeHidden();
+  await markers.first().focus();
+  await expect(tooltip).toBeVisible();
+  const after = await op(request, "memory.inspect", args);
+  expect(after.record).toEqual(before.record);
+  const exported = await op(request, "memory.export", { owner_id, record_ids: [record_id], fmt: "markdown" });
+  expect(exported.content).toContain(before.record.body_markdown);
+  expect(exported.content).not.toContain("〔引1〕");
+});
 
 async function op(request: APIRequestContext, name: string, args: object) {
   const response = await request.post(`api/v1/ops/${name}`, { data: args });

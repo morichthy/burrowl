@@ -14,6 +14,9 @@ tmp/
 .env
 .env.*
 e2e/.state.json
+/frontend/e2e/.state.json
+# 本机验收材料、运行数据与论文原件不随源码发布。
+/outputs/
 frontend/test-results/
 frontend/playwright-report/
 /dist/

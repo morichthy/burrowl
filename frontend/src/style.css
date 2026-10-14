@@ -414,3 +414,13 @@ input.narrow { min-width: 0; width: 64px; }
 .confirm-box .toolbar input { flex: 1; min-width: 200px; }
 details.discarded { margin-top: 12px; }
 details.discarded summary { cursor: pointer; color: var(--muted); }
+
+/* 正文只露出编号；鼠标和键盘都能查看完整名称，窄屏下允许长标题及定位换行。 */
+.citation-marker { position: relative; display: inline-block; font-size: .75em; line-height: 1; vertical-align: super; white-space: nowrap; }
+.citation-marker > a, .citation-marker > button { font-size: inherit; padding: 0; text-decoration: none; }
+.citation-tooltip { display: none; position: absolute; bottom: 100%; left: 0; z-index: 20; width: max-content; max-width: min(32rem, 70vw); padding: 8px 10px; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius-sm); box-shadow: 0 4px 14px #0002; font-size: 12px; line-height: 1.5; white-space: pre-line; overflow-wrap: anywhere; }
+.citation-marker:hover .citation-tooltip, .citation-marker:focus-within .citation-tooltip { display: block; }
+.citation-list { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 8px; }
+.citation-list ol { list-style: none; padding: 0; display: grid; gap: 6px; }
+.citation-list li { overflow-wrap: anywhere; scroll-margin: 20px; }
+.citation-number { color: var(--muted); font-variant-numeric: tabular-nums; }

@@ -31,3 +31,4 @@ def test_example_validates(sample_workspace, kind):
                "operations": [example["operation"]], "dry_run": True}
     result = memory.validate_draft(request)
     assert result["valid"], result
+    assert not any(w["code"] == "INLINE_CITATION_MISSING" for w in result.get("warnings", [])), result

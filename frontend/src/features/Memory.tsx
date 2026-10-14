@@ -2,7 +2,8 @@
 import { useCallback, useMemo, useState } from "react";
 import { useAction, useOp } from "../api";
 import { KINDS, label, LEVELS, OWNER_TYPES } from "../labels";
-import { Empty, ErrorBox, href, type LinkTargets, linkify, Loading, Markdown, Panel, ReviewBadge, Tag, Time, useDebounced } from "../ui";
+import { Empty, ErrorBox, href, Loading, Panel, ReviewBadge, Tag, Time, useDebounced } from "../ui";
+import { CitationList, CitationScope, CitedMarkdown, type CitationFragment, type RefTarget, type StoredLink, targetHref } from "../citations";
 import { DiscardedRecords, DiscardOwner, DiscardRecords } from "./Deletion";
 import type { QueueItem } from "./Review";
 
@@ -270,7 +271,7 @@ export function OwnerView({ ownerId }: { ownerId: string }) {
 interface Block {
   type: "prose" | "unit";
   markdown?: string;
-  record?: { title: string; record_id: string } | null;
+  record?: FullRecord | null;
   resolved_blocks?: { block_id: string; markdown: string }[];
   source_issues: { code: string }[];
 }
@@ -280,10 +281,17 @@ function DocumentView({ ownerId }: { ownerId: string }) {
   const [mode, setMode] = useState<"full" | "outline" | "impact">("full");
   const doc = useOp<{
     document: { title: string; purpose: string; document_type: string } | null;
-    report: { sections: { section_id: string; title: string; blocks: Block[]; source_issues: { code: string }[] }[]; complete: boolean } | null;
+    report: { sections: { section_id: string; ref?: { revision: number }; links?: StoredLink[]; title: string; blocks: Block[]; source_issues: { code: string }[] }[]; complete: boolean } | null;
     missing: { message: string }[];
     candidates: { record_id: string; document_type: string; title: string }[];
   }>("memory.document", { owner_id: ownerId, view: "full", document_type: type as "research_process" }, mode === "full");
+  // 将章节衔接文字和实际收录的块按阅读顺序扫描，整篇文稿共用一份编号表。
+  const fragments: CitationFragment[] = (doc.data?.report?.sections ?? []).flatMap((s) => s.blocks.flatMap((b) =>
+    b.type === "prose" ? [{ source: { owner_id: ownerId, record_id: s.section_id, revision: s.ref?.revision },
+      texts: [b.markdown ?? ""], links: s.links ?? [] }] : b.record ? [{
+      source: { owner_id: b.record.owner_id, record_id: b.record.record_id, revision: b.record.revision },
+      texts: (b.resolved_blocks ?? []).map((block) => block.markdown), links: b.record.links ?? [],
+    }] : []));
   return (
     <div>
       <div className="toolbar">
@@ -307,6 +315,7 @@ function DocumentView({ ownerId }: { ownerId: string }) {
         </div>
       ))}
       {mode === "full" && doc.data?.document ? (
+        <CitationScope key={`${ownerId}/${type}`} fragments={fragments}>
         <article className="document">
           <h2>{doc.data.document.title}</h2>
           <p className="hint">{doc.data.document.purpose}</p>
@@ -316,7 +325,7 @@ function DocumentView({ ownerId }: { ownerId: string }) {
               {s.source_issues.length ? <Tag tone="bad">依据不可用：{s.source_issues.map((i) => i.code).join("、")}</Tag> : null}
               {s.blocks.map((b, i) =>
                 b.type === "prose" ? (
-                  <Markdown key={i} text={b.markdown} />
+                  <DocumentProse key={i} ownerId={ownerId} sectionId={s.section_id} revision={s.ref?.revision} links={s.links ?? []} text={b.markdown} />
                 ) : (
                   <div key={i} className="unit">
                     {b.record ? (
@@ -324,16 +333,34 @@ function DocumentView({ ownerId }: { ownerId: string }) {
                         技术单元：<a href={href("memory", ownerId, b.record.record_id)}>{b.record.title}</a>
                       </div>
                     ) : null}
-                    {b.resolved_blocks?.map((rb) => <Markdown key={rb.block_id} text={rb.markdown} />)}
+                    {b.record ? <DocumentUnit record={b.record} blocks={b.resolved_blocks ?? []} /> : null}
                   </div>
                 ),
               )}
             </section>
           ))}
+          <CitationList />
         </article>
+        </CitationScope>
       ) : null}
     </div>
   );
+}
+
+/** 文稿按被收录技术单元的固定修订读取图片，跨对象收录也不借用当前对象的图号。 */
+function DocumentUnit({ record, blocks }: { record: FullRecord; blocks: { block_id: string; markdown: string }[] }) {
+  const figure = useCallback((index: number, alt: string) =>
+    <Figure ownerId={record.owner_id} record={record} index={index} caption={figureCaption(record, index) || alt} />,
+    [record]);
+  return <>{blocks.map((b) => <CitedMarkdown key={b.block_id} text={b.markdown} links={record.links ?? []}
+    source={{ owner_id: record.owner_id, record_id: record.record_id, revision: record.revision }} figure={figure} />)}</>;
+}
+
+/** 文稿衔接文字使用章节的固定修订解析出处，与技术单元中的出处使用同一写法。 */
+function DocumentProse({ ownerId, sectionId, revision, links, text }: {
+  ownerId: string; sectionId: string; revision?: number; links: StoredLink[]; text?: string;
+}) {
+  return <CitedMarkdown text={text} links={links} source={{ owner_id: ownerId, record_id: sectionId, revision }} />;
 }
 
 function Timeline({ ownerId }: { ownerId: string }) {
@@ -356,6 +383,8 @@ function Timeline({ ownerId }: { ownerId: string }) {
 }
 
 interface FullRecord {
+  links?: StoredLink[];
+  owner_id: string;
   record_id: string;
   kind: string;
   level: string | null;
@@ -387,11 +416,13 @@ export function RecordView({ ownerId, recordId }: { ownerId: string; recordId: s
   // 交换格式视图（R12 T-P3.1）：与导出包、Markdown 库同一个渲染器
   const rendered = useOp<{ markdown: string; path: string }>("memory.render", { owner_id: ownerId, record_id: recordId }, exported);
   const r = record.data?.record;
-  const links = (r as unknown as { links?: { text: string; status: string; ref: { target_id: string } | null }[] })?.links ?? [];
+  const links = r?.links ?? [];
   const handle = (r as unknown as { handle?: string })?.handle;
   // R21 D-11：引用的记录、结论、原件解析为名称与跳转地址；读不到的退回显示 ID
-  const targets = useOp<Record<string, RefTarget>>("ui.ref_targets", { owner_id: ownerId, record_id: recordId, revision }).data ?? {};
-  const linkUrls: LinkTargets = Object.fromEntries(links.map((l) => [l.text, l.ref ? targetHref(targets[l.ref.target_id]) : undefined]));
+  const targetQuery = useOp<Record<string, RefTarget>>("ui.ref_targets", {
+    owner_id: ownerId, record_id: recordId, revision: r?.revision,
+  }, !!r);
+  const targets = !targetQuery.stale ? targetQuery.data ?? {} : {};
   const blocks = r?.payload.blocks ?? [];
   const inline = new Set(blocks.flatMap((b) => [...b.markdown.matchAll(/\]\(figure:(\d+)\)/g)].map((m) => Number(m[1]))));
   const figureAt = useCallback(
@@ -407,6 +438,10 @@ export function RecordView({ ownerId, recordId }: { ownerId: string; recordId: s
       <ErrorBox error={record.error} />
       <Loading show={record.loading && !r} />
       {r ? (
+        <CitationScope key={`${r.owner_id}/${r.record_id}/${r.revision}`} fragments={[{
+          source: { owner_id: r.owner_id, record_id: r.record_id, revision: r.revision }, targets, links,
+          texts: [r.body_markdown, ...blocks.map((b) => b.markdown), ...(r.payload.claims ?? []).map((c) => c.statement)],
+        }]}>
         <Panel
           title={r.title}
           actions={
@@ -462,10 +497,10 @@ export function RecordView({ ownerId, recordId }: { ownerId: string; recordId: s
             </div>
           ) : null}
           {r.provenance_gap ? <div className="notice">依据缺口：{r.provenance_gap}</div> : null}
-          <Markdown text={linkify(r.body_markdown, linkUrls)} />
+          <CitedMarkdown text={r.body_markdown} source={r} links={links} />
           {blocks.map((b) => (
             <div key={b.block_id} id={`block-${b.block_id}`}>
-              <Markdown text={linkify(b.markdown, linkUrls)} figure={figureAt} />
+              <CitedMarkdown text={b.markdown} source={r} links={links} figure={figureAt} />
             </div>
           ))}
           {r.payload.claims?.length ? (
@@ -475,7 +510,7 @@ export function RecordView({ ownerId, recordId }: { ownerId: string; recordId: s
                 {r.payload.claims.map((c) => (
                   <li key={c.claim_id}>
                     <div className="claim-body">
-                      <ReviewBadge value={badges.get(c.claim_id) ?? "not-reviewed"} /> <Markdown text={linkify(c.statement, linkUrls)} />
+                      <ReviewBadge value={badges.get(c.claim_id) ?? "not-reviewed"} /> <CitedMarkdown text={c.statement} source={r} links={links} />
                       <div className="hint">
                         适用范围：{c.scope} · <a href={href("review")}>去复核</a>
                       </div>
@@ -485,18 +520,18 @@ export function RecordView({ ownerId, recordId }: { ownerId: string; recordId: s
               </ul>
             </>
           ) : null}
-          {links.length ? (
-            <>
-              <h3>正文链接（{links.length}）</h3>
+          {links.some((l) => !/^[@!]/.test(l.text)) ? (
+            <details>
+              <summary>概念链接</summary>
               <ul className="sources">
-                {links.map((l) => (
+                {links.filter((l) => !/^[@!]/.test(l.text)).map((l) => (
                   <li key={l.text}>
                     <code>[[{l.text}]]</code> →{" "}
                     {l.ref ? <RefName id={l.ref.target_id} targets={targets} /> : <span className="hint">概念库中还没有这个概念</span>}
                   </li>
                 ))}
               </ul>
-            </>
+            </details>
           ) : null}
           <Figures ownerId={ownerId} record={r} skip={inline} />
           <Provenance recordId={r.record_id} />
@@ -511,7 +546,10 @@ export function RecordView({ ownerId, recordId }: { ownerId: string; recordId: s
             ))}
           </ol>
           {r.keywords.length ? <p className="hint">关键词：{r.keywords.join("、")}</p> : null}
+          <ErrorBox error={targetQuery.error} />
+          <CitationList />
         </Panel>
+        </CitationScope>
       ) : null}
     </>
   );
@@ -714,22 +752,6 @@ function Provenance({ recordId }: { recordId: string }) {
 }
 
 // ---------- R21：引用的名称与跳转 ----------
-interface RefTarget {
-  kind: "record" | "claim" | "file" | "owner";
-  owner_id?: string;
-  record_id?: string;
-  title: string;
-  handle?: string | null;
-  level?: string | null;
-}
-
-function targetHref(target: RefTarget | undefined): string | undefined {
-  if (!target) return undefined;
-  if (target.owner_id && target.record_id) return href("memory", target.owner_id, target.record_id);
-  if (target.kind === "owner" && target.owner_id) return href("memory", target.owner_id);
-  return undefined;
-}
-
 /** 显示引用目标的标题（短名）而不是长编号；完整 ID 在悬停提示里。 */
 function RefName({ id, targets }: { id: string; targets: Record<string, RefTarget> }) {
   const target = targets[id];
@@ -775,6 +797,7 @@ interface ExpansionSection {
     block_id: string;
     markdown?: string;
     see_above?: boolean;
+    links?: StoredLink[];
   }[];
 }
 
@@ -839,6 +862,10 @@ function ExpansionView({ ownerId, sourceId }: { ownerId: string; sourceId: strin
     source_id: sourceId,
   });
   const status = new Map((coverage.data?.segments ?? []).map((s) => [s.key, s]));
+  const fragments: CitationFragment[] = (doc.data?.sections ?? []).flatMap((s) => s.blocks.filter((b) => b.markdown).map((b) => ({
+    source: { owner_id: ownerId, record_id: b.record_id, revision: b.revision },
+    texts: [b.markdown!], links: b.links ?? [],
+  })));
   return (
     <>
       <ErrorBox error={doc.error ?? coverage.error} />
@@ -864,6 +891,7 @@ function ExpansionView({ ownerId, sourceId }: { ownerId: string; sourceId: strin
           ))}</ul>
         </section>
       ) : null}
+      <CitationScope key={`${ownerId}/${sourceId}`} fragments={fragments}>
       <article className="document">
         {doc.data?.sections.map((s) => {
           const row = status.get(s.key);
@@ -889,7 +917,9 @@ function ExpansionView({ ownerId, sourceId }: { ownerId: string; sourceId: strin
             </section>
           );
         })}
+        <CitationList />
       </article>
+      </CitationScope>
     </>
   );
 }
@@ -901,5 +931,6 @@ function BlockMarkdown({ ownerId, block }: { ownerId: string; block: ExpansionSe
     ),
     [ownerId, block.record_id, block.revision],
   );
-  return <Markdown text={block.markdown} figure={figure} />;
+  return <CitedMarkdown text={block.markdown} source={{ owner_id: ownerId, record_id: block.record_id, revision: block.revision }}
+    links={block.links ?? []} figure={figure} />;
 }

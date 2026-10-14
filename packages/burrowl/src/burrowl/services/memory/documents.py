@@ -146,6 +146,7 @@ class DocumentSession:
 
     def resolve_section(self, ref: dict) -> dict:
         row = {"section_id": ref["target_id"], "section_key": "", "title": "不可读取的章节", "role": "appendix",
+               "links": [],
                "ref": deepcopy(ref), "source_issues": [], "blocks": []}
         if ref["target_id"] in self.excluded:
             row["source_issues"] = [_issue(ref, "EXCLUDED")]
@@ -159,6 +160,7 @@ class DocumentSession:
         row["source_issues"] = base
         if not base:
             row.update({k: section["payload"][k] for k in ("section_key", "title", "role")})
+            row["links"] = deepcopy(section.get("links", []))  # 仅交付已固定章节的链接，不另做语义解析。
         for block in section["payload"]["blocks"]:
             resolved = deepcopy(block)
             issues = [*base, *self.check_refs(block["evidence_refs"] if block["type"] == "prose" else [block["ref"]])]

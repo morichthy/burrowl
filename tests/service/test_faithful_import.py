@@ -27,6 +27,34 @@ def _png() -> bytes:
     return buffer.getvalue()
 
 
+def test_pdf_reused_resource_name_selects_correct_page_and_rejects_ambiguity(tmp_path):
+    """同名 PDF XObject 不同页可指向不同内容；禁止按第一张猜图片。"""
+    image = pytest.importorskip("PIL.Image")
+    pdf = pytest.importorskip("pypdf")
+    buffer = io.BytesIO()
+    image.new("RGB", (20, 20), "red").save(buffer, format="PDF", save_all=True,
+                                             append_images=[image.new("RGB", (20, 20), "blue")])
+    raw = buffer.getvalue()
+    original = tmp_path / "input.pdf"
+    original.write_bytes(raw)
+    (tmp_path / "data").mkdir()
+    storage, _memory, _review = services(tmp_path / "data")
+    storage.sources.register("SRC-PDF", str(original))
+    snapshots = SnapshotService(storage, ocr_enabled=lambda: False)
+    taken = snapshots.take("SRC-PDF")
+    # Pillow 写出的每页 image.jpg 同名，快照仍存原始标签，API 视图增加页定位。
+    assert taken["assets"][0]["label"] == taken["assets"][1]["label"]
+    outline = snapshots.outline(taken)
+    assert outline["assets"][0]["label"] != outline["assets"][1]["label"]
+    with pytest.raises(BurrowlError, match="多页重复") as caught:
+        snapshots.attach("SRC-PDF", taken["assets"][0]["label"])
+    assert caught.value.details["available"] == [a["label"] for a in outline["assets"]]
+    second = snapshots.attach("SRC-PDF", outline["assets"][1]["label"])
+    assert storage.sources.resolve(second["source_id"]).path.read_bytes() == pdf.PdfReader(io.BytesIO(raw)).pages[1].images[0].data
+    assert second["ref"]["locator"] == outline["assets"][1]["label"]
+    assert snapshots.load("SRC-PDF") == taken  # 对外消歧不改写历史快照。
+
+
 def _p(text: str, style: str = "", numbered: bool = False, image: bool = False) -> str:
     props = (f'<w:pStyle w:val="{style}"/>' if style else "") + ('<w:numPr><w:ilvl w:val="0"/></w:numPr>' if numbered else "")
     blip = f'<w:r><w:drawing><a:blip {A} r:embed="rId9"/></w:drawing></w:r>' if image else ""

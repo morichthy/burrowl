@@ -60,7 +60,7 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | 操作 | 类型 | 说明 | 参数 |
 |---|---|---|---|
 | `memory.activity` | 只读 | 关键操作记录（只读，按时间倒序）：建立对象、归属确认、保存、复核、Run 结束、发布、删除与恢复，每条一行，带可追溯的引用。 检索、阅读、来源登记等不改变资产的操作不在其中。 | `owner_id`: string|null，`kinds`: array|null，`limit`: integer，`before`: string|null |
-| `memory.commit` | 写入 | 保存一批记录到一个对象（同一对象内原子提交，要么全写入要么都不写）。dry_run=true 只预检不写入。 草案必须写 kind、title、body_markdown、payload、sources、record_reason；owner_id、sensitivity、discovery、 keywords、provenance_gap、handle 可省略（由服务补上，修订时沿用原值）；修订已有记录时写 change_reason。 payload 结构随 kind 不同，写之前用 memory_contract(kind) 查字段与示例。引用一律写固定引用 （刚保存的记录用回执的 fixed_ref）。出错时 errors 一次列出所有问题，path 指向要改的参数位置。 | `owner_id`*: string，`operations`*: array，`expected_head`*: string|null，`request_id`: string|null，`dry_run`: boolean，`attribution`: object|null |
+| `memory.commit` | 写入 | 保存一批记录到一个对象（同一对象内原子提交，要么全写入要么都不写）。dry_run=true 只预检不写入。 草案必须写 kind、title、body_markdown、payload、sources、record_reason；owner_id、sensitivity、discovery、 keywords、provenance_gap、handle 可省略（由服务补上，修订时沿用原值）；修订已有记录时写 change_reason。 payload 结构随 kind 不同，写之前用 memory_contract(kind) 查字段与示例。引用一律写固定引用 （刚保存的记录用回执的 fixed_ref）。正文写完即用 [[@短名#块\|出处]] 就近引用，sources / evidence_refs 仍填写固定依据。只有概念链接、origin 或展开字段不算正文出处；有依据却无可读引用时返回 INLINE_CITATION_MISSING warning（预检与正式提交都有，不阻断保存）；按 path 修订，不重复创建。 无警告不证明逐句引用齐全。导入 L1 保留原文与原语言，归纳和矛盾分析放 L2–L4，L2 只记真实过程。 出错时 errors 一次列出所有问题，path 指向要改的参数位置。 | `owner_id`*: string，`operations`*: array，`expected_head`*: string|null，`request_id`: string|null，`dry_run`: boolean，`attribution`: object|null |
 | `memory.consolidate_apply` | 写入 | 保存巩固处置（retain/revise/retract/defer…），可与本批实际修订一起提交。 | `owner_id`*: string，`basis`*: object，`decisions`*: array，`reason`*: string，`operations`: array|null，`dry_run`: boolean |
 | `memory.consolidate_prepare` | 只读 | 阶段巩固的待处理清单：自上次巩固以来的变化、受影响下游与合并/冲突候选； unfixed_evidence 是没被任何 L1–L4 引用的 Run 与 L0，unlinked_details 是没被任何 L2–L4 或文稿指向的本对象 L1 （逐项补就近链接，或写明不需要的理由）。 | `owner_id`*: string，`since_commit`: string|null |
 | `memory.contract` | 只读 | 某类记录的草案契约：每个字段是 required / optional / conditional（以及省略时的默认值）、不要写的服务端字段、 payload 结构、写作要点和一份经校验的示例草案。写 memory_commit / memory_summary_save 的草案前先调用。 | `kind`*: string |
@@ -210,7 +210,7 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | `sources.relocate` | 写入 | 原件搬家：新位置的字节必须与登记时一致，旧路径记入 relocated_from，已有固定引用继续有效。 | `source_id`*: string，`new_path`*: string |
 | `sources.relocate_root` | 写入 | 工作目录整体搬家：逐个核对新位置下已登记文件的指纹，全部一致才改根的位置；已有固定引用不变。 | `root_id`*: string，`new_path`*: string，`allow_missing`: boolean |
 | `sources.roots` | 只读 | 已登记的工作根（工作目录）与本次会话的工作目录。工作根下的来源记为"根 + 相对路径"，目录搬家只改根。 | 无 |
-| `sources.snapshot` | 写入 | 原文快照：没有就先生成（只读原件、核对登记指纹）。返回分段目录（key 与字数）、提取出的图片（assets 的 label） 与抽取警告；给 keys 时附这些分段的全文。转写时 L1 的 origin.locators 与块的 locators 写这里的 key； 图片用 sources_attach 复制为附件后再引用。 | `source_id`*: string，`keys`: array|null，`max_chars`: integer |
+| `sources.snapshot` | 写入 | 原文快照：没有就先生成（只读原件、核对登记指纹）。返回分段目录（key 与字数）、提取出的图片（assets 的 label） 与抽取警告；给 keys 时附这些分段的全文。转写时 L1 的 origin.locators 与块的 locators 写这里的 key； PDF 图片标签带页码（如 Page 2/Im0.jpg），因为不同页可有同名图片；附加时原样使用该标签，不能去掉页码。 图片用 sources_attach 复制为附件后再引用。 | `source_id`*: string，`keys`: array|null，`max_chars`: integer |
 | `sources.update` | 仅用户（不暴露给 agent） | （仅用户）启用/停用来源或调整敏感级别。停用或设为 restricted 后，读取被拒的记录在检索和关系图中也同时隐去。 | `source_id`*: string，`enabled`: boolean|null，`sensitivity`: string|null |
 
 ## system

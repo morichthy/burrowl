@@ -174,7 +174,11 @@ def commit(ctx: Ctx, owner_id: OwnerId,
     草案必须写 kind、title、body_markdown、payload、sources、record_reason；owner_id、sensitivity、discovery、
     keywords、provenance_gap、handle 可省略（由服务补上，修订时沿用原值）；修订已有记录时写 change_reason。
     payload 结构随 kind 不同，写之前用 memory_contract(kind) 查字段与示例。引用一律写固定引用
-    （刚保存的记录用回执的 fixed_ref）。出错时 errors 一次列出所有问题，path 指向要改的参数位置。"""
+    （刚保存的记录用回执的 fixed_ref）。正文写完即用 [[@短名#块|出处]] 就近引用，sources / evidence_refs
+    仍填写固定依据。只有概念链接、origin 或展开字段不算正文出处；有依据却无可读引用时返回
+    INLINE_CITATION_MISSING warning（预检与正式提交都有，不阻断保存）；按 path 修订，不重复创建。
+    无警告不证明逐句引用齐全。导入 L1 保留原文与原语言，归纳和矛盾分析放 L2–L4，L2 只记真实过程。
+    出错时 errors 一次列出所有问题，path 指向要改的参数位置。"""
     request = {"schema_version": 3, "request_id": request_id or str(uuid.uuid4()), "actor": ctx.actor,
                "owner_id": owner_id, "expected_head": expected_head, "operations": operations, "dry_run": dry_run}
     if attribution is not None:

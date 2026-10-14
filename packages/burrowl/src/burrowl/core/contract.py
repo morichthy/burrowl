@@ -45,7 +45,8 @@ COMMON_NOTES = {
               "不能含空格和 / # | [ ] @ !",
     "record_reason": "为什么保存这一条",
     "sensitivity": "public / internal / confidential / restricted；restricted 不进索引、不发布、不被引用",
-    "sources": "本条依据的固定引用列表（见 Ref）；正文里的编号或 ID 要与这里对应",
+    "sources": "本条依据的固定引用列表（见 Ref）；正文就近用 [[@短名#块|出处]] 对应这些依据，"
+               "不能只填列表。正文不要写来源 ID 或哈希；原件引用登记它的 L0 短名",
     "provenance_gap": "依据缺口的说明；没有缺口不写（即 null）",
     "discovery": ("一般不写：知识记录（L1–L4、关联、概念页）默认 workspace_summary（全库检索可见），目标、检查点、"
                   "路线、问题等工作状态默认 owner_only（只在指定该对象时可见）；对象策略显式设置时以对象为准；"
@@ -171,6 +172,12 @@ def contract(kind: str) -> dict[str, Any]:
     return {"kind": kind, "level": LEVELS.get(kind), "schema_version": versions[kind],
             "write_with": INTERNAL_KINDS.get(kind, WRITE_WITH),
             "guidance": example["note"] if example else "",
+            "citation_guidance": "写完事实、公式、数字或判断就就近引用，再核对 sources / evidence_refs。"
+                                 "共同原文出处可在 L1 块开头引用 L0，依赖块用 requires_block_ids 带出处。"
+                                 "L2–L4 链接具体 L1 块或结论；只有概念链接、展开字段或来源列表不算就近引用。"
+                                 "导入 L1 默认逐字保留原文与原语言；排版修复以外的总结、改写和矛盾分析放 L2–L4，"
+                                 "标原文主张或 AI 归纳；L2 只写真实过程。缺口如实说明，不凑引用。"
+                                 "INLINE_CITATION_MISSING 只提示结构性漏引，没有 warning 也须逐段自查。",
             "draft_fields": draft_fields(kind), "do_not_write": sorted(SYSTEM_FIELDS & set(draft["properties"])),
             "payload_legend": PAYLOAD_LEGEND,
             "payload_fields": _payload_fields(draft, all_defs),

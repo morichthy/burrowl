@@ -53,6 +53,24 @@ def seed(base: Path) -> dict:
         {"role": "method", "value": "[[E2E 主体]]"}, {"role": "case", "value": "[[E2E 客体]]"}]}
     app.memory.commit(request(owner.owner_id, None, {"op": "put_record", "client_key": "n",
                                                      "draft": narrative | {"discovery": "workspace_summary"}}))
+    # 引用编号验收使用独立对象，避免影响发布测试及用户数据；仍经正式服务保存规范记录。
+    citation_owner = app.storage.owners.create("research", "citation-demo", "引用编号演示")
+    citation_draft = {
+        "owner_id": citation_owner.owner_id, "kind": "overview", "title": "名称较长的原始论文记录用于编号显示验收",
+        "handle": "原始论文", "body_markdown": "原论文的引文 [1] 保留。", "sources": [],
+        "record_reason": "端到端引用编号种子", "provenance_gap": "测试构造材料",
+        "payload": {"question": "引用编号显示", "methods": [], "results": [], "current_stage": "测试",
+                    "limitations": ["测试构造"], "open_questions": [], "claims": [], "experience_refs": [],
+                    "process_refs": [], "technical_refs": []},
+    }
+    citation_base = app.memory.commit(request(citation_owner.owner_id, None,
+        {"op": "put_record", "client_key": "original", "draft": citation_draft}))
+    citation_reading = app.memory.commit(request(citation_owner.owner_id, citation_base["commit_id"],
+        {"op": "put_record", "client_key": "reading", "draft": citation_draft | {
+            "title": "引用编号阅读测试", "handle": "编号阅读",
+            "body_markdown": "原文 [1]。依据：[[@原始论文|很长的显示名称]]。再次引用：[[@原始论文]]。",
+            "sources": [citation_base["record_results"][0]["fixed_ref"]],
+        }}))
     app.index.reconcile()
     session = call(agent, "reading.start", {"question": "Kahan 补偿求和的误差界是多少"})
     call(agent, "reading.ask_user", {"session_id": session["session_id"], "kind": "fulltext",
@@ -75,7 +93,8 @@ def seed(base: Path) -> dict:
                       "question": "如何验证虚拟环境", "methods": ["检查解释器"], "results": ["依赖已隔离"],
                       "current_stage": "完成", "limitations": ["测试构造"], "open_questions": [],
                       "claims": [], "experience_refs": [], "process_refs": [], "technical_refs": []}}}))
-    return {"data": str(data), "vault": str(vault), "session_id": session["session_id"], "owner_id": owner.owner_id}
+    return {"data": str(data), "vault": str(vault), "session_id": session["session_id"], "owner_id": owner.owner_id,
+            "citation_owner": citation_owner.owner_id, "citation_record": citation_reading["record_results"][0]["record_id"]}
 
 
 def main(port: int) -> None:

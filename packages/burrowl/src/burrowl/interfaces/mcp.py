@@ -30,6 +30,9 @@ from .ops.registry import Ctx, OpSpec, call, load
 COMMON = """工作流说明（burrowl-work / burrowl-read / burrowl-consolidate 及公共规则）：客户端已加载 burrowl 的 Skill 就按 Skill 执行；
 否则调用本服务的工具 system_guide 读取——开始实质工作前读 name=rules，再按任务读 burrowl-work / burrowl-read / burrowl-consolidate，
 写记忆记录前读 recording，并用 memory_contract(kind) 查该类记录的字段与示例。
+写完事实、公式、数字或判断就就近写 [[@短名#块|出处]]，同时核对固定 sources / evidence_refs；
+仅填来源列表、origin 或展开字段不能代替正文出处。提交的 INLINE_CITATION_MISSING 是可修订的警告，保存仍成功；
+没有警告也要逐段检查。导入 L1 默认保留原文与原语言，只做必要排版修复；AI 总结、改写和矛盾分析放 L2–L4 并标明。
 MCP 错误兼容返回由工作台设置控制，默认关闭。开启时每次结果为 {{ok:true,result:…}} 或 {{ok:false,error:…}}；
 ok=false 明确表示业务操作失败，不得当成保存或执行成功。直接按 error 的错误码、路径和提示处理，不必遍历错误日志。
 用户查询某主题的相关知识、找已有经验，默认先 reading_start 建立可见阅读会话：简查用 strategy=quick，完整阅读用 standard。

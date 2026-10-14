@@ -3,6 +3,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Owners, OwnerView, RecordView } from "./Memory";
 
 let calls: { name: string; args: Record<string, unknown> }[];
+let showFigures: boolean;
+
+// 文稿跨对象收录固定修订：图号是技术单元本地索引，不能用文稿对象读取。
+const FIGURE_RECORD = {
+  owner_id: "RES-SOURCE", record_id: "R-FIG", title: "论文原文", revision: 2,
+  body_markdown: "", keywords: [], sources: [], sensitivity: "internal", record_reason: "导入",
+  provenance_gap: null, updated_at: "2026-10-01T00:00:00Z",
+  links: [{ text: "@原件", status: "resolved", ref: { target_id: "R-SOURCE" } }],
+  payload: { figures: [{ caption: "论文 Figure 1" }], blocks: [{ block_id: "results", markdown: "出处：[\u005b@原件|原文\u005d]\n\n![图](figure:0)" }] },
+};
 
 const ROWS = [
   { record_id: "R-OV", kind: "overview", level: "L4", title: "求和概览", revision: 1, updated_at: "2026-10-01T00:00:00Z", excerpt: "总体结论", claims: [] },
@@ -22,6 +32,7 @@ function mock(name: string, args: Record<string, unknown>): unknown {
       };
     }
     case "memory.inspect":
+      if (showFigures) return { record: FIGURE_RECORD };
       return {
         record: {
           ...ROWS[1],
@@ -47,6 +58,12 @@ function mock(name: string, args: Record<string, unknown>): unknown {
     case "ui.transcriptions":
       return [{ source_id: "SRC-X", title: "原始说明", has_snapshot: true, counts: { covered: 1 } }];
     case "memory.document":
+      if (showFigures && args.view === "full") return {
+        document: { title: "论文测试稿", purpose: "固定版本的图片", document_type: "research_process" },
+        missing: [], candidates: [], report: { complete: true, sections: [{ section_id: "section", title: "结果", ref: { revision: 4 }, links: FIGURE_RECORD.links,
+          source_issues: [], blocks: [{ type: "prose", markdown: "衔接依据：[\u005b@原件|章节出处\u005d]", source_issues: [] }, { type: "unit", source_issues: [], record: FIGURE_RECORD,
+            resolved_blocks: FIGURE_RECORD.payload.blocks }] }] },
+      };
       return args.view === "coverage" ? {
         segments: [{ key: "方法", status: "covered", ratio: 1, overlap: 1 }],
         assets: [
@@ -56,6 +73,10 @@ function mock(name: string, args: Record<string, unknown>): unknown {
         ],
         warnings: ["原文包含未抽取的矢量图"],
       } : { file_name: "说明.pdf", sections: [] };
+    case "memory.figure":
+      return { data_url: "data:image/png;base64,AA==" };
+    case "ui.ref_targets":
+      return { "R-SOURCE": { kind: "record", owner_id: "RES-SOURCE", record_id: "R-SOURCE", title: "原件" } };
     default:
       return {};
   }
@@ -63,6 +84,7 @@ function mock(name: string, args: Record<string, unknown>): unknown {
 
 beforeEach(() => {
   calls = [];
+  showFigures = false;
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init: RequestInit) => {
@@ -80,6 +102,30 @@ afterEach(() => {
 });
 
 describe("系统记忆", () => {
+  it("文稿内显示所收录技术单元固定修订的图片，跨对象也用原对象", async () => {
+    showFigures = true;
+    render(<OwnerView ownerId="RES-X" />);
+    fireEvent.click(await screen.findByRole("tab", { name: "文稿" }));
+    expect(await screen.findByRole("img", { name: "论文 Figure 1" })).toBeInTheDocument();
+    // 章节衔接文字与技术单元引用同一原件，整篇文稿只分配一个编号。
+    expect(await screen.findAllByRole("link", { name: "引用 1：原件" })).toHaveLength(2);
+    screen.getAllByRole("link", { name: "引用 1：原件" }).forEach((link) =>
+      expect(link).toHaveAttribute("href", "#/memory/RES-SOURCE/R-SOURCE"));
+    expect(screen.queryByRole("link", { name: "原文" })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "引用对照" }).querySelectorAll("li")).toHaveLength(1);
+    expect(calls.some((c) => c.name === "ui.ref_targets" && c.args.record_id === "section" && c.args.revision === 4)).toBe(true);
+    expect(calls.filter((c) => c.name === "memory.figure").map((c) => c.args)).toEqual([
+      { owner_id: "RES-SOURCE", record_id: "R-FIG", revision: 2, index: 0 },
+    ]);
+  });
+  it("记录页在原位置只渲染一次图片，无 figure 嵌套 p", async () => {
+    showFigures = true;
+    const { container } = render(<RecordView ownerId="RES-SOURCE" recordId="R-FIG" />);
+    expect(await screen.findByRole("img", { name: "论文 Figure 1" })).toBeInTheDocument();
+    expect(screen.getAllByRole("img", { name: "论文 Figure 1" })).toHaveLength(1);
+    expect(container.querySelector("p figure")).toBeNull();
+    expect(calls.filter((c) => c.name === "memory.figure")).toHaveLength(1);
+  });
   it("文字已认领仍展示图片缺口和抽取警告，不将覆盖结果当作完整转录", async () => {
     render(<OwnerView ownerId="RES-X" />);
     fireEvent.click(await screen.findByRole("tab", { name: "原文展开" }));

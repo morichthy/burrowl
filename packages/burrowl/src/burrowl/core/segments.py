@@ -9,6 +9,7 @@
 """
 import hashlib
 import re
+from copy import deepcopy
 from difflib import SequenceMatcher
 from typing import Any
 
@@ -145,6 +146,8 @@ def expansion(segments: list[dict], records: list[dict], source_id: str, omitted
                 block["see_above"] = True
             else:
                 block["markdown"] = hit["block"]["markdown"]
+                if hit["record"].get("links"):
+                    block["links"] = deepcopy(hit["record"]["links"])  # 展开仍使用记录已固定的出处。
                 shown.add(ident)
             entry["blocks"].append(block)
         if not entry["blocks"]:
