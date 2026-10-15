@@ -461,7 +461,7 @@ export declare namespace RelationsGraph {
     categories?: ("structure" | "evidence" | "reference" | "navigation" | "mention" | "claim_part")[] | null;
     domains?: string[] | null;
     excluded_domains?: string[] | null;
-    node_types?: ("owner" | "record" | "block" | "claim" | "concept" | "source")[] | null;
+    node_types?: ("owner" | "record" | "block" | "figure" | "claim" | "concept" | "source")[] | null;
   }
 }
 
@@ -1776,7 +1776,8 @@ export declare namespace SourcesSnapshot {
 export declare namespace SourcesAttach {
   /**
    * 把原件中的 PNG/JPEG/WebP 原始图片字节复制为受控附件并登记，返回固定引用 ref（不以 OCR 缩略图替代）。
-   * L1 的 payload.figures 写 {caption: 照录原文图注, ref}，块正文用 ![图注](figure:序号) 在原位置引用。
+   * L1 的 payload.figures 写 {label: 按原文图号如 fig-1, caption: 照录原文图注, ref}，块正文在原位置写 ![[#fig-1]]，
+   * 正文不再另外照录图注；其他记录用 [[@短名#fig-1]] 引用、![[@短名#fig-1]] 显示，不重复登记（R24）。
    * 附件随数据目录备份和迁移；同一张图重复附加是幂等的。
    */
   export interface Args {
@@ -2014,6 +2015,7 @@ export declare namespace MemoryContract {
 export declare namespace MemoryInspect {
   /**
    * 读取对象的当前快照，或某条记录的当前/指定修订（含完整正文与固定引用）。
+   * 读单条记录时附 link_targets：正文里每个 [[…]] 指向的标题、ID、固定修订与块或图（引用对照）。
    */
   export interface Args {
     /**
@@ -2135,7 +2137,8 @@ export declare namespace MemoryDocument {
 
 export declare namespace MemoryFigure {
   /**
-   * 技术单元登记的图片（data URL）。
+   * 技术单元登记的图片（data URL）。index（序号）与 label（图的锚点名，如 fig-1）二选一；
+   * basis_issues 列出记录其余依据的变化（图片本身已核对，照常返回）。
    */
   export interface Args {
     /**
@@ -2144,7 +2147,8 @@ export declare namespace MemoryFigure {
     owner_id: string;
     record_id: string;
     revision: number;
-    index: number;
+    index?: number | null;
+    label?: string | null;
   }
 }
 

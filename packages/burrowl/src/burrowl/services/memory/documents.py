@@ -13,7 +13,7 @@ from ...core.errors import BurrowlError
 from ...core.hashing import sha256_bytes
 from ...core.jsonschema import validate
 from ...core.schema import defs
-from ...core.technical import description_text, select_blocks
+from ...core.technical import description_text, figure_anchors, figure_display_name, select_blocks
 from .claims import iter_refs
 from .context import Storage
 from .reader import Reader, fixed_ref, ref_identity
@@ -456,21 +456,35 @@ def document_impact(storage: Storage, owner_id: str, **selection: Any) -> dict:
                            "uncovered_unit_ids": sorted(uncovered), "scientific_review": "not_evaluated"})
 
 
-def figure(storage: Storage, owner_id: str, record_id: str, revision: int, index: int) -> dict:
-    """只返回技术单元登记的、数据目录内的栅格图片（PNG/JPEG/WebP），拒绝 SVG/HTML 与任意路径。"""
+def figure(storage: Storage, owner_id: str, record_id: str, revision: int, index: int | None = None,
+           label: str | None = None) -> dict:
+    """只返回技术单元登记的、数据目录内的栅格图片（PNG/JPEG/WebP），拒绝 SVG/HTML 与任意路径。
+
+    图片本身的固定引用必须严格一致；记录其余依据（原件、上游记录等）只要求仍可读取：
+    它们的字节变化不影响这张按内容寻址的附件，作为 basis_issues 随图返回，由调用方提示复核，不拦截显示。
+    """
     reader = Reader(storage)
     reader.state(owner_id)
     record = reader.record({"target_id": record_id, "revision": revision})
     if record["owner_id"] != owner_id or record["kind"] != "detail":
         raise BurrowlError("ACCESS_DENIED", "图片不属于所选技术单元")
     figures = record["payload"].get("figures", [])
+    if (index is None) == (label is None):
+        raise BurrowlError("INVALID_ARGUMENT", "index 与 label 二选一")
+    if label is not None:  # R24 D-13：按锚点名取图（显式 label 或推导名 fig-N）
+        index = figure_anchors(record["payload"]).get(label)
+        if index is None:
+            raise BurrowlError("NOT_FOUND", "图的锚点名不存在", {"label": label})
     if not 0 <= index < len(figures):
         raise BurrowlError("NOT_FOUND", "图片序号不存在")
-    for ref in iter_refs({"sources": record["sources"], "payload": record["payload"]}):
-        reader.check_ref(ref)
     ref = figures[index]["ref"]
     if ref["target_kind"] != "file":
         raise BurrowlError("INVALID_ARGUMENT", "图片必须引用已登记的固定文件")
+    reader.check_ref(ref)
+    issues = reader.try_check(list(iter_refs({"sources": record["sources"], "payload": record["payload"]})))
+    denied = next((i for i in issues if i["code"] in {"ACCESS_DENIED", "UNSAFE_PATH"}), None)
+    if denied:  # 授权问题仍然拦截：放宽的只是"依据已变化"，不是读取权限
+        raise BurrowlError(denied["code"], "记录的依据当前不可读取", {"target_id": denied["target_id"]})
     source = storage.sources.resolve(ref["target_id"])
     if not source.path.is_relative_to(storage.ws.root):
         raise BurrowlError("ACCESS_DENIED", "研究图片必须是数据目录内的受控附件")
@@ -483,4 +497,5 @@ def figure(storage: Storage, owner_id: str, record_id: str, revision: int, index
         raise BurrowlError("INTEGRITY_ERROR", "图片格式或固定指纹不匹配")
     reader.recheck()
     return {"data_url": f"data:{mime};base64,{base64.b64encode(raw).decode('ascii')}",
-            "caption": figures[index]["caption"], "sha256": ref["sha256"]}
+            "caption": figures[index]["caption"], "sha256": ref["sha256"], "basis_issues": issues,
+            "index": index, "name": figure_display_name(record["payload"], index)}

@@ -30,7 +30,7 @@
 | origin | L1 转写自哪个原件的哪些分段：`{source_ref, locators}`；块上可细到 `locators` | 不是证据关系的替代：证据仍写在 sources / evidence_refs | `payload.origin` |
 | 覆盖报告 | 对比快照与 L1，列出未覆盖、偏短或差异较大的文字；另核对图片标签、固定附件和原位置正文引用 | 只是提示，不阻断提交、不证明完整转录；抽取器漏掉的内容必须对照原件检查 | `memory.document(view=coverage)` |
 | 原文展开 | 按原文顺序拼出认领各分段的 L1 块，在工作台核对导入是否完整 | 是现算的视图，不是保存的文稿 | `memory.document(view=expansion)` |
-| 附件 | 从原件中复制进数据目录的图片，按内容命名并登记为来源，供 L1 的 figures 引用 | 不是原件；原件仍留在原位 | `attachments/`、`SRC-ATT-…`、`sources.attach` |
+| 附件 | 从原件中复制进数据目录的图片，按内容命名并登记为来源，供 L1 的 figures 引用（取图只严格核对附件本身，记录其余依据的变化随图返回 `basis_issues`） | 不是原件；原件仍留在原位 | `attachments/`、`SRC-ATT-…`、`sources.attach` |
 | 经过 | L2 记录：研究、实施、排错或决策的实际经过 | 不是操作日志（日志留在 Run） | `kind=narrative` |
 | 经验 | L3 记录：可复用的观察、结论、假设或建议，写明适用边界 | `knowledge_type` 是内容分类，不是复核状态 | `kind=experience` |
 | 概览 | L4 记录：Owner 的顶层发现入口，说明用途、范围、当前结果和限制 | 不是文稿根，不能代替全文 | `kind=overview` |
@@ -110,9 +110,10 @@
 
 | 术语 | 定义 | 不是什么 / 注意 | 代码标识 |
 |---|---|---|---|
-| 知识节点 | 可以被单独引用、判断和修订的图节点：结论、概念，以及作为容器的对象、记录、L1 块、来源 | 与 L0–L4 正交：层级是容纳知识节点的容器 | `node_type` |
+| 知识节点 | 可以被单独引用、判断和修订的图节点：结论、概念，以及作为容器的对象、记录、L1 块与图、来源 | 与 L0–L4 正交：层级是容纳知识节点的容器 | `node_type` |
 | 概念库 / 概念页 | 概念库是配置 `graph.concept_owner_id` 指定的那一个 knowledge 对象；其他 knowledge 对象是通用知识对象，承接不属于具体研究、项目、工具、数据的知识；其中 page_type 为 concept / entity 的 wiki_page 是概念页，标题加别名就是概念的身份。可按领域（`domains`）筛选或屏蔽；合并、拆分用修订表达，从不删除 | 不是证据，也不是结论 | `graph.concept_owner_id`、`KNW-…` |
-| 链接 | 正文里的 `[[概念]]`、`[[@handle]]`、`[[@对象短名/handle]]`、`[[@handle#块]]`、`[[!结论短名]]` 写法；提交时解析并固定版本，存入记录的 `links` | 不是证据，除非另写在依据字段里；未解析的概念不阻塞提交 | `links`、`UNRESOLVED_LINK` |
+| 链接 | 正文里的四条写法：`[[@handle]]`、`[[@对象短名/handle]]`、`[[@handle#块或图]]`（记录、块、图）；`[[!结论短名]]`（结论）；`![[@handle#图]]` / `![[#图]]`（在此处显示图）；`[[概念]]`（提及概念）。提交时解析并固定版本，存入记录的 `links` | 不是证据，除非另写在依据字段里；概念链接不算出处；未解析的概念不阻塞提交 | `links`、`UNRESOLVED_LINK`、`LINK_SIGIL_MISSING` |
+| 图锚点 | L1 `figures[].label`（如 `fig-1`，按原文图号），与块号共用记录内的 `#` 名称；没写时推导为 `fig-N`。图只登记在一条归属记录里，其他记录用 `[[@…#fig-1]]` 引用 | 不是独立记录；图注只存在 `caption` | `figures[].label`、`figure:<锚点名>`（R24） |
 | 图投影 | 从记录派生的节点表和边表，存在 index.sqlite 中，带水位，可以重建 | 不是真源；要修改关系应修改记录 | `graph_nodes`、`graph_edges` |
 | 边类别 | 由程序得出：structure 结构、evidence 依据、reference 引用、navigation 关联、mention 提及（材料讨论了某个概念）、claim_part 结论要素（结论 → 参与者，类型为角色名；结论 → 适用范围中的条件） | AI 不填写类别；类别说明边表达什么，节点类型说明点是什么 | `category` |
 | 谓词框架 | 每个结论谓词预先定义的必填角色、可选角色与方向读法（如 causes：原因、结果，可选机制）；框架外的角色与自定义谓词以 `x-` 开头 | 角色不在每条结论里临时命名；条件不是角色（写在 scope），矛盾不是谓词（写在依据） | `core/predicates.py`、`claim_relation` |

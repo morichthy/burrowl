@@ -23,7 +23,7 @@ describe("引用编号只派生在阅读视图", () => {
     expect(screen.getAllByRole("link", { name: "引用 1：一份名称很长的原始论文记录" })).toHaveLength(2);
     expect(within(screen.getByRole("region", { name: "引用对照" })).getAllByRole("listitem")).toHaveLength(3);
     expect(screen.getAllByRole("tooltip")[0]).toHaveTextContent("固定修订 2");
-    expect(screen.getAllByRole("tooltip")[3]).toHaveTextContent("位置：block:method");
+    expect(screen.getAllByRole("tooltip")[3]).toHaveTextContent("位置：块 method");  // R24：定位显示为可读写法
     // 编号不写回文本，别名和原有定位仍完整保存在规范输入里。
     expect(fragments[0].texts[0]).toBe("第一段 [[@论文|长显示名]]");
   });
@@ -36,13 +36,35 @@ describe("引用编号只派生在阅读视图", () => {
       "C-1": { kind: "record", owner_id: "KNW-X", record_id: "C-1", title: "相干性" } } });
     expect(citationEntries([f])).toHaveLength(1);
     const { container } = render(<CitationScope fragments={[f]}><CitedMarkdown text={text} source={source} links={links} /><CitationList /></CitationScope>);
-    expect(screen.getByRole("link", { name: "相干性" })).toHaveAttribute("href", "#/memory/KNW-X/C-1");
+    // 概念在正文中是普通链接，在底部"提及的概念"中另列一次（R24 D-11），都不编号。
+    screen.getAllByRole("link", { name: "相干性" }).forEach((link) => expect(link).toHaveAttribute("href", "#/memory/KNW-X/C-1"));
+    expect(within(screen.getByRole("region", { name: "引用对照" })).getByText("提及的概念")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "文献" })).toHaveAttribute("href", "https://example.org");
     expect(container.querySelectorAll("code")).toHaveLength(2);
     expect(container.querySelector(".katex")).toBeInTheDocument();
     expect(container).toHaveTextContent("原文 [1]");
     expect(container).toHaveTextContent("缺口 [[@未知]]");
     expect(screen.getAllByRole("link", { name: /^引用 / })).toHaveLength(1);
+  });
+
+  it("引用别的记录的图：![[@…#图]] 显示图并计入编号，[[#图]] 由归属记录显示（R24）", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
+      const args = JSON.parse(String(init.body ?? "{}"));
+      return new Response(JSON.stringify(url.endsWith("memory.figure") ? { data_url: "data:image/png;base64,AA==",
+        caption: `成绩对比 ${args.label}`, name: "Figure 1" } : targets), { status: 200 });
+    }));
+    const figureLink = recordLink("@论文#fig-1", 2, "figure:fig-1");
+    const text = "见 [[@论文#fig-1|Figure 1]]。\n\n![[@论文#fig-1]]\n\n本记录的图 ![[#fig-2]]";
+    const f = fragment(text, [figureLink]);
+    const own = (key: number | string) => <span>本记录图 {String(key)}</span>;
+    const { container } = render(<CitationScope fragments={[f]}><CitedMarkdown text={text} source={source} links={f.links} figure={own} />
+      <CitationList /></CitationScope>);
+    expect(await screen.findByRole("img", { name: "成绩对比 fig-1" })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /^引用 1/ })).toHaveLength(2);  // 文中引用与图注后的编号是同一条
+    expect(container).toHaveTextContent("Figure 1：成绩对比 fig-1");
+    expect(container).toHaveTextContent("本记录图 fig-2");
+    expect(container.querySelector("p figure")).toBeNull();
+    expect(within(screen.getByRole("region", { name: "引用对照" })).getAllByRole("listitem")).toHaveLength(1);
   });
 
   it("结论引用与不同内容指纹分开编号；未显示的引用不占号", () => {

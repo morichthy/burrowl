@@ -3,7 +3,7 @@
 没有外部依据的自足记录不强迫凑引用。提示不写入记录、不改变指纹，也不阻断保存；
 代码中的链接、概念链接和图片标记不能充当文字出处。
 """
-from ...core.links import parse
+from ...core.links import WRITING_RULES, parse
 
 KINDS = {"detail", "narrative", "experience", "overview", "document_section"}
 
@@ -64,7 +64,7 @@ L1 的共同原文出处可以在一个块开头说明，再由 requires_block_i
                                             "sources、origin 和展开字段不能代替就近出处。此提示不判断逐句支持关系",
                                  "action": "在事实、公式、数字或判断旁补 [[@短名#块|出处]]，并核对 sources / "
                                            "evidence_refs；原件先登记 L0。共同出处可在块开头引用并声明块依赖；"
-                                           "没有依据的推断应标明缺口，不编造引用"})
+                                           "没有依据的推断应标明缺口，不编造引用。" + WRITING_RULES})
     return warnings
 
 

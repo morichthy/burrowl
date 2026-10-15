@@ -69,8 +69,8 @@ def subgraph(graph: dict, *, center: str | None = None, hops: int = 2, kinds: li
         return not values or ((not wanted or values & wanted) and not (masked and values <= masked))
 
     nodes = {n["id"]: n for n in graph["nodes"] if n["id"] not in blocked
-             and (kinds is None or n["kind"] in kinds or n["type"] in {"owner", "block", "claim", "concept", "source"})
-             and (levels is None or n["level"] in levels or n["type"] not in {"record", "block"})
+             and (kinds is None or n["kind"] in kinds or n["type"] in {"owner", "block", "figure", "claim", "concept", "source"})
+             and (levels is None or n["level"] in levels or n["type"] not in {"record", "block", "figure"})
              and (node_types is None or n["type"] in node_types) and domain_ok(n)}
     edges = [e for e in graph["edges"] if e["source"] in nodes and e["target"] in nodes
              and (categories is None or e.get("category") in categories)]

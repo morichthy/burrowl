@@ -67,8 +67,8 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | `memory.document` | 只读 | 读取研究文稿：完整文稿 / 目录 / 单章上下文包（改写某章用）/ 依据变化影响； 以及转写外部原件时的覆盖报告（哪些原文分段没被 L1 认领或明显偏短）与原文展开（R21）。 | `owner_id`*: string，`view`: string，`document_type`: string，`document_id`: string|null，`section_id`: string|null，`max_chars`: integer，`source_id`: string|null |
 | `memory.export` | 只读 | 导出对象的记忆（不产生新记录、不复制原件）。 | `owner_id`*: string，`fmt`: string，`record_ids`: array|null，`exclude_ids`: array|null，`include_raw_materials`: boolean |
 | `memory.feedback` | 写入 | 记录检索结果的使用反馈（采用次数不是复核）。label=outcome 时 adopted_in 须指向实际应用它的 Run 或记录。 | `owner_id`*: string，`query_id`*: string，`target`*: object，`label`*: string，`note`: string，`adopted_in`: object|null，`request_id`: string|null |
-| `memory.figure` | 只读 | 技术单元登记的图片（data URL）。 | `owner_id`*: string，`record_id`*: string，`revision`*: integer，`index`*: integer |
-| `memory.inspect` | 只读 | 读取对象的当前快照，或某条记录的当前/指定修订（含完整正文与固定引用）。 | `owner_id`*: string，`record_id`: string|null，`revision`: integer|null |
+| `memory.figure` | 只读 | 技术单元登记的图片（data URL）。index（序号）与 label（图的锚点名，如 fig-1）二选一； basis_issues 列出记录其余依据的变化（图片本身已核对，照常返回）。 | `owner_id`*: string，`record_id`*: string，`revision`*: integer，`index`: integer|null，`label`: string|null |
+| `memory.inspect` | 只读 | 读取对象的当前快照，或某条记录的当前/指定修订（含完整正文与固定引用）。 读单条记录时附 link_targets：正文里每个 [[…]] 指向的标题、ID、固定修订与块或图（引用对照）。 | `owner_id`*: string，`record_id`: string|null，`revision`: integer|null |
 | `memory.kinds` | 只读 | 全部记录类型：层级、版本、由哪个操作写入、一句话用途。 | 无 |
 | `memory.owner_adopt` | 写入 | 把内容树中已有的文档登记为对象（原件不修改；须给出你看到的字节指纹）。 | `path`*: string，`expected_sha256`*: string |
 | `memory.owner_create` | 写入 | 新建对象（写入业务卡；首次提交记忆时才建立记忆目录）。Run 用 runs_create 建立。 先用 memory_owners 查找：同一目标的继续或子任务沿用已有对象；主题相似只引用；独立交付目标才新建。 core-algorithm 只用于公司文档定义的关键算法，普通脚本/模块/工具不要建算法卡。 knowledge 有两种用途：配置 graph.concept_owner_id 指定的那一个是概念库（只放概念页，建好后把 owner_id 填进该配置）； 其他 knowledge 对象是通用知识对象，承接不属于任何具体研究、项目、工具、数据的知识，按主题复用，主题不同再新建。 | `owner_type`*: string，`slug`*: string，`title`*: string，`description`: string，`keywords`: array|null，`source_document`: string|null，`short_name`: string|null，`sensitivity`: string |
@@ -203,7 +203,7 @@ HTTP：`POST /api/v1/ops/<name>`；MCP：工具名把 `.` 换成 `_`；CLI：`bu
 | 操作 | 类型 | 说明 | 参数 |
 |---|---|---|---|
 | `sources.add_root` | 写入 | 登记一个工作根。通常不必手动调用：登记本次工作目录里的文件时会自动建根。 | `path`*: string，`title`: string |
-| `sources.attach` | 写入 | 把原件中的 PNG/JPEG/WebP 原始图片字节复制为受控附件并登记，返回固定引用 ref（不以 OCR 缩略图替代）。 L1 的 payload.figures 写 {caption: 照录原文图注, ref}，块正文用 ![图注](figure:序号) 在原位置引用。 附件随数据目录备份和迁移；同一张图重复附加是幂等的。 | `source_id`*: string，`asset_label`: string|null，`title`: string |
+| `sources.attach` | 写入 | 把原件中的 PNG/JPEG/WebP 原始图片字节复制为受控附件并登记，返回固定引用 ref（不以 OCR 缩略图替代）。 L1 的 payload.figures 写 {label: 按原文图号如 fig-1, caption: 照录原文图注, ref}，块正文在原位置写 ![[#fig-1]]， 正文不再另外照录图注；其他记录用 [[@短名#fig-1]] 引用、![[@短名#fig-1]] 显示，不重复登记（R24）。 附件随数据目录备份和迁移；同一张图重复附加是幂等的。 | `source_id`*: string，`asset_label`: string|null，`title`: string |
 | `sources.list` | 只读 | 已登记的来源文件（file 引用的唯一授权入口），附当前解析出的位置 location。 | 无 |
 | `sources.register` | 写入 | 登记一个来源文件并记录当前字节指纹：L0 原件的唯一授权入口。原件留在原处，不复制、不修改。 工作目录里的文件自动记为"工作根 + 相对路径"，迁移时随根重定向。 同一 ID 重复登记同一文件是幂等的；内容变了请用新 ID；文件搬家用 sources_relocate / sources_relocate_root。 | `source_id`*: string，`path`*: string，`title`: string，`sensitivity`: string，`snapshot`: boolean |
 | `sources.register_many` | 写入 | 批量登记来源（导入已有资料时使用）。 | `items`*: array，`snapshot`: boolean |

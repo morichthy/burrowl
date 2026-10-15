@@ -8,7 +8,13 @@ import base64
 from typing import Any
 
 from ...core.errors import BurrowlError
-from ...core.technical import render_full, select_blocks
+from ...core.technical import (
+    embedded_figures,
+    figure_anchors,
+    figure_display_name,
+    render_full,
+    select_blocks,
+)
 from ..memory.reader import Reader, fixed_ref
 from .budget import Ledger
 
@@ -86,8 +92,9 @@ class Packet:
         if not self.include_figures:
             return []
         out = []
+        shown = embedded_figures(record["payload"], text)  # 两种嵌图写法（R24 D-03）
         for number, figure in enumerate(record["payload"].get("figures", [])):
-            if not whole and f"](figure:{number})" not in text:
+            if not whole and number not in shown:
                 continue
             ref = figure["ref"]
             try:
@@ -100,7 +107,8 @@ class Packet:
                         if raw.startswith(b"\xff\xd8\xff") else "image/webp" if raw[8:12] == b"WEBP" else None)
                 if mime is None:
                     raise BurrowlError("INVALID_ARGUMENT", "图示不是可展示的栅格图片")
-                out.append({"index": number, "caption": figure["caption"], "ref": ref,
+                out.append({"index": number, "name": figure_display_name(record["payload"], number),
+                            "caption": figure["caption"], "ref": ref,
                             "data_url": f"data:{mime};base64,{base64.b64encode(raw).decode('ascii')}"})
             except BurrowlError as exc:
                 if exc.code == "BUDGET_EXCEEDED":
@@ -165,6 +173,13 @@ class Packet:
         locator = ref.get("locator") or ""
         if record["kind"] == "detail":
             selected = [locator[6:]] if locator.startswith("block:") else None
+            if locator.startswith("figure:"):  # R24：引用到图时交付显示这张图的块（连同图）
+                index = figure_anchors(record["payload"]).get(locator[7:])
+                selected = [b["block_id"] for b in record["payload"]["blocks"]
+                            if index is not None and index in embedded_figures(record["payload"], b["markdown"])]
+                if not selected:
+                    self.gap("NOT_FOUND", "引用的图不存在，或没有在任何块中显示", ref)
+                    return
             try:
                 blocks, _added = select_blocks(record, selected)
             except BurrowlError as exc:

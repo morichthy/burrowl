@@ -61,11 +61,11 @@ describe("关系图筛选（R12 T-P2.8）", () => {
     expect(types.getByRole("checkbox", { name: "结论（独立判断）" })).toBeChecked();
     expect(types.getByRole("checkbox", { name: "来源" })).not.toBeChecked();
     const details = within(screen.getByRole("group", { name: "记录内部细节" }));
-    expect(details.getByRole("checkbox", { name: "展开 L1 记录内的块" })).not.toBeChecked();
-    fireEvent.click(details.getByRole("checkbox", { name: "展开 L1 记录内的块" }));
-    await screen.findByText(/5 个节点、0 条关系/);
+    expect(details.getByRole("checkbox", { name: "展开 L1 记录内的块与图" })).not.toBeChecked();
+    fireEvent.click(details.getByRole("checkbox", { name: "展开 L1 记录内的块与图" }));
+    await screen.findByText(/6 个节点、0 条关系/);  // R24 D-12：块与图一起展开
     for (const name of ["对象", "记录", "结论（独立判断）", "概念"]) fireEvent.click(types.getByRole("checkbox", { name }));
-    fireEvent.click(details.getByRole("checkbox", { name: "展开 L1 记录内的块" }));
+    fireEvent.click(details.getByRole("checkbox", { name: "展开 L1 记录内的块与图" }));
     await screen.findByText(/0 个节点、0 条关系/);
     expect(latestGraph().node_types).toEqual([]);
   });

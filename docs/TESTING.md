@@ -69,6 +69,7 @@
 **记录契约与链接**
 
 - 就近引用（R21 D-20）：预检、实际提交与幂等重试给出一致的非阻断提醒；修订补引用后消失，提示不进入规范记录。代码、概念和图片标记不充当文字出处；共同 L1 出处可沿块依赖传递；自足无外部依据的记录不强迫引用。契约示例全部可解析并无漏引提示（`test_citation_warnings.py`、`test_draft_examples.py`）。前端检查记录及文稿内原位置图片、不重复加载、合法 HTML、跨对象固定修订的图片请求；实际论文导入单独验收，软件测试不证明 AI 逐句引用完整。
+- 图锚点与引用写法（R24，`tests/service/test_figure_anchors.py`）：`label` 与推导名、与块号冲突；`![[#图]]` 校验且不进 links；跨记录 `[[@…#图]]` 按修订固定为 `figure:` 定位、`![[…]]` 只能指向图；漏写 `@`/`!` 返回 `LINK_SIGIL_MISSING`；`memory.figure(label)`；`link_table` 与阅读分页的 `link_targets`；材料包定位到图时交付嵌图块；覆盖统计把图注计入嵌图块。取图在原件变化时照常返回并附 `basis_issues`（`test_documents.py`）。前端：嵌入别的记录的图计入同一编号、本记录 `![[#图]]` 原位显示、底部"提及的概念"（`citations.test.tsx`），关系图块与图一起展开（`Relations.test.tsx`）。
 - 阅读视图引用编号（R21 D-24）：跨段和跨章节共用编号；同一固定依据的别名去重，不同修订、指纹、位置分开；概念、原文 `[1]`、公式、代码和未解析链接不冒充出处；名称查询按来源固定修订去重，失败仍显示引用名，异步完成不重建图片（`frontend/src/citations.test.tsx`、`Memory.test.tsx`）。真实后端端到端检查鼠标与键盘提示、文末对照、回读规范记录完全相同及导出未写入界面编号。
 
 - 契约只做增量：浮点样例全部记录的 content_hash、record_hash、结论指纹不变（`tests/service/test_links.py`）。

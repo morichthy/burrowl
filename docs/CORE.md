@@ -92,8 +92,10 @@ AI 按任务选择 Skill：
         → 整理者注说明原文组织逻辑、切分依据与必要上下文
         （读取分段不是记录边界；跨页可认领多个 key，同一 key 可由多个 L1 块共同转写）
         图片：sources.attach → 原始 PNG/JPEG/WebP 字节保存到 attachments/<sha256>.<ext>
-            → 登记为 SRC-ATT-…，L1 figures 引用、正文 ![图注](figure:N)
+            → 登记为 SRC-ATT-…，L1 figures {label, caption, ref}、正文在原位置 ![[#fig-1]]（旧写法 ![图注](figure:N) 仍有效）
+            → 图注只存在 caption，覆盖报告把它计入嵌图所在块的正文（R24 D-07）
             → OCR 缩略图只在缓存中；导入抽取不沿用检索的图片数量上限
+            → memory.figure 只严格核对附件本身；记录其余依据变化随图返回 basis_issues（工作台提示复核），读取权限问题仍拒绝
         有意省略：L0 payload.omitted = [{locators, reason}]
     分别检查 L2 形成过程、L3 可复用知识（含简化方法、判断规则、经验与边界）
         → 有实际内容则提炼，保留条件、就近链接 L1；原文主张与 AI 归纳分开
@@ -130,8 +132,10 @@ AI 组成提交请求：{owner_id, expected_head, request_id, operations:[put_re
     handle：修订沿用原值（改动 → INVALID_TRANSITION）；新建未提供时按标题生成，本对象内冲突追加 -2、-3
     正文（L1–L4、文稿章节、结论陈述）中新写入的长编号（XXX-<uuid>）或 64 位指纹 → UNREADABLE_REF，
         hint 给出可直接替换的 [[@短名]]（上一修订已有的不拦，由维护页"引用改写"处理）
-    解析正文链接 → links：概念找不到记为 unresolved_concept（不阻塞）；记录/块/结论找不到或有歧义
-        → UNRESOLVED_LINK + 候选；修订时原文未变的链接沿用旧固定版本，repin=true 才改指当前版本
+    解析正文链接 → links：概念找不到记为 unresolved_concept（不阻塞），名字正好是本对象记录或结论短名时
+        返回 LINK_SIGIL_MISSING warning；记录/块/图/结论找不到或有歧义 → UNRESOLVED_LINK + 候选 + 四条写法；
+        # 后先找块再找图（图锚点按修订固定，locator figure:<锚点名>，R24 D-04）；![[…]] 只能指向图；
+        本记录的 ![[#图]] 只校验不进 links；修订时原文未变的链接沿用旧固定版本，repin=true 才改指当前版本
     校验结构、领域规则、引用和授权（受限来源、敏感级别不得降低、支持关系不能成环）
     有固定依据却无可读记录/块/结论链接 → INLINE_CITATION_MISSING warning（L1 按块及其依赖检查）
         预检与保存均提醒，不阻断、不改记录指纹；无提醒仍须 AI 逐段检查引用与支持关系
@@ -254,7 +258,7 @@ finish：交接文本 = 有效综合稿或逐对象笔记；陈旧笔记、超�
 
 ```text
 图投影（每次同步对象时与检索条目一起更新，可删除重建）：
-    节点：对象、记录、L1 块、结论、概念页、被引用的来源（restricted 与被隐藏的记录不进图）
+    节点：对象、记录、L1 块与图（记录#锚点，R24 D-12）、结论、概念页、被引用的来源（restricted 与被隐藏的记录不进图）
     边（通用抽边，新记录类型不改代码）：记录归属与块依赖 | sources 与 payload 中任意固定引用 |
         正文 links | 结论的依据、relation 参与者（按角色）与适用范围中的链接（条件）| association 两端（rejected/withdrawn 除外）|
         复核中的 superseded；没有由结论派生的对象间直连边

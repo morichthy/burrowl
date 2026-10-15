@@ -126,6 +126,8 @@ class Page:
         def replace(match: re.Match) -> str:
             inner = match.group(1)
             link = syntax.parse_one(inner)
+            if link is not None and link.kind == "anchor":  # 本记录的图（R24）：交换包不带图，原样保留写法
+                return match.group(0)
             display = inner.split("|", 1)[1].strip() if "|" in inner else (link.name if link else inner)
             target = self.target_path((resolved.get(link.text) or {}).get("ref")) if link else None
             return f"[[{target}|{display}]]" if target else display

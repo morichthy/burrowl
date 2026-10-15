@@ -1,0 +1,138 @@
+{
+  "schema_version": 1,
+  "run_id": "RUN-20260908T214955Z-2273015D2CEF",
+  "owner_id": "RES-FLOATING-POINT-SUMMATION",
+  "project_id": null,
+  "title": "三轮求和的逐步误差轨迹与细节复核",
+  "keywords": [
+    "浮点求和",
+    "逐步误差",
+    "抵消",
+    "Kahan",
+    "Neumaier"
+  ],
+  "review_history": [],
+  "claims": [],
+  "dependencies": [],
+  "run_type": "analysis",
+  "status": "failed",
+  "created_at": "2026-09-08T21:49:55Z",
+  "started_at": "2026-09-08T21:54:18.487560Z",
+  "ended_at": "2026-09-08T21:54:18.825929Z",
+  "owner": "AI research assistant",
+  "question": "旧三轮的每个结果能否逐项复现，补偿变量如何产生抵消反例？",
+  "hypotheses": [],
+  "inputs": [
+    {
+      "path": "runs/run-20260908t201214z-d0ab308f66ad/inputs.json",
+      "sha256": "83d97bbfcf42bdbbe3780df71d202033bc8cede38f197913da5d0b77f5f7cf45"
+    },
+    {
+      "path": "runs/run-20260908t201214z-d0ab308f66ad/results.json",
+      "sha256": "cdb1f9e4f0580d5baaea4a09416f75801e6c5d01eab96c601ded00a28e31134d"
+    },
+    {
+      "path": "runs/run-20260908t201228z-a0980824dc18/inputs.json",
+      "sha256": "a48c045211280be1e1bb58524a8067598eea6d9d8e964a8b513b4b544e195cd6"
+    },
+    {
+      "path": "runs/run-20260908t201228z-a0980824dc18/results.json",
+      "sha256": "f5ef99109b146631abf1fc7256fc62287cbf125c6535ba097da4440570fc8247"
+    },
+    {
+      "path": "runs/run-20260908t201240z-90107a617cf8/inputs.json",
+      "sha256": "9da1f46663a569680b3e61e842f164880d24c047e0ab13ac0471df6683d32561"
+    },
+    {
+      "path": "runs/run-20260908t201240z-90107a617cf8/results.json",
+      "sha256": "693058d77bb3ed61e94535369bbfa4d74b6a2ed7f406a8af0b5782a0dc4fa7ef"
+    }
+  ],
+  "parameters": {
+    "reference": "exact rational sum of represented integer-valued floats",
+    "unit": "dimensionless",
+    "source_rounds": 3,
+    "saved_seed": 20260909
+  },
+  "code": {
+    "commit": null,
+    "dirty": true,
+    "source_snapshot_sha256": "92628e66d7deef458cc2f966d15416e8fa00d176dd718c2ecda2ee9d8ef2cefa",
+    "source_path": "research/floating-point-summation/runs/run-20260908t214955z-2273015d2cef/reproduce.py"
+  },
+  "environment": {
+    "python": "3.12.10",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "lock_or_image_digest": null
+  },
+  "random_seeds": [],
+  "quality_results": [
+    {
+      "check": "full numerical recheck and figure generation command",
+      "required": true,
+      "status": "failed"
+    }
+  ],
+  "metrics": {},
+  "artifacts": [
+    {
+      "path": "research/floating-point-summation/runs/run-20260908t214955z-2273015d2cef/execution.json",
+      "sha256": "bd4855e5b255bd5d664e078e3472094364ecb5a91d2ed103da2908d68906b950"
+    },
+    {
+      "path": "research/floating-point-summation/runs/run-20260908t214955z-2273015d2cef/lineage.jsonl",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "research/floating-point-summation/runs/run-20260908t214955z-2273015d2cef/outputs/operation-traces.json",
+      "sha256": "d7348aca67bf17dc4369a7b8d756b2193571b8c6f7010cc0efb6557ef409da8c"
+    },
+    {
+      "path": "research/floating-point-summation/runs/run-20260908t214955z-2273015d2cef/outputs/trace-results.json",
+      "sha256": "a09888d9b5c4a669dee0296acd9aa3788d2d73fefe413037ade9e7b29043cf6d"
+    },
+    {
+      "path": "research/floating-point-summation/runs/run-20260908t214955z-2273015d2cef/README.md",
+      "sha256": "262b60605eb361723385cd6379aec645ae1900a6e2ae78604b23999bb6f6bc75"
+    },
+    {
+      "path": "research/floating-point-summation/runs/run-20260908t214955z-2273015d2cef/reproduce.py",
+      "sha256": "92628e66d7deef458cc2f966d15416e8fa00d176dd718c2ecda2ee9d8ef2cefa"
+    },
+    {
+      "path": "research/floating-point-summation/runs/run-20260908t214955z-2273015d2cef/source-manifest.json",
+      "sha256": "d7958e2c0b086f312113c95b5b5cd242ad3a83e52d3c22ab67f46e1fa18429f2"
+    },
+    {
+      "path": "research/floating-point-summation/runs/run-20260908t214955z-2273015d2cef/stderr.txt",
+      "sha256": "fce41d9526563ba30e96ed6a29714858e651d3474024228271389c35b526a9db"
+    },
+    {
+      "path": "research/floating-point-summation/runs/run-20260908t214955z-2273015d2cef/stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "lineage_events": "lineage.jsonl",
+  "conclusion": "数值轨迹文件已生成，但隔离绘图依赖在沙箱中不可读，Matplotlib导入为不完整命名空间，绘图步骤失败。",
+  "limitations": [
+    "仅复核原三轮有限整数浮点输入，不证明任意输入准确。",
+    "本次新执行复核，旧三轮文件和时间未修改。",
+    "数值复算仅用标准库；图形生成使用独立Matplotlib作者环境，工作台阅读PNG无需安装绘图库。"
+  ],
+  "parent_run_ids": [
+    "RUN-20260908T201214Z-D0AB308F66AD",
+    "RUN-20260908T201228Z-A0980824DC18",
+    "RUN-20260908T201240Z-90107A617CF8"
+  ],
+  "related_module_ids": [],
+  "related_research_ids": [
+    "RES-FLOATING-POINT-SUMMATION"
+  ],
+  "related_dataset_ids": [],
+  "review": {
+    "status": "not-reviewed",
+    "reviewer": null,
+    "date": null
+  },
+  "sensitivity": "internal"
+}

@@ -75,8 +75,9 @@ const TYPE_COLORS: Record<string, string> = {
   claim: "#b26ad8",
   concept: "#e0664a",
   block: "#8f9bab",
+  figure: "#4f9fb8",
 };
-const NODE_TYPE_LABELS: Record<string, string> = { owner: "对象", record: "记录", claim: "结论（独立判断）", concept: "概念", source: "来源", block: "L1 记录内的块" };
+const NODE_TYPE_LABELS: Record<string, string> = { owner: "对象", record: "记录", claim: "结论（独立判断）", concept: "概念", source: "来源", block: "L1 记录内的块", figure: "L1 记录内的图" };
 // R23 D-11：类别回答"这条边表达什么"；节点类型回答"这个点是什么"
 const CATEGORIES: { value: string; label: string; color: string }[] = [
   { value: "structure", label: "结构", color: "#c8c8c8" },
@@ -109,7 +110,7 @@ const PREDICATE_LABELS: Record<string, string> = {
   applies_to: "适用于", requires: "需要", equivalent_to: "等价于", part_of: "组成",
 };
 // 形状区分节点类型（不只靠颜色，色弱也能分辨）；对象另加一圈光环
-const NODE_SHAPES: Record<string, string> = { owner: "ellipse", record: "ellipse", block: "ellipse", source: "round-rectangle", claim: "round-diamond", concept: "round-hexagon" };
+const NODE_SHAPES: Record<string, string> = { owner: "ellipse", record: "ellipse", block: "ellipse", figure: "rectangle", source: "round-rectangle", claim: "round-diamond", concept: "round-hexagon" };
 const UNSAFE_REVIEW = new Set(["disputed", "retracted", "superseded", "stale", "upstream-blocked"]);
 /**
  * 重点关系：在类别颜色之外再用线型、粗细和箭头形状区分，按顺序取优先（一条连线只套用最靠前的一种）。
@@ -124,7 +125,9 @@ const EMPHASIS: { type: string; label: string; color?: string; dash: number[]; w
   { type: "prerequisite", label: "前提", color: "#4f6a8f", dash: [2, 3], width: 2, arrow: "square", legend: "蓝灰点线，方块端点" },
 ];
 const EMPHASIS_BY_TYPE = new Map(EMPHASIS.map((e, i) => [e.type, { ...e, order: i }]));
-const NODE_TYPES =["owner", "record", "block", "claim", "concept", "source"];
+const NODE_TYPES = ["owner", "record", "block", "figure", "claim", "concept", "source"];
+// 记录内部细节（R24 D-12）：块与图一起展开、一起收起
+const INNER_TYPES = ["block", "figure"];
 // 默认隐藏内容块以免图过密；空数组则明确表示不显示任何节点。
 const DEFAULT_NODE_TYPES = ["owner", "record", "claim", "concept"];  // R23 D-12：结论默认显示
 const PALETTE = ["#4e79a7", "#f28e2b", "#e15759", "#76b7b2", "#59a14f", "#edc948", "#b07aa1", "#ff9da7", "#9c755f", "#bab0ac"];
@@ -370,6 +373,10 @@ export function Relations() {
     const current = view[key] ?? [];
     setView({ ...view, [key]: current.includes(value) ? current.filter((v) => v !== value) : [...current, value] });
   };
+  const toggleInner = () => {
+    const current = (view.nodeTypes ?? []).filter((t) => !INNER_TYPES.includes(t));
+    setView({ ...view, nodeTypes: view.nodeTypes?.includes("block") ? current : [...current, ...INNER_TYPES] });
+  };
   // 关系类别按"勾选=显示"呈现：空数组表示全部显示；不允许取消最后一类（后端把空筛选视为全部，会造成误解）
   const allCategories = CATEGORIES.map((c) => c.value);
   const visibleCategories = view.categories?.length ? view.categories : allCategories;
@@ -429,7 +436,7 @@ export function Relations() {
             节点
           </span>
           <div className="chips" role="group" aria-label="节点类型">
-            {NODE_TYPES.filter((type) => type !== "block").map((type) => (
+            {NODE_TYPES.filter((type) => !INNER_TYPES.includes(type)).map((type) => (
               <label key={type} className={view.nodeTypes?.includes(type) ? "on" : ""}>
                 <input type="checkbox" checked={!!view.nodeTypes?.includes(type)} onChange={() => toggle("nodeTypes", type)} />
                 <i className={`shape shape-${type}`} style={{ background: TYPE_COLORS[type] }} />
@@ -440,11 +447,11 @@ export function Relations() {
           <span className="filter-label" title="块是 L1 记录内部的小节，不是另一条 L1 记录。">记录内部细节</span>
           <div className="chips" role="group" aria-label="记录内部细节">
             <label className={view.nodeTypes?.includes("block") ? "on" : ""}>
-              <input type="checkbox" checked={!!view.nodeTypes?.includes("block")} onChange={() => toggle("nodeTypes", "block")} />
+              <input type="checkbox" checked={!!view.nodeTypes?.includes("block")} onChange={toggleInner} />
               <i className="shape shape-block" style={{ background: TYPE_COLORS.block }} />
-              展开 L1 记录内的块
+              展开 L1 记录内的块与图
             </label>
-            <span className="hint">块是记录内部的小节，不是 L1 记录本身。</span>
+            <span className="hint">块是记录内部的小节，图是记录登记的图片；都不是 L1 记录本身。</span>
           </div>
           <span className="filter-label" title="只筛选记录节点；选“全部”或不选任何分类时显示全部记录。结论、来源等其他节点由上一行控制">
             记录分类
@@ -837,7 +844,7 @@ function GraphCanvas(props: {
         // 颜色在加入时就给出（与下方社区着色 effect 同一规则），否则样式里的 data(color) 映射会在首帧缺值告警
         const fields = {
           label: n.title.slice(0, 28),
-          size: (n.type === "block" ? 10 : 14) + Math.min(30, Math.sqrt(d) * 5),
+          size: (INNER_TYPES.includes(n.type) ? 10 : 14) + Math.min(30, Math.sqrt(d) * 5),
           shape: NODE_SHAPES[n.type] ?? "ellipse",
           color: nodeColor(n, communities),
         };

@@ -1117,6 +1117,7 @@
          "owner",
          "record",
          "block",
+         "figure",
          "claim",
          "concept",
          "source"
@@ -3820,10 +3821,10 @@
   "name": "sources.attach",
   "group": "sources",
   "effect": "write",
-  "summary": "把原件中的 PNG/JPEG/WebP 原始图片字节复制为受控附件并登记，返回固定引用 ref（不以 OCR 缩略图替代）。 L1 的 payload.figures 写 {caption: 照录原文图注, ref}，块正文用 ![图注](figure:序号) 在原位置引用。 附件随数据目录备份和迁移；同一张图重复附加是幂等的。",
+  "summary": "把原件中的 PNG/JPEG/WebP 原始图片字节复制为受控附件并登记，返回固定引用 ref（不以 OCR 缩略图替代）。 L1 的 payload.figures 写 {label: 按原文图号如 fig-1, caption: 照录原文图注, ref}，块正文在原位置写 ![[#fig-1]]， 正文不再另外照录图注；其他记录用 [[@短名#fig-1]] 引用、![[@短名#fig-1]] 显示，不重复登记（R24）。 附件随数据目录备份和迁移；同一张图重复附加是幂等的。",
   "input": {
    "additionalProperties": false,
-   "description": "把原件中的 PNG/JPEG/WebP 原始图片字节复制为受控附件并登记，返回固定引用 ref（不以 OCR 缩略图替代）。\nL1 的 payload.figures 写 {caption: 照录原文图注, ref}，块正文用 ![图注](figure:序号) 在原位置引用。\n附件随数据目录备份和迁移；同一张图重复附加是幂等的。",
+   "description": "把原件中的 PNG/JPEG/WebP 原始图片字节复制为受控附件并登记，返回固定引用 ref（不以 OCR 缩略图替代）。\nL1 的 payload.figures 写 {label: 按原文图号如 fig-1, caption: 照录原文图注, ref}，块正文在原位置写 ![[#fig-1]]，\n正文不再另外照录图注；其他记录用 [[@短名#fig-1]] 引用、![[@短名#fig-1]] 显示，不重复登记（R24）。\n附件随数据目录备份和迁移；同一张图重复附加是幂等的。",
    "properties": {
     "source_id": {
      "description": "原件的来源 ID（SRC-…）",
@@ -4422,10 +4423,10 @@
   "name": "memory.inspect",
   "group": "memory",
   "effect": "read",
-  "summary": "读取对象的当前快照，或某条记录的当前/指定修订（含完整正文与固定引用）。",
+  "summary": "读取对象的当前快照，或某条记录的当前/指定修订（含完整正文与固定引用）。 读单条记录时附 link_targets：正文里每个 [[…]] 指向的标题、ID、固定修订与块或图（引用对照）。",
   "input": {
    "additionalProperties": false,
-   "description": "读取对象的当前快照，或某条记录的当前/指定修订（含完整正文与固定引用）。",
+   "description": "读取对象的当前快照，或某条记录的当前/指定修订（含完整正文与固定引用）。\n读单条记录时附 link_targets：正文里每个 [[…]] 指向的标题、ID、固定修订与块或图（引用对照）。",
    "properties": {
     "owner_id": {
      "description": "对象 ID，如 RES-…、PRJ-…、RUN-…",
@@ -4794,10 +4795,10 @@
   "name": "memory.figure",
   "group": "memory",
   "effect": "read",
-  "summary": "技术单元登记的图片（data URL）。",
+  "summary": "技术单元登记的图片（data URL）。index（序号）与 label（图的锚点名，如 fig-1）二选一； basis_issues 列出记录其余依据的变化（图片本身已核对，照常返回）。",
   "input": {
    "additionalProperties": false,
-   "description": "技术单元登记的图片（data URL）。",
+   "description": "技术单元登记的图片（data URL）。index（序号）与 label（图的锚点名，如 fig-1）二选一；\nbasis_issues 列出记录其余依据的变化（图片本身已核对，照常返回）。",
    "properties": {
     "owner_id": {
      "description": "对象 ID，如 RES-…、PRJ-…、RUN-…",
@@ -4813,15 +4814,34 @@
      "type": "integer"
     },
     "index": {
-     "title": "Index",
-     "type": "integer"
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Index"
+    },
+    "label": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Label"
     }
    },
    "required": [
     "owner_id",
     "record_id",
-    "revision",
-    "index"
+    "revision"
    ],
    "title": "memory_figure_input",
    "type": "object"

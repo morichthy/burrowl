@@ -1,0 +1,408 @@
+{
+  "roots": [
+    {
+      "created_at": "2026-10-14T20:05:34.395413Z",
+      "path": "C:/Users/livky/AppData/Local/Temp/burrowl-compat-y56umoy2/work",
+      "root_id": "ROOT-WORK",
+      "title": "标本工作根"
+    }
+  ],
+  "schema_version": 1,
+  "sources": [
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t201214z-d0ab308f66ad/results.json",
+      "sensitivity": "internal",
+      "sha256": "cdb1f9e4f0580d5baaea4a09416f75801e6c5d01eab96c601ded00a28e31134d",
+      "source_id": "SRC-SUMMATION-R01",
+      "title": "results.json"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t201228z-a0980824dc18/results.json",
+      "sensitivity": "internal",
+      "sha256": "f5ef99109b146631abf1fc7256fc62287cbf125c6535ba097da4440570fc8247",
+      "source_id": "SRC-SUMMATION-R02",
+      "title": "results.json"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t201240z-90107a617cf8/results.json",
+      "sensitivity": "internal",
+      "sha256": "693058d77bb3ed61e94535369bbfa4d74b6a2ed7f406a8af0b5782a0dc4fa7ef",
+      "source_id": "SRC-SUMMATION-R03",
+      "title": "results.json"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/verification.json",
+      "sensitivity": "internal",
+      "sha256": "739d2ce2c6922dc7ce74dfea9ac22d987dd6b8d353484e70c615fc96d2f22074",
+      "source_id": "SRC-SUMMATION-TRACE-VERIFY",
+      "title": "verification.json"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/operation-traces.json",
+      "sensitivity": "internal",
+      "sha256": "d7348aca67bf17dc4369a7b8d756b2193571b8c6f7010cc0efb6557ef409da8c",
+      "source_id": "SRC-SUMMATION-OP-TRACES",
+      "title": "operation-traces.json"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/sampling-verification.json",
+      "sensitivity": "internal",
+      "sha256": "8fc77120e5495b853becd8d160ae84f8c135318eec5dda1f8108b68dd5dfc52d",
+      "source_id": "SRC-SUMMATION-SAMPLING-VERIFY",
+      "title": "sampling-verification.json"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t214955z-2273015d2cef/execution.json",
+      "sensitivity": "internal",
+      "sha256": "bd4855e5b255bd5d664e078e3472094364ecb5a91d2ed103da2908d68906b950",
+      "source_id": "SRC-SUMMATION-FAILED-EXECUTION",
+      "title": "execution.json"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t214955z-2273015d2cef/stderr.txt",
+      "sensitivity": "internal",
+      "sha256": "fce41d9526563ba30e96ed6a29714858e651d3474024228271389c35b526a9db",
+      "source_id": "SRC-SUMMATION-FAILED-STDERR",
+      "title": "stderr.txt"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/fixtures/original-documents/details/round-01.md.snapshot",
+      "sensitivity": "internal",
+      "sha256": "4259addfe1da6ca0b2736a05e02d3a662fdad3d6c842243e3818c99e120e34de",
+      "source_id": "SRC-SUMMATION-DETAIL-R01",
+      "title": "round-01.md.snapshot"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t201214z-d0ab308f66ad/inputs.json",
+      "sensitivity": "internal",
+      "sha256": "83d97bbfcf42bdbbe3780df71d202033bc8cede38f197913da5d0b77f5f7cf45",
+      "source_id": "SRC-SUMMATION-INPUT-R01",
+      "title": "inputs.json"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/round-1-summary.png",
+      "sensitivity": "internal",
+      "sha256": "043d9bc1c51b300a97a2b915b5c53af73553f1d726b9936c9315a074220fbea8",
+      "source_id": "SRC-SUMMATION-FIGURE-R01",
+      "title": "round-1-summary.png"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/fixtures/original-documents/details/round-02.md.snapshot",
+      "sensitivity": "internal",
+      "sha256": "6663c5e22a2c3154c13dae18754d7cc20b6d4c225d159ebc8081cbe27a0beb34",
+      "source_id": "SRC-SUMMATION-DETAIL-R02",
+      "title": "round-02.md.snapshot"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t201228z-a0980824dc18/inputs.json",
+      "sensitivity": "internal",
+      "sha256": "a48c045211280be1e1bb58524a8067598eea6d9d8e964a8b513b4b544e195cd6",
+      "source_id": "SRC-SUMMATION-INPUT-R02",
+      "title": "inputs.json"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/round-2-summary.png",
+      "sensitivity": "internal",
+      "sha256": "1a7a01affa7bd299c9c0d1652018a5f2e15fa29df034fced669254733da694ad",
+      "source_id": "SRC-SUMMATION-FIGURE-R02",
+      "title": "round-2-summary.png"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/fixtures/original-documents/details/round-03.md.snapshot",
+      "sensitivity": "internal",
+      "sha256": "16afde15315ac4f45463c1f3124a3e7d886398e8c09c6fb9adfdc19e43bd228d",
+      "source_id": "SRC-SUMMATION-DETAIL-R03",
+      "title": "round-03.md.snapshot"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t201240z-90107a617cf8/inputs.json",
+      "sensitivity": "internal",
+      "sha256": "9da1f46663a569680b3e61e842f164880d24c047e0ab13ac0471df6683d32561",
+      "source_id": "SRC-SUMMATION-INPUT-R03",
+      "title": "inputs.json"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/round-3-summary.png",
+      "sensitivity": "internal",
+      "sha256": "7759b89aa016be03e7f18169240dd308c28b21bfafac980c92cbce36bfeeaeee",
+      "source_id": "SRC-SUMMATION-FIGURE-R03",
+      "title": "round-3-summary.png"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t215458z-04c7d84d40d8/outputs/round-3-permutations.png",
+      "sensitivity": "internal",
+      "sha256": "0fdc0ea6ef408adaf2c7c5c2e56fd0f72e95db032a30d5fc344e3cf9e21bd456",
+      "source_id": "SRC-SUMMATION-FIGURE-PERMUTATIONS",
+      "title": "round-3-permutations.png"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/details/report-v2/methods.md",
+      "sensitivity": "internal",
+      "sha256": "bf89c9889ac3795214b21b6a3d19557750da1304fc60fb58d63d119784e7ceed",
+      "source_id": "SRC-SUMMATION-REPORT-V2-METHODS",
+      "title": "methods.md"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/details/report-v2/round-01.md",
+      "sensitivity": "internal",
+      "sha256": "77941df3cdaf33546da7a65362918f07f00fd02196163e4992508444fe763d23",
+      "source_id": "SRC-SUMMATION-REPORT-V2-ROUND-01",
+      "title": "round-01.md"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/details/report-v2/round-02.md",
+      "sensitivity": "internal",
+      "sha256": "70b04d20e8973083af0f7a99a27c8715d97791bf051fbbd1a5f8d3b3c410df0a",
+      "source_id": "SRC-SUMMATION-REPORT-V2-ROUND-02",
+      "title": "round-02.md"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/details/report-v2/round-03.md",
+      "sensitivity": "internal",
+      "sha256": "be64d72d7648d1463ab8e007d18b984b418601794fad391c6dec047af5f5ac6d",
+      "source_id": "SRC-SUMMATION-REPORT-V2-ROUND-03",
+      "title": "round-03.md"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/PLAN.md",
+      "sensitivity": "internal",
+      "sha256": "dd6ed1e91dcda6709f1cf4d362c5471d25f7d3338dcf240f79a7337676113fde",
+      "source_id": "SRC-SUMMATION-ORIGINAL-PLAN",
+      "title": "PLAN.md"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t201214z-d0ab308f66ad/README.md",
+      "sensitivity": "internal",
+      "sha256": "693548f1ed4e4448d25da861d18f9e680f241364c5008f5fea4bcf3a1ffb6741",
+      "source_id": "SRC-SUMMATION-RELOCATED-cad4505cfe48c44f",
+      "title": "README.md"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t201214z-d0ab308f66ad/execution.json",
+      "sensitivity": "internal",
+      "sha256": "9de7f8b212f5ee202706f243c03ea1a1b24f6ff6ed96dd3fe631ba15be87b440",
+      "source_id": "SRC-SUMMATION-RELOCATED-21148afd8cbcbb0f",
+      "title": "execution.json"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t201214z-d0ab308f66ad/lineage.jsonl",
+      "sensitivity": "internal",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_id": "SRC-SUMMATION-RELOCATED-762ecf68603e5c7b",
+      "title": "lineage.jsonl"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t201214z-d0ab308f66ad/reproduce.py",
+      "sensitivity": "internal",
+      "sha256": "8dc8cd86e17a2595b0217e9bcef712c5a61db1eec07828fb446ea556657f2284",
+      "source_id": "SRC-SUMMATION-RELOCATED-87fe209f32e34e60",
+      "title": "reproduce.py"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t201214z-d0ab308f66ad/run.json",
+      "sensitivity": "internal",
+      "sha256": "4ff223d25cd5ea92ee3b6d90546944ce94b4af7578cd1811f8325da1303ae858",
+      "source_id": "SRC-SUMMATION-RELOCATED-1d776c92d3485151",
+      "title": "run.json"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t201214z-d0ab308f66ad/stderr.txt",
+      "sensitivity": "internal",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_id": "SRC-SUMMATION-RELOCATED-413771b008737b33",
+      "title": "stderr.txt"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t201214z-d0ab308f66ad/stdout.txt",
+      "sensitivity": "internal",
+      "sha256": "20af7ea0ab47558a73435f9662827cb0e30365b8f6714f2d5aa07070a1dbc6c2",
+      "source_id": "SRC-SUMMATION-RELOCATED-a6cc6ad566232d8c",
+      "title": "stdout.txt"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t201228z-a0980824dc18/README.md",
+      "sensitivity": "internal",
+      "sha256": "08daa0b3fe39eae416aa485d014e6f4ade61ee1237c06071a7e7da7718210344",
+      "source_id": "SRC-SUMMATION-RELOCATED-170a23df51104ce1",
+      "title": "README.md"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t201228z-a0980824dc18/execution.json",
+      "sensitivity": "internal",
+      "sha256": "1d693558847dc790efd19293b0176afa27176d0f1ee9ccfcb1f83e65c4edc496",
+      "source_id": "SRC-SUMMATION-RELOCATED-6d617cbb35e2f2f9",
+      "title": "execution.json"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t201228z-a0980824dc18/lineage.jsonl",
+      "sensitivity": "internal",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_id": "SRC-SUMMATION-RELOCATED-dfa140cb338bd5a6",
+      "title": "lineage.jsonl"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t201228z-a0980824dc18/reproduce.py",
+      "sensitivity": "internal",
+      "sha256": "8dc8cd86e17a2595b0217e9bcef712c5a61db1eec07828fb446ea556657f2284",
+      "source_id": "SRC-SUMMATION-RELOCATED-df27dd52e290d0ba",
+      "title": "reproduce.py"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t201228z-a0980824dc18/run.json",
+      "sensitivity": "internal",
+      "sha256": "ae3855924c5cb40057fec3ce21717c675477a3bc6738a997ffde7233c199de09",
+      "source_id": "SRC-SUMMATION-RELOCATED-0db04f3ad9b639bb",
+      "title": "run.json"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t201228z-a0980824dc18/stderr.txt",
+      "sensitivity": "internal",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_id": "SRC-SUMMATION-RELOCATED-a3f611c5f64c1ddb",
+      "title": "stderr.txt"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t201228z-a0980824dc18/stdout.txt",
+      "sensitivity": "internal",
+      "sha256": "e4dd92ed3dcbe33b4beff6efffa0b96abb2fea5e15a1009b3884b48ee50d3b43",
+      "source_id": "SRC-SUMMATION-RELOCATED-170b3b382d4e10cc",
+      "title": "stdout.txt"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t201240z-90107a617cf8/README.md",
+      "sensitivity": "internal",
+      "sha256": "082783ec986a0a5b9f4a6bb1c26248033e6300522dec5764d08799abba3f01dc",
+      "source_id": "SRC-SUMMATION-RELOCATED-f7ddf57f4874e1d5",
+      "title": "README.md"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t201240z-90107a617cf8/execution.json",
+      "sensitivity": "internal",
+      "sha256": "6ec8ecba6aebbac0609d5a89ca0e67028639d22c0356e9b34ffae71ad125d1ae",
+      "source_id": "SRC-SUMMATION-RELOCATED-14489a5cdcfe0776",
+      "title": "execution.json"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t201240z-90107a617cf8/lineage.jsonl",
+      "sensitivity": "internal",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_id": "SRC-SUMMATION-RELOCATED-f738d8388254fdb4",
+      "title": "lineage.jsonl"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t201240z-90107a617cf8/reproduce.py",
+      "sensitivity": "internal",
+      "sha256": "8dc8cd86e17a2595b0217e9bcef712c5a61db1eec07828fb446ea556657f2284",
+      "source_id": "SRC-SUMMATION-RELOCATED-d526bf0d36560844",
+      "title": "reproduce.py"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t201240z-90107a617cf8/run.json",
+      "sensitivity": "internal",
+      "sha256": "64f82aaba34def6261c05a0c3e84e5b47ff3d99b2a6c6000897f622249429a47",
+      "source_id": "SRC-SUMMATION-RELOCATED-48add9231919e768",
+      "title": "run.json"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t201240z-90107a617cf8/stderr.txt",
+      "sensitivity": "internal",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_id": "SRC-SUMMATION-RELOCATED-44d287307b9dc1ab",
+      "title": "stderr.txt"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/runs/run-20260908t201240z-90107a617cf8/stdout.txt",
+      "sensitivity": "internal",
+      "sha256": "09526f84ed0a7d7e5d33f3ac3225235476ff7c835ab8584a60f93afc2ca73e0d",
+      "source_id": "SRC-SUMMATION-RELOCATED-706baa3fc0953423",
+      "title": "stdout.txt"
+    },
+    {
+      "enabled": true,
+      "path": "inputs/samples.csv",
+      "root": "ROOT-WORK",
+      "sensitivity": "internal",
+      "sha256": "2a2b86e74ffd5e6a9b75e52a105cf9d02920837179f8e8961aa15411d380f7a3",
+      "source_id": "SRC-COMPAT-SAMPLES",
+      "title": "samples.csv"
+    },
+    {
+      "enabled": true,
+      "path": "README.md",
+      "root": "ROOT-WORK",
+      "sensitivity": "internal",
+      "sha256": "d14a81d47439b044623cbca7d4e4622e8aa2ca9ad3808e7fe3f21c80220c44df",
+      "source_id": "SRC-COMPAT-README",
+      "title": "README.md"
+    },
+    {
+      "enabled": true,
+      "path": "research/floating-point-summation/compat-note.txt",
+      "sensitivity": "internal",
+      "sha256": "1c98659c56b3bfafdb9d30b7a6d331e24040a4bde144ff1b61e328e91009293a",
+      "source_id": "SRC-COMPAT-INSIDE",
+      "title": "数据目录内来源"
+    },
+    {
+      "enabled": true,
+      "path": "inputs/algorithm.docx",
+      "root": "ROOT-WORK",
+      "sensitivity": "internal",
+      "sha256": "140204b62b7ac4c76cd1abb3b3145786342a812bf7861a033125d921bddc7644",
+      "source_id": "SRC-COMPAT-DOCX",
+      "title": "标本算法说明"
+    },
+    {
+      "enabled": true,
+      "path": "attachments/e60fe9fdf8789a8a08c1acb2d4162ddb32fdd3ea4564f4faf482a55090b15642.png",
+      "sensitivity": "internal",
+      "sha256": "e60fe9fdf8789a8a08c1acb2d4162ddb32fdd3ea4564f4faf482a55090b15642",
+      "source_id": "SRC-ATT-e60fe9fdf8789a8a",
+      "title": "标本算法说明 · word/media/image1.png"
+    }
+  ]
+}

@@ -284,6 +284,7 @@ textarea { width: 100%; min-height: 64px; line-height: 1.55; }
 i.shape { display: inline-block; width: 9px; height: 9px; border-radius: 50%; vertical-align: -1px; flex: none; }
 i.shape-owner { box-shadow: 0 0 0 1.5px var(--panel), 0 0 0 3px var(--line-strong); }
 i.shape-block { width: 7px; height: 7px; }
+i.shape-figure { width: 8px; height: 7px; border-radius: 1px; }
 i.shape-source { border-radius: 2px; }
 i.shape-claim { border-radius: 1.5px; transform: rotate(45deg) scale(0.85); }
 i.shape-concept { border-radius: 0; clip-path: polygon(25% 4%, 75% 4%, 100% 50%, 75% 96%, 25% 96%, 0 50%); }

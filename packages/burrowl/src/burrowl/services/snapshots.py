@@ -6,7 +6,6 @@
 登记为来源（`SRC-ATT-<sha 前 16 位>`），供 L1 的 figures 固定引用；迁移时随数据目录一起走。
 覆盖报告与展开视图只读，从快照与对象的当前记录现算，不保存。
 """
-import re
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +15,7 @@ from ..core.clock import utc_now
 from ..core.errors import BurrowlError
 from ..core.hashing import sha256_bytes, sha256_file
 from ..core.refs import make_ref
+from ..core.technical import embedded_figures
 from ..index import extract
 from .memory.context import Storage
 from .memory.reader import Reader
@@ -164,7 +164,8 @@ class SnapshotService:
                                               title=title or f"{source.entry.get('title') or source.path.name} · {label}")
         return {"source_id": attachment_id, "sha256": entry["sha256"], "path": relative,
                 "ref": make_ref("file", attachment_id, sha256=entry["sha256"], locator=label),
-                "use": "写进 L1 的 payload.figures：{caption, ref}；块正文用 ![图注](figure:序号) 在原位置引用"}
+                "use": "写进 L1 的 payload.figures：{label: 原文图号如 fig-1, caption: 照录原文图注, ref}；"
+                       "块正文在原位置写 ![[#fig-1]]，不再另外照录图注（R24 D-07）"}
 
     # ---------- 覆盖与展开（只读） ----------
     def _owner_material(self, owner_id: str, source_id: str) -> tuple[dict, list[dict], list[dict]]:
@@ -229,7 +230,7 @@ class SnapshotService:
             matches = []
             for hit in claims.get(asset["segment"], []):
                 figures = hit["record"]["payload"].get("figures", [])
-                mentioned = {int(m[1]) for m in re.finditer(r"!\[[^\]]*\]\(figure:(\d+)\)", hit["block"]["markdown"])}
+                mentioned = embedded_figures(hit["record"]["payload"], hit["block"]["markdown"])
                 for index, figure in enumerate(figures):
                     ref = figure["ref"]
                     if ref.get("target_kind") != "file" or ref.get("locator") not in {

@@ -8,6 +8,9 @@
     [[@第三轮实验#kahan]]           记录中的块（只对 L1 有效）
     [[!补偿抵消失效]]               结论（claim_id 以 "-补偿抵消失效" 结尾；也可写完整 CLM-…）
     [[!浮点求和/补偿抵消失效]]      其他对象的结论
+    [[@第三轮实验#fig-1]]           记录中的图（R24：图与块共用 # 后的锚点名）
+    ![[@第三轮实验#fig-1]]          在此处显示被引用的图（前缀 !，只能指向图）
+    ![[#fig-1]]                     图的归属记录在原位置显示自己的图（不是引用，不进 links）
     [[…|显示文字]]                  竖线后是显示文字，不参与解析
 
 代码围栏与行内代码里的 [[…]] 不算链接。
@@ -15,7 +18,7 @@
 import re
 import unicodedata
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Literal
 
 from .records import HANDLE_FORBIDDEN, HANDLE_MAX
@@ -24,16 +27,22 @@ _LINK = re.compile(r"\[\[([^\[\]\n]+?)\]\]")
 _FENCE = re.compile(r"^ {0,3}(```|~~~).*?^ {0,3}\1[^\n]*$", re.M | re.S)
 _INLINE_CODE = re.compile(r"`[^`\n]*`")
 
-LinkKind = Literal["concept", "record", "block", "claim"]
+LinkKind = Literal["concept", "record", "block", "claim", "anchor"]
+
+# 给 AI 的引用写法（R24 D-03、D-10）：报错与提示统一引用这一处
+WRITING_RULES = ("引用写法：① 记录、块或图写 [[@短名]]、[[@短名#块或图]]，其他对象前加“对象/”；"
+                 "② 结论写 [[!短名]]；③ 在此处显示一张图在引用前加 !：![[@短名#图]]，"
+                 "图的归属记录显示自己的图写 ![[#图]]；④ 提到概念写 [[名称]]，概念不算出处")
 
 
 @dataclass(frozen=True)
 class Link:
     text: str            # 竖线前的原文（不含方括号），也是"重新固定"规则里比较的键
     kind: LinkKind
-    name: str            # 概念名 / 记录 handle / 结论短名
+    name: str            # 概念名 / 记录 handle / 结论短名 / 本记录锚点名
     owner: str | None    # 斜杠前的对象名；None 表示本对象（概念不分对象）
-    block: str | None = None
+    block: str | None = None  # # 后的锚点名：块号或图的锚点名（R24 D-01）
+    embed: bool = False  # 前面紧跟 !：在此处显示（R24 D-05）
 
 
 def normalize(name: str) -> str:
@@ -53,6 +62,9 @@ def parse_one(inner: str) -> Link | None:
     text = inner.split("|", 1)[0].strip()
     if not text:
         return None
+    if text[0] == "#":  # 本记录锚点（R24）
+        name = text[1:].strip()
+        return Link(text, "anchor", name, None, name) if name else None
     if text[0] in "@!":
         sigil, body = text[0], text[1:].strip()
         owner, _, name = body.rpartition("/") if "/" in body else (None, "", body)
@@ -71,13 +83,24 @@ def parse_one(inner: str) -> Link | None:
 
 
 def parse(text: str) -> list[Link]:
-    """按出现顺序返回不重复的链接（同一原文只保留一次）。"""
+    """按出现顺序返回不重复的链接（同一原文只保留一次；任一处带 ! 前缀即记为嵌入）。"""
     found: dict[str, Link] = {}
-    for match in _LINK.finditer(_blank_code(text or "")):
+    visible = _blank_code(text or "")
+    for match in _LINK.finditer(visible):
         link = parse_one(match.group(1))
-        if link is not None and link.text not in found:
-            found[link.text] = link
+        if link is None:
+            continue
+        embed = match.start() > 0 and visible[match.start() - 1] == "!"
+        _merge(found, replace(link, embed=embed))
     return list(found.values())
+
+
+def _merge(found: dict[str, Link], link: Link) -> None:
+    old = found.get(link.text)
+    if old is None:
+        found[link.text] = link
+    elif link.embed and not old.embed:
+        found[link.text] = replace(old, embed=True)
 
 
 def link_texts(record: dict, *, claim_parts: bool = True) -> list[str]:
@@ -136,7 +159,7 @@ def collect(record: dict) -> list[Link]:
     found: dict[str, Link] = {}
     for text in link_texts(record):
         for link in parse(text):
-            found.setdefault(link.text, link)
+            _merge(found, link)
     return list(found.values())
 
 

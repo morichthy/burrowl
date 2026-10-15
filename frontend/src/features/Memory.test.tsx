@@ -74,7 +74,7 @@ function mock(name: string, args: Record<string, unknown>): unknown {
         warnings: ["原文包含未抽取的矢量图"],
       } : { file_name: "说明.pdf", sections: [] };
     case "memory.figure":
-      return { data_url: "data:image/png;base64,AA==" };
+      return { data_url: "data:image/png;base64,AA==", caption: "论文 Figure 1", name: "图 1" };
     case "ui.ref_targets":
       return { "R-SOURCE": { kind: "record", owner_id: "RES-SOURCE", record_id: "R-SOURCE", title: "原件" } };
     default:

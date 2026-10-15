@@ -249,7 +249,7 @@ wheels = [
 
 [[package]]
 name = "burrowl"
-version = "0.9.2"
+version = "0.10.0"
 source = { editable = "packages/burrowl" }
 dependencies = [
     { name = "fastapi" },
@@ -295,7 +295,7 @@ provides-extras = ["documents", "models"]
 
 [[package]]
 name = "burrowl-connector-lightrag"
-version = "0.9.2"
+version = "0.10.0"
 source = { editable = "packages/burrowl-connector-lightrag" }
 dependencies = [
     { name = "burrowl" },
@@ -315,7 +315,7 @@ provides-extras = ["runtime"]
 
 [[package]]
 name = "burrowl-connector-weknora"
-version = "0.9.2"
+version = "0.10.0"
 source = { editable = "packages/burrowl-connector-weknora" }
 dependencies = [
     { name = "burrowl" },

@@ -1,0 +1,37 @@
+{
+  "rounds": [
+    {
+      "run_id": "RUN-20260908T201214Z-D0AB308F66AD",
+      "inputs": {
+        "path": "runs/run-20260908t201214z-d0ab308f66ad/inputs.json",
+        "sha256": "83d97bbfcf42bdbbe3780df71d202033bc8cede38f197913da5d0b77f5f7cf45"
+      },
+      "results": {
+        "path": "runs/run-20260908t201214z-d0ab308f66ad/results.json",
+        "sha256": "cdb1f9e4f0580d5baaea4a09416f75801e6c5d01eab96c601ded00a28e31134d"
+      }
+    },
+    {
+      "run_id": "RUN-20260908T201228Z-A0980824DC18",
+      "inputs": {
+        "path": "runs/run-20260908t201228z-a0980824dc18/inputs.json",
+        "sha256": "a48c045211280be1e1bb58524a8067598eea6d9d8e964a8b513b4b544e195cd6"
+      },
+      "results": {
+        "path": "runs/run-20260908t201228z-a0980824dc18/results.json",
+        "sha256": "f5ef99109b146631abf1fc7256fc62287cbf125c6535ba097da4440570fc8247"
+      }
+    },
+    {
+      "run_id": "RUN-20260908T201240Z-90107A617CF8",
+      "inputs": {
+        "path": "runs/run-20260908t201240z-90107a617cf8/inputs.json",
+        "sha256": "9da1f46663a569680b3e61e842f164880d24c047e0ab13ac0471df6683d32561"
+      },
+      "results": {
+        "path": "runs/run-20260908t201240z-90107a617cf8/results.json",
+        "sha256": "693058d77bb3ed61e94535369bbfa4d74b6a2ed7f406a8af0b5782a0dc4fa7ef"
+      }
+    }
+  ]
+}

@@ -1568,6 +1568,10 @@
   "DetailFigure": {
    "type": "object",
    "properties": {
+    "label": {
+     "type": "string",
+     "minLength": 1
+    },
     "caption": {
      "type": "string",
      "minLength": 1

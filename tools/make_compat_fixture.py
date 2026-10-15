@@ -196,14 +196,14 @@ def build(data: Path, work: Path) -> dict:
            "record_reason": "兼容性标本", "sources": [docx_ref],
            "payload": {"unit_type": "experiment", "run_ref": None, "evidence_refs": [], "missing_refs": [],
                        "origin": {"source_ref": docx_ref, "locators": keys[:-1]},
-                       "figures": [{"caption": "标本图", "ref": attached["ref"]}],
+                       "figures": [{"label": "fig-1", "caption": "标本图", "ref": attached["ref"]}],  # R24 图锚点
                        "retrieval_description": {"question": "标本", "method": "转写", "key_findings": ["标本"],
                                                  "applicable": ["标本"], "not_applicable": ["未知"],
                                                  "limitations": ["未知"]},
                        "blocks": [{"block_id": "body", "role": "results", "requires_block_ids": [],
                                    "locators": keys[:1], "markdown": "标本正文。\n\n![标本图](figure:0)"},
                                   {"block_id": "general", "role": "discussion", "requires_block_ids": [],
-                                   "markdown": "标本观点原话。"}]}})
+                                   "markdown": "标本观点原话。\n\n![[#fig-1]]"}]}})  # 新旧两种嵌图写法都留在标本里
     made["transcription"] = {"owner_id": knowledge, "source_id": "SRC-COMPAT-DOCX"}
 
     # 修订、复核、关联决定、检索反馈

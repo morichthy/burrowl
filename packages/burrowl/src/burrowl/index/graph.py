@@ -17,8 +17,9 @@ from ..core import links as link_syntax
 from ..core import predicates
 from ..core.hashing import canonical_hash
 from ..core.records import claim_hash
+from ..core.technical import figure_anchors, figure_display_name
 
-GRAPH_VERSION = "graph-v3"  # v2：Run 节点由引用它的对象投影（R14 D-11）；v3：结论要素边、删除快捷边（R23 D-11）
+GRAPH_VERSION = "graph-v4"  # v2：Run 节点由引用它的对象投影（R14 D-11）；v3：结论要素边、删除快捷边（R23 D-11）；v4：图锚点子节点（R24 D-12）
 SKIP_KINDS = {"review", "policy", "feedback", "association", "representation"}  # 不成为节点（association 画成边）
 CONCEPT_PAGE_TYPES = {"concept", "entity"}
 CATEGORY = {
@@ -87,10 +88,10 @@ def expand_weight(edge: dict, maturity_factor: float = 0.5) -> float:
 
 
 def target_node(ref: dict) -> str:
-    """固定引用 → 节点身份：块引用指向 "MEM-…#块"，其余用 target_id。"""
+    """固定引用 → 节点身份：块与图的引用指向 "MEM-…#锚点"（R24 D-12），其余用 target_id。"""
     locator = str(ref.get("locator") or "")
-    if ref.get("target_kind") == "record" and locator.startswith("block:"):
-        return f"{ref['target_id']}#{locator[6:]}"
+    if ref.get("target_kind") == "record" and locator.startswith(("block:", "figure:")):
+        return f"{ref['target_id']}#{locator.split(':', 1)[1]}"
     return ref["target_id"]
 
 
@@ -186,6 +187,11 @@ def graph(owner, records: list[dict], badges: dict[str, str], hidden: set[str],
                 edge(rid, block_node, "contains", record, "blocks")
                 for required in block.get("requires_block_ids", []):
                     edge(block_node, f"{rid}#{required}", "depends_on", record, "blocks.requires_block_ids")
+            for anchor, index in figure_anchors(payload).items():          # R24 D-12：图锚点子节点（block_id 列存锚点名）
+                figure_node = f"{rid}#{anchor}"
+                node(figure_node, "figure", f"{record['title']} › {figure_display_name(payload, index)}", record,
+                     block_id=anchor, ref=record_ref | {"locator": f"figure:{anchor}"})
+                edge(rid, figure_node, "contains", record, "figures")
         for ref in record["sources"]:                                       # ② 依据与引用
             edge(rid, target_node(ref), ref["relation"], record, "sources")
         skip = frozenset({"missing_refs", "claims"})

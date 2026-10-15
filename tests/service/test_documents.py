@@ -37,3 +37,18 @@ def test_impact_and_figures(sample_workspace):
                 assert image["data_url"].startswith("data:image/")
                 return
     raise AssertionError("样例文稿应包含至少一张图片")
+
+
+def test_figure_survives_changed_basis(sample_workspace):
+    """原件等其余依据字节变化只作为 basis_issues 提示；图片附件本身未变就照常显示。"""
+    storage = Storage.open(sample_workspace)
+    full = documents.build_document(storage, OWNER)
+    record = next(b["record"] for s in full["report"]["sections"] for b in s["blocks"]
+                  if b.get("record") and b["record"]["payload"].get("figures"))
+    figure_id = record["payload"]["figures"][0]["ref"]["target_id"]
+    other = next(r for r in record["sources"] if r["target_kind"] == "file" and r["target_id"] != figure_id)
+    path = storage.sources.resolve(other["target_id"]).path
+    path.write_bytes(path.read_bytes() + b"\n")
+    image = documents.figure(Storage.open(sample_workspace), OWNER, record["record_id"], record["revision"], 0)
+    assert image["data_url"].startswith("data:image/")
+    assert {"target_id": other["target_id"], "code": "STALE_BASIS"} in image["basis_issues"]

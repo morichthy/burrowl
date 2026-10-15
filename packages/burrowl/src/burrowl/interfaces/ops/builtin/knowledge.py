@@ -107,7 +107,7 @@ def formal(ctx: Ctx, target_ids: Annotated[list[str], Field(description="结论�
 
 # ---------- 关联与关系图 ----------
 GraphCategory = Literal["structure", "evidence", "reference", "navigation", "mention", "claim_part"]
-NodeType = Literal["owner", "record", "block", "claim", "concept", "source"]
+NodeType = Literal["owner", "record", "block", "figure", "claim", "concept", "source"]
 
 
 @op("relations.graph")
@@ -577,7 +577,8 @@ def sources_attach(ctx: Ctx, source_id: Annotated[str, Field(description="原件
                        "原件中图片的标签（sources_snapshot 返回的 assets[].label）；原件本身就是图片时不写"))] = None,
                    title: Annotated[str, Field(description="附件名称；不写时用原件名称 + 图片标签")] = "") -> dict:
     """把原件中的 PNG/JPEG/WebP 原始图片字节复制为受控附件并登记，返回固定引用 ref（不以 OCR 缩略图替代）。
-    L1 的 payload.figures 写 {caption: 照录原文图注, ref}，块正文用 ![图注](figure:序号) 在原位置引用。
+    L1 的 payload.figures 写 {label: 按原文图号如 fig-1, caption: 照录原文图注, ref}，块正文在原位置写 ![[#fig-1]]，
+    正文不再另外照录图注；其他记录用 [[@短名#fig-1]] 引用、![[@短名#fig-1]] 显示，不重复登记（R24）。
     附件随数据目录备份和迁移；同一张图重复附加是幂等的。"""
     return ctx.app.snapshots.attach(source_id, asset_label, title=title)
 

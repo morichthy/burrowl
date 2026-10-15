@@ -151,8 +151,12 @@ def contract(ctx: Ctx, kind: Annotated[str, Field(description="记录类型，�
 def inspect(ctx: Ctx, owner_id: OwnerId,
             record_id: Annotated[str | None, Field(description="记录 ID（MEM-…）；不给时返回整个对象的当前快照")] = None,
             revision: Annotated[int | None, Field(description="指定修订号；不给时取当前修订")] = None) -> dict:
-    """读取对象的当前快照，或某条记录的当前/指定修订（含完整正文与固定引用）。"""
-    return ctx.app.memory.inspect(owner_id, record_id=record_id, revision=revision)
+    """读取对象的当前快照，或某条记录的当前/指定修订（含完整正文与固定引用）。
+    读单条记录时附 link_targets：正文里每个 [[…]] 指向的标题、ID、固定修订与块或图（引用对照）。"""
+    result = ctx.app.memory.inspect(owner_id, record_id=record_id, revision=revision)
+    if record_id and (record := result.get("record")) and record.get("links"):  # R24 D-08
+        result["link_targets"] = targets.link_table(record, targets.ref_targets(ctx.app.storage, owner_id, record))
+    return result
 
 
 @op("memory.commit", effect="write")
@@ -218,9 +222,11 @@ def document(ctx: Ctx, owner_id: OwnerId,
 
 
 @op("memory.figure")
-def figure(ctx: Ctx, owner_id: OwnerId, record_id: str, revision: int, index: int) -> dict:
-    """技术单元登记的图片（data URL）。"""
-    return documents.figure(ctx.app.storage, owner_id, record_id, revision, index)
+def figure(ctx: Ctx, owner_id: OwnerId, record_id: str, revision: int, index: int | None = None,
+           label: str | None = None) -> dict:
+    """技术单元登记的图片（data URL）。index（序号）与 label（图的锚点名，如 fig-1）二选一；
+    basis_issues 列出记录其余依据的变化（图片本身已核对，照常返回）。"""
+    return documents.figure(ctx.app.storage, owner_id, record_id, revision, index, label)
 
 
 @op("ui.ref_targets")

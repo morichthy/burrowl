@@ -194,6 +194,8 @@ class MemoryService:
                                        errors=raw)
                 resolved = link_resolver.resolve(record, record_id=rid, previous=old.get("links") if old else None,
                                                  repin=bool(operation.get("repin")))
+                resolver.link_warnings.extend(rebase(link_resolver.sigil_hints(record, resolved), "",
+                                                     f"/operations/{positions[id(operation)]}/draft"))
                 self._check_sensitivity(record, resolver)
             except BurrowlError as exc:  # R20 D-05：规则层的路径相对草案，补成从提交参数根算起
                 exc.errors = rebase(exc.errors, "", f"/operations/{positions[id(operation)]}/draft")
@@ -361,7 +363,7 @@ class MemoryService:
         resolver.recheck()
         result = {"valid": True, "dry_run": True, "owner_id": owner.owner_id, "head": snapshot.head,
                   "record_results": results, "writes": 0}
-        if warnings := self._warnings(request["operations"]):
+        if warnings := self._warnings(request["operations"]) + resolver.link_warnings:
             result["warnings"] = warnings
         return result
 
@@ -403,7 +405,8 @@ class MemoryService:
         if prior := self.storage.store.find_receipt(owner, snapshot, request["request_id"], digest):
             return self._with_index(prior, notify=False, warnings=warnings)
         # 先在锁外完整预检：无效输入不会创建任何目录或锁。
-        self.validate_draft(request, allow_review=allow_review)
+        checked = self.validate_draft(request, allow_review=allow_review)
+        warnings += [w for w in checked.get("warnings", []) if w["code"] == "LINK_SIGIL_MISSING"]
         owner = self.storage.owners.persist(owner, request["actor"])
         holder: dict[str, RefResolver] = {}
 

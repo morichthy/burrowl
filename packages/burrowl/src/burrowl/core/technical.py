@@ -32,6 +32,59 @@ def description_text(record: dict) -> str:
     return "\n\n".join(parts)
 
 
+# 块正文中显示本单元的图：旧写法 ![图注](figure:序号)（R21），新写法 ![[#锚点名]]（R24 D-03）
+_LEGACY_EMBED = re.compile(r"!\[[^\]]*\]\(figure:(\d+)\)")
+_ANCHOR_EMBED = re.compile(r"!\[\[#([^\[\]|\n]+?)(?:\|[^\[\]\n]*)?\]\]")
+_ANCHOR_FORBIDDEN = re.compile(r"[\[\]|#/\s]")
+
+
+def figure_anchors(payload: dict) -> dict[str, int]:
+    """图锚点名 → 序号（R24 D-01）：显式 label 优先；没有 label 的图用推导名 fig-<序号+1>，只用于解析。
+    推导名与显式名冲突时以显式名为准（冲突本身由 figure_errors 报告）。"""
+    figures = payload.get("figures") or []
+    explicit = {f["label"]: i for i, f in enumerate(figures) if isinstance(f, dict) and f.get("label")}
+    derived = {f"fig-{i + 1}": i for i, f in enumerate(figures) if isinstance(f, dict) and not f.get("label")}
+    return {**derived, **explicit}
+
+
+def figure_display_name(payload: dict, index: int) -> str:
+    """工作台与引用对照里的图名：显式 label 原样（fig-1 显示为 Figure 1），没有 label 时为"图 N"。"""
+    label = ((payload.get("figures") or [])[index] or {}).get("label")
+    if not label:
+        return f"图 {index + 1}"
+    match = re.fullmatch(r"fig-(.+)", label)
+    return f"Figure {match[1]}" if match else label
+
+
+def embedded_figures(payload: dict, markdown: str, *, legacy: bool = True) -> set[int]:
+    """一段块正文在原位置显示了本单元的哪些图（两种写法都识别；不存在的锚点忽略，由校验报告）。
+    legacy=False 只算新写法：旧写法的方括号里已经带着图注。"""
+    anchors = figure_anchors(payload)
+    found = {int(m[1]) for m in _LEGACY_EMBED.finditer(markdown)} if legacy else set()
+    found |= {anchors[m[1].strip()] for m in _ANCHOR_EMBED.finditer(markdown) if m[1].strip() in anchors}
+    return found
+
+
+def figure_errors(payload: dict) -> Errors:
+    """图锚点名的写法、重复，以及与块号的冲突（R24 D-01：图与块共用记录内的 # 命名空间）。"""
+    errors: Errors = []
+    blocks = {b["block_id"] for b in payload.get("blocks", [])}
+    seen: dict[str, int] = {}
+    for i, figure in enumerate(payload.get("figures") or []):
+        label = figure.get("label")
+        if label is not None and (not label or len(label) > 64 or _ANCHOR_FORBIDDEN.search(label)):
+            errors.append((f"/figures/{i}/label", "图的锚点名不超过 64 字、不能含空白与 [ ] | # /，建议按原文图号写 fig-1"))
+            continue
+        name = label or f"fig-{i + 1}"
+        if name in seen:
+            errors.append((f"/figures/{i}/label", f"锚点名 {name} 与第 {seen[name] + 1} 张图重复"
+                           + ("" if label else "（未写 label 的图按序号推导为 fig-N）")))
+        elif name in blocks:
+            errors.append((f"/figures/{i}/label", f"锚点名 {name} 与块号重复：图和块共用记录内的 # 名称"))
+        seen.setdefault(name, i)
+    return errors
+
+
 def block_errors(blocks: list[dict]) -> Errors:
     errors: Errors = []
     ids: set[str] = set()
@@ -112,16 +165,22 @@ def fixed_ref_errors(ref: dict, path: str, *, record_only: bool = False) -> Erro
 
 def validate_unit(record: dict) -> Errors:
     payload = record["payload"]
-    errors = block_errors(payload["blocks"])
+    errors = block_errors(payload["blocks"]) + figure_errors(payload)
+    anchors = figure_anchors(payload)
     for key, value in payload["retrieval_description"].items():
         if any(not text.strip() for text in (value if isinstance(value, list) else [value])):
             errors.append(("/retrieval_description/" + key, "写出具体条件，或明确写“未知”"))
     for position, block in enumerate(payload["blocks"]):
         if not block["markdown"].strip():
             errors.append((f"/blocks/{position}/markdown", "技术块正文不能为空"))
-        for match in re.finditer(r"!\[[^\]]*\]\(figure:(\d+)\)", block["markdown"]):
+        for match in _LEGACY_EMBED.finditer(block["markdown"]):
             if int(match[1]) >= len(payload["figures"]):
                 errors.append((f"/blocks/{position}/markdown", "正文引用的图号没有登记在本单元的 figures 中"))
+        for match in _ANCHOR_EMBED.finditer(block["markdown"]):
+            if match[1].strip() not in anchors:
+                known = "、".join(sorted(anchors)) or "（本单元没有登记图）"
+                errors.append((f"/blocks/{position}/markdown",
+                               f"![[#{match[1].strip()}]] 指向的图没有登记在本单元的 figures 中；可用的锚点名：{known}"))
     run, origin = payload["run_ref"], payload.get("origin")
     if payload["unit_type"] == "experiment" and run is None and origin is None:
         errors.append(("/run_ref", "experiment 类型必须用 run_ref 引用实际执行过的 Run；"

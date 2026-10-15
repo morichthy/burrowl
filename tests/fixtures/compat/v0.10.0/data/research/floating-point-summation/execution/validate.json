@@ -1,0 +1,25 @@
+{
+  "valid": true,
+  "errors": [],
+  "dry_run": true,
+  "owner_id": "RES-FLOATING-POINT-SUMMATION",
+  "head": null,
+  "record_results": [
+    {
+      "client_key": "experience",
+      "record_id": "MEM-58fd845a-05a5-516c-8bbe-c88d887cbb91",
+      "revision": 1,
+      "content_hash": "4da1f1b6f91f604c23765cb6be668d443d13969b3b4799ecf43118850938a0f3",
+      "status": "would_create"
+    },
+    {
+      "client_key": "map",
+      "record_id": "MEM-a8226b54-a4cd-545a-8f22-422c2f513bfc",
+      "revision": 1,
+      "content_hash": "c0afe4ab89715e25b22603a9d2b05d992f301caa8a6c9d90763421ffe1ed1ab4",
+      "status": "would_create"
+    }
+  ],
+  "writes": 0
+}
+

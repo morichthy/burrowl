@@ -4,6 +4,7 @@ import { useAction, useOp } from "../api";
 import { KINDS, label, LEVELS, OWNER_TYPES } from "../labels";
 import { Empty, ErrorBox, href, Loading, Panel, ReviewBadge, Tag, Time, useDebounced } from "../ui";
 import { CitationList, CitationScope, CitedMarkdown, type CitationFragment, type RefTarget, type StoredLink, targetHref } from "../citations";
+import { figureAnchors, type FigureEntry, figureName, RecordFigure } from "../figures";
 import { DiscardedRecords, DiscardOwner, DiscardRecords } from "./Deletion";
 import type { QueueItem } from "./Review";
 
@@ -349,8 +350,8 @@ function DocumentView({ ownerId }: { ownerId: string }) {
 
 /** 文稿按被收录技术单元的固定修订读取图片，跨对象收录也不借用当前对象的图号。 */
 function DocumentUnit({ record, blocks }: { record: FullRecord; blocks: { block_id: string; markdown: string }[] }) {
-  const figure = useCallback((index: number, alt: string) =>
-    <Figure ownerId={record.owner_id} record={record} index={index} caption={figureCaption(record, index) || alt} />,
+  const figure = useCallback((key: number | string, alt: string) =>
+    <RecordFigure ownerId={record.owner_id} recordId={record.record_id} revision={record.revision} figureKey={key} fallback={alt} />,
     [record]);
   return <>{blocks.map((b) => <CitedMarkdown key={b.block_id} text={b.markdown} links={record.links ?? []}
     source={{ owner_id: record.owner_id, record_id: record.record_id, revision: record.revision }} figure={figure} />)}</>;
@@ -424,10 +425,11 @@ export function RecordView({ ownerId, recordId }: { ownerId: string; recordId: s
   }, !!r);
   const targets = !targetQuery.stale ? targetQuery.data ?? {} : {};
   const blocks = r?.payload.blocks ?? [];
-  const inline = new Set(blocks.flatMap((b) => [...b.markdown.matchAll(/\]\(figure:(\d+)\)/g)].map((m) => Number(m[1]))));
+  const figureList = r?.payload.figures as FigureEntry[] | undefined;
+  const inline = useMemo(() => inlineFigures(blocks, figureList), [blocks, figureList]);
   const figureAt = useCallback(
-    (index: number, alt: string) =>
-      r ? <Figure ownerId={ownerId} record={r} index={index} caption={figureCaption(r, index) || alt} /> : null,
+    (key: number | string, alt: string) =>
+      r ? <RecordFigure ownerId={ownerId} recordId={r.record_id} revision={r.revision} figureKey={key} fallback={alt} /> : null,
     [ownerId, r],
   );
   return (
@@ -658,50 +660,27 @@ function RawMaterials({ ownerId }: { ownerId: string }) {
   );
 }
 
-function figureCaption(record: FullRecord, index: number): string {
-  return ((record.payload.figures as { caption: string }[] | undefined) ?? [])[index]?.caption ?? "";
+/** 正文中已在原位置显示的图（两种写法，R24 D-03），记录页底部只列其余的图。 */
+function inlineFigures(blocks: { markdown: string }[], figures: FigureEntry[] | undefined): Set<number> {
+  const anchors = figureAnchors(figures);
+  return new Set(blocks.flatMap((b) => [
+    ...[...b.markdown.matchAll(/\]\(figure:(\d+)\)/g)].map((m) => Number(m[1])),
+    ...[...b.markdown.matchAll(/!\[\[#([^[\]|\n]+?)(?:\|[^[\]\n]*)?\]\]/g)].map((m) => anchors[m[1].trim()]),
+  ]).filter((i) => i !== undefined));
 }
 
 function Figures({ ownerId, record, skip }: { ownerId: string; record: FullRecord; skip: Set<number> }) {
-  const figures = ((record.payload.figures as { caption: string }[] | undefined) ?? []).map((f, i) => ({ ...f, i }));
+  const figures = ((record.payload.figures as FigureEntry[] | undefined) ?? []).map((f, i) => ({ ...f, i }));
   const rest = figures.filter((f) => !skip.has(f.i));
   if (!rest.length) return null;
   return (
     <>
       <h3>{skip.size ? `其他图（${rest.length}）` : `图（${rest.length}）`}</h3>
       {rest.map((f) => (
-        <Figure key={f.i} ownerId={ownerId} record={record} index={f.i} caption={f.caption} />
+        <RecordFigure key={f.i} ownerId={ownerId} recordId={record.record_id} revision={record.revision} figureKey={f.i}
+          fallback={`${figureName(record.payload.figures as FigureEntry[], f.i)}：${f.caption}`} />
       ))}
     </>
-  );
-}
-
-function Figure({ ownerId, record, index, caption }: { ownerId: string; record: FullRecord; index: number; caption: string }) {
-  return <RecordFigure ownerId={ownerId} recordId={record.record_id} revision={record.revision} index={index} caption={caption} />;
-}
-
-function RecordFigure({
-  ownerId,
-  recordId,
-  revision,
-  index,
-  caption,
-}: {
-  ownerId: string;
-  recordId: string;
-  revision: number;
-  index: number;
-  caption: string;
-}) {
-  const figure = useOp<{ data_url: string }>("memory.figure", { owner_id: ownerId, record_id: recordId, revision, index });
-  return (
-    <figure className="figure">
-      <ErrorBox error={figure.error} />
-      {figure.data ? <img src={figure.data.data_url} alt={caption} /> : <Loading show />}
-      <figcaption>
-        图 {index + 1}：{caption}
-      </figcaption>
-    </figure>
   );
 }
 
@@ -926,8 +905,8 @@ function ExpansionView({ ownerId, sourceId }: { ownerId: string; sourceId: strin
 
 function BlockMarkdown({ ownerId, block }: { ownerId: string; block: ExpansionSection["blocks"][number] }) {
   const figure = useCallback(
-    (index: number, alt: string) => (
-      <RecordFigure ownerId={ownerId} recordId={block.record_id} revision={block.revision} index={index} caption={alt} />
+    (key: number | string, alt: string) => (
+      <RecordFigure ownerId={ownerId} recordId={block.record_id} revision={block.revision} figureKey={key} fallback={alt} />
     ),
     [ownerId, block.record_id, block.revision],
   );

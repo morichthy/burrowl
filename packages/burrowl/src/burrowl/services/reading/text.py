@@ -8,7 +8,7 @@ R19 D-11：图扩展带来的对象默认定点阅读（target_page_of）：只�
 from ...core.errors import BurrowlError
 from ...core.records import claim_hash
 from ...core.technical import description_text, render_full
-from ..memory import documents
+from ..memory import documents, targets
 from ..memory.context import Storage
 from ..memory.reader import Reader, fixed_ref
 from ..query.assemble import record_text
@@ -37,6 +37,8 @@ def segments(storage: Storage, owner_id: str) -> tuple[list[dict], str, list[dic
     """返回 (段落列表, 文本形态, 缺口)。每段：{heading, markdown, ref, ids}；ids 是本段交付的可引用身份。"""
     built = documents.build_document(storage, owner_id, document_type="research_process")
     gaps = list(built.get("missing", []))
+    reader = Reader(storage)
+    names = _Names(storage, owner_id, reader)
     if built["document"] is not None:
         out = []
         for section in built["report"]["sections"]:
@@ -46,7 +48,8 @@ def segments(storage: Storage, owner_id: str) -> tuple[list[dict], str, list[dic
                     gaps.extend(block["source_issues"])
                 elif block["type"] == "prose":
                     out.append({"heading": section["title"], "markdown": block["markdown"], "ref": section["ref"],
-                                "ids": [section["section_id"], *[r["target_id"] for r in block["evidence_refs"]]]})
+                                "ids": [section["section_id"], *[r["target_id"] for r in block["evidence_refs"]]],
+                                "link_targets": names.table_of(section["ref"])})
                 else:
                     record = block["record"]
                     for item in block["resolved_blocks"]:
@@ -54,9 +57,8 @@ def segments(storage: Storage, owner_id: str) -> tuple[list[dict], str, list[dic
                         out.append({"heading": f"{section['title']} · {record['title']}", "markdown": item["markdown"],
                                     "ref": fixed_ref(record) | {"locator": "block:" + item["block_id"]},
                                     "ids": [*ids, *[f["ref"]["target_id"] for f in record["payload"].get("figures", [])]],
-                                    "extra_refs": extra})
+                                    "extra_refs": extra, "link_targets": names.table(record)})
         return out, "document", gaps
-    reader = Reader(storage)
     records = [r for r in reader.state(owner_id).records.values()
                if r["kind"] in ORDER and r["sensitivity"] != "restricted"]
     records.sort(key=lambda r: (ORDER[r["kind"]], r["created_at"]))
@@ -69,7 +71,7 @@ def segments(storage: Storage, owner_id: str) -> tuple[list[dict], str, list[dic
         text = render_full(record) if record["kind"] == "detail" else record_text(record)
         ids, extra = _record_ids(record)
         out.append({"heading": f"{record['level']} · {record['title']}", "markdown": text, "ref": fixed_ref(record),
-                    "ids": ids, "extra_refs": extra})
+                    "ids": ids, "extra_refs": extra, "link_targets": names.table(record)})
     reader.recheck()
     if not out:
         gaps.append({"code": "NO_READABLE_TEXT", "target_id": owner_id})
@@ -109,6 +111,7 @@ def target_segments(storage: Storage, owner_id: str, targets: list[str]) -> tupl
     """定点阅读的分段（R19 D-11）：目标是记录 → 该记录正文；L1 块 → 所在记录的检索说明、该块与它依赖的定义块；
     结论 → 所在记录正文。同一记录只交付一次；目标不存在或不可读时记为缺口。"""
     reader = Reader(storage)
+    names = _Names(storage, owner_id, reader)
     records = {rid: r for rid, r in reader.state(owner_id).records.items() if r["sensitivity"] != "restricted"}
     by_claim = {c["claim_id"]: rid for rid, r in records.items() for c in r["payload"].get("claims", []) or []}
     wanted: dict[str, set[str] | None] = {}  # 记录 → 要交付的块（None 表示整条记录）
@@ -140,7 +143,7 @@ def target_segments(storage: Storage, owner_id: str, targets: list[str]) -> tupl
             text = "\n\n".join([description_text(record), *(by_id[b]["markdown"] for b in order)])
             ids, extra = _record_ids(record, order)
         out.append({"heading": f"{record['level']} · {record['title']}", "markdown": text, "ref": fixed_ref(record),
-                    "ids": ids, "extra_refs": extra})
+                    "ids": ids, "extra_refs": extra, "link_targets": names.table(record)})
     reader.recheck()
     if not out:
         gaps.append({"code": "NO_READABLE_TEXT", "target_id": owner_id})
@@ -178,4 +181,38 @@ def _page(owner_id: str, form: str, pages: list[list[dict]], number: int, gaps: 
             "has_more": number < len(pages), "text": render(current),
             "refs": [p["ref"] for p in current] + [r for p in current for r in p.get("extra_refs", [])],
             "ids": sorted({i for p in current for i in p["ids"]}),
+            "link_targets": _page_links(current),
             "outline": outline if number == 1 else None, "gaps": gaps}
+
+
+class _Names:
+    """R24 D-08：分段的引用对照。同一次读取共用一个 Reader；读不到名称时退回 ID，不让整页失败。"""
+
+    def __init__(self, storage: Storage, owner_id: str, reader: Reader):
+        self.storage, self.owner_id, self.reader = storage, owner_id, reader
+
+    def table_of(self, ref: dict) -> list[dict]:
+        try:
+            return self.table(self.reader.record(ref))
+        except BurrowlError:
+            return []
+
+    def table(self, record: dict | None) -> list[dict]:
+        if not record or not record.get("links"):
+            return []
+        try:
+            names = targets.ref_targets(self.storage, self.owner_id, record, self.reader)
+        except BurrowlError:
+            names = {}
+        return targets.link_table(record, names)
+
+
+def _page_links(page: list[dict]) -> list[dict]:
+    """本页文字里实际出现的链接（长段落被拆页时只列本页这一截里的），按出现先后去重。"""
+    out, seen = [], set()
+    for part in page:
+        for item in part.get("link_targets", []):
+            if item["link"] not in seen and item["link"][:-2] in part["markdown"]:
+                seen.add(item["link"])
+                out.append(item)
+    return out

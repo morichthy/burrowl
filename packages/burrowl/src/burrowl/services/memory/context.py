@@ -41,6 +41,7 @@ class RefResolver:
     checks: list[dict] = field(default_factory=list)
     _cache: dict[str, Any] = field(default_factory=dict)
     claim_lookup: Any = None  # 可选：claim 解析回调（由复核图提供）
+    link_warnings: list[dict] = field(default_factory=list)  # 解析正文链接时的提示（R24 D-09），不进回执
 
     def __call__(self, ref: dict) -> Any:
         require_ref(ref, "引用")

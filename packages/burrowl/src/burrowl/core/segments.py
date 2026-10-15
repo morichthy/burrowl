@@ -13,6 +13,8 @@ from copy import deepcopy
 from difflib import SequenceMatcher
 from typing import Any
 
+from .technical import embedded_figures
+
 NGRAM = 4            # 字符 n-gram 长度：中文按字、英文按字母，都比较稳定
 THIN_RATIO = 0.9     # 默认完整转录：长度不足九成时提示核对，而不是容许大幅摘要化。
 THIN_OVERLAP = 0.9   # 长度足够也可能遗漏原文；重合度单独触发提示，不与长度条件互相抵消。
@@ -87,6 +89,15 @@ def claims(records: list[dict], source_id: str) -> dict[str, list[dict]]:
             for key in block.get("locators") or origin["locators"]:
                 found.setdefault(key, []).append({"record": record, "block": block})
     return found
+
+
+def block_text(hit: dict) -> str:
+    """块正文加上它在原位置显示的图的图注：图注只存在 figures[].caption（R24 D-07），覆盖统计仍算作该段的正文。"""
+    payload = hit["record"]["payload"]
+    figures = payload.get("figures") or []
+    captions = [figures[i]["caption"] for i in sorted(embedded_figures(payload, hit["block"]["markdown"], legacy=False))
+                if i < len(figures)]
+    return "\n".join([hit["block"]["markdown"], *captions])
 
 
 def coverage(segments: list[dict], records: list[dict], source_id: str, omitted: list[dict]) -> dict[str, Any]:

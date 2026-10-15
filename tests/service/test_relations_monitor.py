@@ -12,7 +12,7 @@ def test_graph_and_subgraph(sample_workspace):
     storage = Storage.open(sample_workspace)
     graph = relations.build_graph(storage, IndexService.open(storage, IndexConfig(), fake_vectors=True))
     types = {n["type"] for n in graph["nodes"]}
-    assert types == {"owner", "record", "source", "block"}   # 样例没有结论和概念页
+    assert types == {"owner", "record", "source", "block", "figure"}   # 样例没有结论和概念页；样例 L1 登记了图（R24 D-12）
     assert any(e["type"] == "belongs_to" and e["category"] == "structure" for e in graph["edges"])
     # 图 API 需要把边的声明身份带到 UI，供它通过 memory.inspect 读取有权限的原始记录。
     declared = next(e for e in graph["edges"] if e["type"] == "belongs_to")
